@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../lib/api.js';
 import { usePolling } from '../../hooks/usePolling.js';
+import { useNotificationSound } from '../../hooks/useNotificationSound.js';
 import ConversationList from '../../components/ConversationList.jsx';
 import ChatWindow from '../../components/ChatWindow.jsx';
 import ClientInfoPanel from '../../components/ClientInfoPanel.jsx';
@@ -11,18 +12,27 @@ export default function Inbox() {
   const [conversas, setConversas] = useState([]);
   const [selecionada, setSelecionada] = useState(null);
   const [searchParams] = useSearchParams();
+  const convIdsRef = useRef(null);
+  const tocarNotificacao = useNotificationSound();
 
   const view = searchParams.get('view') || 'todos';
   const filialId = searchParams.get('filial') || null;
 
   const carregarConversas = useCallback(async () => {
     const { data } = await api.get('/conversations');
+
+    if (convIdsRef.current !== null) {
+      const temNova = data.some(c => !convIdsRef.current.has(c.id));
+      if (temNova) tocarNotificacao();
+    }
+    convIdsRef.current = new Set(data.map(c => c.id));
+
     setConversas(data);
     if (selecionada) {
       const atualizada = data.find(c => c.id === selecionada.id);
       if (atualizada) setSelecionada(atualizada);
     }
-  }, [selecionada?.id]);
+  }, [selecionada?.id, tocarNotificacao]);
 
   usePolling(carregarConversas, 5000);
 

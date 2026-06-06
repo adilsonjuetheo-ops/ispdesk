@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
+import { usePolling } from '../hooks/usePolling.js';
+import { useNotificationSound } from '../hooks/useNotificationSound.js';
 import { Send, UserCheck, Bot, X, Loader2, Paperclip, FileText, ImageIcon, Mic, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -84,19 +86,51 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   const [atalhosList, setAtalhosList] = useState([]);
   const [buscaAtalho, setBuscaAtalho] = useState('');
   const bottomRef = useRef(null);
+  const msgAreaRef = useRef(null);
   const fileRef = useRef(null);
+  const msgIdsRef = useRef(new Set());
+  const inicialRef = useRef(false);
+  const atBottomRef = useRef(true);
+  const tocarNotificacao = useNotificationSound();
 
-  const carregarMsgs = () =>
-    api.get(`/conversations/${conversa.id}/messages`).then(r => setMsgs(r.data));
+  const checkAtBottom = () => {
+    const el = msgAreaRef.current;
+    atBottomRef.current = !el || (el.scrollHeight - el.scrollTop - el.clientHeight < 120);
+  };
+
+  const carregarMsgs = () => {
+    checkAtBottom();
+    return api.get(`/conversations/${conversa.id}/messages`).then(r => {
+      if (inicialRef.current) {
+        const temNovaCliente = r.data.some(
+          m => m.origem === 'cliente' && !msgIdsRef.current.has(m.id)
+        );
+        if (temNovaCliente) {
+          tocarNotificacao();
+          atBottomRef.current = true;
+        }
+      }
+      msgIdsRef.current = new Set(r.data.map(m => m.id));
+      inicialRef.current = true;
+      setMsgs(r.data);
+    });
+  };
 
   useEffect(() => {
     setMsgs([]);
+    inicialRef.current = false;
+    msgIdsRef.current = new Set();
+    atBottomRef.current = true;
     carregarMsgs();
     setAba('resposta');
   }, [conversa.id]);
 
+  usePolling(carregarMsgs, 5000);
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (atBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [msgs]);
 
   useEffect(() => {
@@ -204,7 +238,7 @@ export default function ChatWindow({ conversa, onAtualizar }) {
       </div>
 
       {/* mensagens */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div ref={msgAreaRef} className="flex-1 overflow-y-auto p-4">
         {msgs.map(m => <BolaoMsg key={m.id} msg={m} agenteNome={user?.nome} />)}
         <div ref={bottomRef} />
       </div>
