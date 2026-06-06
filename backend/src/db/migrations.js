@@ -18,6 +18,10 @@ export async function runMigrations() {
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS filial_id uuid REFERENCES filiais(id)`;
     await sql`ALTER TABLE clientes ADD COLUMN IF NOT EXISTS filial_nome text`;
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS tags jsonb DEFAULT '[]'`;
+    await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS ultima_mensagem text`;
+    await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS ultima_msg_em timestamp`;
+    await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS ultima_msg_origem text`;
+    await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS ultima_msg_nome text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS horarios jsonb`;
     await sql`
       CREATE TABLE IF NOT EXISTS push_subscriptions (

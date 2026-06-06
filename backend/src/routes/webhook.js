@@ -93,6 +93,16 @@ function normalizar(s) {
   return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+async function atualizarUltMsg(conversaId, conteudo, origem, nome = null) {
+  const preview = conteudo.replace(/^\[(Áudio|Imagem|Arquivo)\] /, '').slice(0, 200);
+  await db.update(conversas).set({
+    ultimaMensagem: preview,
+    ultimaMsgEm: new Date(),
+    ultimaMsgOrigem: origem,
+    ultimaMsgNome: nome,
+  }).where(eq(conversas.id, conversaId));
+}
+
 async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false) {
   let [cliente] = await db.select().from(clientes)
     .where(and(eq(clientes.tenantId, tenant.id), eq(clientes.whatsapp, remetente)))
@@ -124,12 +134,14 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     }).returning();
   }
 
+  const conteudoCliente = isAudio ? `[Áudio] ${texto}` : texto;
   await db.insert(mensagens).values({
     conversaId: conversa.id,
     origem: 'cliente',
-    conteudo: isAudio ? `[Áudio] ${texto}` : texto,
+    conteudo: conteudoCliente,
     wamid,
   });
+  await atualizarUltMsg(conversa.id, conteudoCliente, 'cliente');
 
   // Notificação push para agentes do tenant
   enviarPushParaTenant(tenant.id, {
@@ -211,6 +223,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
       origem: 'bot',
       conteudo: resultado.resposta,
     });
+    await atualizarUltMsg(conversa.id, resultado.resposta, 'bot');
     try {
       await enviarMensagem(tenant, remetente, resultado.resposta);
     } catch (err) {

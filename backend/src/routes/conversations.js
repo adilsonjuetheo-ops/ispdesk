@@ -62,6 +62,11 @@ router.get('/', async (req, res) => {
     agenteNome: tenantUsers.nome,
     motivoHandoff: conversas.motivoHandoff,
     resumoIa: conversas.resumoIa,
+    tags: conversas.tags,
+    ultimaMensagem: conversas.ultimaMensagem,
+    ultimaMsgEm: conversas.ultimaMsgEm,
+    ultimaMsgOrigem: conversas.ultimaMsgOrigem,
+    ultimaMsgNome: conversas.ultimaMsgNome,
     iniciadaEm: conversas.iniciadaEm,
     encerradaEm: conversas.encerradaEm,
     clienteId: clientes.id,
@@ -192,6 +197,13 @@ router.post('/:id/send', async (req, res) => {
     origem: 'agente',
     conteudo: texto,
   }).returning();
+
+  await db.update(conversas).set({
+    ultimaMensagem: texto.slice(0, 200),
+    ultimaMsgEm: new Date(),
+    ultimaMsgOrigem: 'agente',
+    ultimaMsgNome: req.user.nome,
+  }).where(eq(conversas.id, id));
 
   res.json(msg);
 });

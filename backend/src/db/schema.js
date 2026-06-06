@@ -74,17 +74,21 @@ export const clientes = pgTable('clientes', {
 });
 
 export const conversas = pgTable('conversas', {
-  id:            uuid('id').primaryKey().defaultRandom(),
-  tenantId:      uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  clienteId:     uuid('cliente_id').notNull().references(() => clientes.id),
-  filialId:      uuid('filial_id').references(() => filiais.id),
-  status:        text('status').default('bot'),
-  agenteId:      uuid('agente_id').references(() => tenantUsers.id),
-  motivoHandoff: text('motivo_handoff'),
-  resumoIa:      text('resumo_ia'),
-  tags:          jsonb('tags').default('[]'),
-  iniciadaEm:    timestamp('iniciada_em').defaultNow(),
-  encerradaEm:   timestamp('encerrada_em'),
+  id:              uuid('id').primaryKey().defaultRandom(),
+  tenantId:        uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  clienteId:       uuid('cliente_id').notNull().references(() => clientes.id),
+  filialId:        uuid('filial_id').references(() => filiais.id),
+  status:          text('status').default('bot'),
+  agenteId:        uuid('agente_id').references(() => tenantUsers.id),
+  motivoHandoff:   text('motivo_handoff'),
+  resumoIa:        text('resumo_ia'),
+  tags:            jsonb('tags').default('[]'),
+  ultimaMensagem:  text('ultima_mensagem'),
+  ultimaMsgEm:     timestamp('ultima_msg_em'),
+  ultimaMsgOrigem: text('ultima_msg_origem'),
+  ultimaMsgNome:   text('ultima_msg_nome'),
+  iniciadaEm:      timestamp('iniciada_em').defaultNow(),
+  encerradaEm:     timestamp('encerrada_em'),
 });
 
 export const mensagens = pgTable('mensagens', {
