@@ -8,24 +8,38 @@ const router = Router({ mergeParams: true });
 router.use(autenticar);
 
 router.get('/', async (req, res) => {
-  const rows = await db.select().from(filiais)
-    .where(eq(filiais.tenantId, req.params.tenantId))
-    .orderBy(filiais.nome);
-  res.json(rows);
+  const tenantId = req.params.tenantId;
+  console.log('[filiais GET] tenantId:', tenantId, 'user.tenantId:', req.user?.tenantId);
+  try {
+    const rows = await db.select().from(filiais)
+      .where(eq(filiais.tenantId, tenantId))
+      .orderBy(filiais.nome);
+    console.log('[filiais GET] rows encontradas:', rows.length);
+    res.json(rows);
+  } catch (err) {
+    console.error('[filiais GET] erro DB:', err.message);
+    res.status(500).json({ erro: err.message });
+  }
 });
 
 router.post('/', apenasAdmin, async (req, res) => {
   const tenantId = req.params.tenantId;
-  // garante que admin só cria filiais do próprio tenant
+  console.log('[filiais POST] tenantId:', tenantId, 'user.tenantId:', req.user?.tenantId, 'body:', req.body);
   if (req.user.role !== 'superadmin' && req.user.tenantId !== tenantId) {
     return res.status(403).json({ erro: 'Acesso negado a este provedor' });
   }
   const { nome, cidade, uf } = req.body;
   if (!nome || !cidade) return res.status(400).json({ erro: 'nome e cidade obrigatórios' });
-  const [filial] = await db.insert(filiais).values({
-    tenantId, nome, cidade, uf,
-  }).returning();
-  res.status(201).json(filial);
+  try {
+    const [filial] = await db.insert(filiais).values({
+      tenantId, nome, cidade, uf,
+    }).returning();
+    console.log('[filiais POST] criada:', filial);
+    res.status(201).json(filial);
+  } catch (err) {
+    console.error('[filiais POST] erro DB:', err.message);
+    res.status(500).json({ erro: err.message });
+  }
 });
 
 router.put('/:id', apenasAdmin, async (req, res) => {
