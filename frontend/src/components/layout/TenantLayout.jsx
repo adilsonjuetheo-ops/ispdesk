@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
-import { MessageSquare, Users, Settings, LogOut, Wifi } from 'lucide-react';
+import { MessageSquare, Users, Settings, LogOut, Wifi, BarChart2 } from 'lucide-react';
 import api from '../../lib/api.js';
 
 export default function TenantLayout() {
@@ -71,6 +71,10 @@ export default function TenantLayout() {
               <NavLink to="/agents" className={navClass}>
                 <Users className="w-4 h-4" />
                 Equipe
+              </NavLink>
+              <NavLink to="/relatorio" className={navClass}>
+                <BarChart2 className="w-4 h-4" />
+                Relatório
               </NavLink>
               <NavLink to="/settings" className={navClass}>
                 <Settings className="w-4 h-4" />
