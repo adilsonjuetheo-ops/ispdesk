@@ -9,22 +9,18 @@ router.use(autenticar);
 
 router.get('/', async (req, res) => {
   const tenantId = req.params.tenantId;
-  console.log('[filiais GET] tenantId:', tenantId, 'user.tenantId:', req.user?.tenantId);
   try {
     const rows = await db.select().from(filiais)
       .where(eq(filiais.tenantId, tenantId))
       .orderBy(filiais.nome);
-    console.log('[filiais GET] rows encontradas:', rows.length);
     res.json(rows);
   } catch (err) {
-    console.error('[filiais GET] erro DB:', err.message);
     res.status(500).json({ erro: err.message });
   }
 });
 
 router.post('/', apenasAdmin, async (req, res) => {
   const tenantId = req.params.tenantId;
-  console.log('[filiais POST] tenantId:', tenantId, 'user.tenantId:', req.user?.tenantId, 'body:', req.body);
   if (req.user.role !== 'superadmin' && req.user.tenantId !== tenantId) {
     return res.status(403).json({ erro: 'Acesso negado a este provedor' });
   }
@@ -34,10 +30,8 @@ router.post('/', apenasAdmin, async (req, res) => {
     const [filial] = await db.insert(filiais).values({
       tenantId, nome, cidade, uf,
     }).returning();
-    console.log('[filiais POST] criada:', filial);
     res.status(201).json(filial);
   } catch (err) {
-    console.error('[filiais POST] erro DB:', err.message);
     res.status(500).json({ erro: err.message });
   }
 });

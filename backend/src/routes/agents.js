@@ -27,25 +27,33 @@ router.post('/', async (req, res) => {
   if (!nome || !email || !senha) return res.status(400).json({ erro: 'nome, email e senha obrigatórios' });
   if (senha.length < 6) return res.status(400).json({ erro: 'Senha mínimo 6 caracteres' });
 
+  const roleValido = ['agente', 'admin'].includes(role) ? role : 'agente';
   const senhaHash = await bcrypt.hash(senha, 10);
-  const [agente] = await db.insert(tenantUsers).values({
-    tenantId: req.params.tenantId,
-    nome,
-    email,
-    senhaHash,
-    role: role || 'agente',
-    filialId: filialId || null,
-  }).returning({
-    id: tenantUsers.id,
-    nome: tenantUsers.nome,
-    email: tenantUsers.email,
-    role: tenantUsers.role,
-    filialId: tenantUsers.filialId,
-    ativo: tenantUsers.ativo,
-    criadoEm: tenantUsers.criadoEm,
-  });
 
-  res.status(201).json(agente);
+  try {
+    const [agente] = await db.insert(tenantUsers).values({
+      tenantId: req.params.tenantId,
+      nome,
+      email,
+      senhaHash,
+      role: roleValido,
+      filialId: filialId || null,
+    }).returning({
+      id: tenantUsers.id,
+      nome: tenantUsers.nome,
+      email: tenantUsers.email,
+      role: tenantUsers.role,
+      filialId: tenantUsers.filialId,
+      ativo: tenantUsers.ativo,
+      criadoEm: tenantUsers.criadoEm,
+    });
+    res.status(201).json(agente);
+  } catch (err) {
+    if (err.message?.includes('unique') || err.message?.includes('duplicate')) {
+      return res.status(409).json({ erro: 'E-mail já está em uso' });
+    }
+    res.status(500).json({ erro: 'Erro ao criar agente' });
+  }
 });
 
 router.put('/:id', async (req, res) => {
