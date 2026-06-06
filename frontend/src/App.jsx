@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth.js';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/superadmin/Dashboard.jsx';
@@ -26,7 +26,7 @@ function RootRedirect() {
 
 export default function App() {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<RootRedirect />} />
@@ -59,6 +59,6 @@ export default function App() {
           } />
         </Route>
       </Routes>
-    </HashRouter>
+    </BrowserRouter>
   );
 }
