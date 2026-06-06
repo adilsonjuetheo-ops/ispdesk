@@ -10,6 +10,7 @@ import conversationsRouter from './routes/conversations.js';
 import webhookRouter from './routes/webhook.js';
 import relatorioRouter from './routes/relatorio.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
+import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
 
 const app = express();
 
@@ -41,4 +42,5 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`ISPDesk backend rodando na porta ${PORT}`);
   agendarLimpeza();
+  agendarEncerramentoInativo();
 });

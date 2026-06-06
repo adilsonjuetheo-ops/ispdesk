@@ -13,7 +13,7 @@ export default function TenantLayout() {
   const location = useLocation();
   const [tenant, setTenant] = useState(null);
   const [filiais, setFiliais] = useState([]);
-  const [mineCount, setMineCount] = useState(0);
+  const [counts, setCounts] = useState({ todos: 0, mine: 0, fila: 0 });
 
   useEffect(() => {
     api.get('/tenants/me').then(r => setTenant(r.data)).catch(() => {});
@@ -25,13 +25,11 @@ export default function TenantLayout() {
   }, [user?.tenantId]);
 
   useEffect(() => {
-    const fetchCount = () => {
-      api.get('/conversations?mine=true&status=humano')
-        .then(r => setMineCount(Array.isArray(r.data) ? r.data.length : 0))
-        .catch(() => {});
+    const fetchCounts = () => {
+      api.get('/conversations/counts').then(r => setCounts(r.data)).catch(() => {});
     };
-    fetchCount();
-    const id = setInterval(fetchCount, 15000);
+    fetchCounts();
+    const id = setInterval(fetchCounts, 10000);
     return () => clearInterval(id);
   }, []);
 
@@ -110,9 +108,9 @@ export default function TenantLayout() {
               <MessageSquare className="w-3 h-3" /> Conversas
             </p>
             <div className="space-y-0.5">
-              {subItem(isTodos, () => navigate('/inbox'), Activity, 'Acontecendo agora')}
-              {subItem(isView('fila'), () => navigate('/inbox?view=fila'), Clock, 'Fila')}
-              {subItem(isView('mine'), () => navigate('/inbox?view=mine'), UserCheck, 'Meus atendimentos', mineCount)}
+              {subItem(isTodos, () => navigate('/inbox'), Activity, 'Acontecendo agora', counts.todos)}
+              {subItem(isView('fila'), () => navigate('/inbox?view=fila'), Clock, 'Fila', counts.fila)}
+              {subItem(isView('mine'), () => navigate('/inbox?view=mine'), UserCheck, 'Meus atendimentos', counts.mine)}
               {subItem(isView('historico'), () => navigate('/inbox?view=historico'), Archive, 'Histórico')}
             </div>
           </div>

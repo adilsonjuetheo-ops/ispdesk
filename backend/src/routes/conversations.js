@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { conversas, mensagens, clientes, tenantUsers, filiais } from '../db/schema.js';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, ne, count, inArray } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.js';
@@ -10,6 +10,22 @@ import { tenants } from '../db/schema.js';
 
 const router = Router();
 router.use(autenticar);
+
+router.get('/counts', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  if (!tenantId) return res.json({ todos: 0, mine: 0, fila: 0 });
+
+  const [r1] = await db.select({ total: count() }).from(conversas)
+    .where(and(eq(conversas.tenantId, tenantId), ne(conversas.status, 'encerrada')));
+
+  const [r2] = await db.select({ total: count() }).from(conversas)
+    .where(and(eq(conversas.tenantId, tenantId), eq(conversas.agenteId, req.user.id), eq(conversas.status, 'humano')));
+
+  const [r3] = await db.select({ total: count() }).from(conversas)
+    .where(and(eq(conversas.tenantId, tenantId), inArray(conversas.status, ['aguardando', 'aguardando_filial'])));
+
+  res.json({ todos: Number(r1.total), mine: Number(r2.total), fila: Number(r3.total) });
+});
 
 router.get('/', async (req, res) => {
   const { status } = req.query;
