@@ -1,10 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
-import { Send, UserCheck, Bot, X, Loader2, Paperclip, FileText, ImageIcon, Mic } from 'lucide-react';
+import { Send, UserCheck, Bot, X, Loader2, Paperclip, FileText, ImageIcon, Mic, ClipboardList } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
+
+const FORMULARIO_CADASTRO = `📝 Formulário de Cadastro
+Por favor, preencha os campos abaixo para darmos continuidade ao seu atendimento:
+
+👤 Nome completo:
+🆔 CPF:
+🪪 RG:
+📅 Data de nascimento:
+📧 E-mail:
+📱 Celular:
+📍 Endereço completo:
+📦 Plano escolhido:
+🗓️ Data de vencimento preferida:`;
 
 function MidiaBolao({ conteudo, isCliente }) {
   const isImagem = conteudo.startsWith('[Imagem]');
@@ -181,6 +194,20 @@ export default function ChatWindow({ conversa, onAtualizar }) {
         {msgs.map(m => <BolaoMsg key={m.id} msg={m} agenteNome={user?.nome} />)}
         <div ref={bottomRef} />
       </div>
+
+      {/* atalhos rápidos */}
+      {eHumano && (
+        <div className="bg-white border-t border-gray-100 px-3 pt-2 pb-0 flex gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setTexto(FORMULARIO_CADASTRO)}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-full px-3 py-1 transition-colors"
+          >
+            <ClipboardList className="w-3.5 h-3.5" />
+            Formulário de cadastro
+          </button>
+        </div>
+      )}
 
       {/* input */}
       <form onSubmit={handleEnviar} className="bg-white border-t border-gray-200 p-3 flex gap-2 items-center">

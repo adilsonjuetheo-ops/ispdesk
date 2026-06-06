@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { buscarContextoSgp, getTools, executarTool } from './sgp.js';
+import { FORMULARIO_CADASTRO } from '../constants/formularios.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -20,6 +21,9 @@ INSTRUÇÕES IMPORTANTES:
 - Se não conseguir resolver após usar as ferramentas: escreva ACTION:HANDOFF:motivo detalhado
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
 - Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem.
+- Se o cliente solicitar instalação ou contratar um plano e NÃO houver dados cadastrais dele (cliente sem contrato no sistema), envie exatamente o formulário abaixo e aguarde o preenchimento:
+
+${FORMULARIO_CADASTRO}
 
 PROVEDOR: ${tenant.nome}
 ASSISTENTE: ${tenant.nomeAssistente}`;
