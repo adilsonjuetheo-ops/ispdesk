@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
-import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2 } from 'lucide-react';
 
 export default function TenantDetail() {
   const { id } = useParams();
@@ -15,6 +15,15 @@ export default function TenantDetail() {
   const [modalAgente, setModalAgente] = useState(false);
   const [formAgente, setFormAgente] = useState({ nome: '', email: '', senha: '', role: 'agente' });
   const [editandoAgente, setEditandoAgente] = useState(null);
+  const fileRef = useRef(null);
+
+  const handleLogoUpload = e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setTenant(t => ({ ...t, logoUrl: ev.target.result }));
+    reader.readAsDataURL(file);
+  };
 
   const carregar = () =>
     api.get(`/tenants/${id}`).then(r => {
@@ -84,6 +93,32 @@ export default function TenantDetail() {
 
       <form onSubmit={handleSalvarTenant} className="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6">
         <h2 className="text-white font-semibold mb-4">Dados do provedor</h2>
+
+        {/* logo */}
+        <div className="mb-4">
+          <label className="block text-xs text-gray-400 mb-2">Logo</label>
+          <div className="flex items-center gap-3">
+            <div className="w-16 h-16 rounded-xl border border-gray-700 bg-gray-900 flex items-center justify-center overflow-hidden shrink-0">
+              {tenant.logoUrl
+                ? <img src={tenant.logoUrl} alt="logo" className="w-full h-full object-contain p-1" />
+                : <Building2 className="w-7 h-7 text-gray-600" />
+              }
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button type="button" onClick={() => fileRef.current?.click()}
+                className="flex items-center gap-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg">
+                <Upload className="w-3.5 h-3.5" />
+                {tenant.logoUrl ? 'Trocar logo' : 'Enviar logo'}
+              </button>
+              {tenant.logoUrl && (
+                <button type="button" onClick={() => setTenant(t => ({ ...t, logoUrl: null }))}
+                  className="text-xs text-red-400 hover:text-red-300 px-2">Remover</button>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-4 mb-4">
           <Field dark label="Nome" value={tenant.nome} onChange={v => setTenant(t => ({ ...t, nome: v }))} />
           <Field dark label="Slug" value={tenant.slug} onChange={v => setTenant(t => ({ ...t, slug: v }))} />

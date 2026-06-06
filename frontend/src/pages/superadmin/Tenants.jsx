@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../../lib/api.js';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X, Loader2, Building2 } from 'lucide-react';
+import { Plus, X, Loader2, Building2, Upload } from 'lucide-react';
 
 const FORM_VAZIO = {
   slug: '', nome: '', corPrimaria: '#0066CC', whatsappNumberId: '',
-  whatsappToken: '', systemPrompt: '', nomeAssistente: 'Assistente', plano: 'basic',
+  whatsappToken: '', systemPrompt: '', nomeAssistente: 'Assistente', plano: 'basic', logoUrl: '',
 };
 
 export default function Tenants() {
@@ -15,9 +15,18 @@ export default function Tenants() {
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState('');
   const navigate = useNavigate();
+  const fileRef = useRef(null);
 
   const carregar = () => api.get('/tenants').then(r => setTenants(r.data));
   useEffect(() => { carregar(); }, []);
+
+  const handleLogoUpload = e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setForm(f => ({ ...f, logoUrl: ev.target.result }));
+    reader.readAsDataURL(file);
+  };
 
   const handleSalvar = async e => {
     e.preventDefault();
@@ -55,9 +64,12 @@ export default function Tenants() {
         {tenants.map(t => (
           <div key={t.id} className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex items-center justify-between hover:border-gray-600 transition-colors">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                style={{ backgroundColor: t.corPrimaria }}>
-                {t.nome[0]}
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm overflow-hidden shrink-0"
+                style={{ backgroundColor: t.logoUrl ? 'transparent' : t.corPrimaria }}>
+                {t.logoUrl
+                  ? <img src={t.logoUrl} alt={t.nome} className="w-full h-full object-contain" />
+                  : t.nome[0]
+                }
               </div>
               <div>
                 <p className="text-white font-medium">{t.nome}</p>
@@ -89,6 +101,28 @@ export default function Tenants() {
               </button>
             </div>
             <form onSubmit={handleSalvar} className="p-5 space-y-4">
+              {/* logo */}
+              <div>
+                <label className="block text-xs text-gray-400 mb-2">Logo do provedor</label>
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-lg border border-gray-700 bg-gray-800 flex items-center justify-center overflow-hidden shrink-0">
+                    {form.logoUrl
+                      ? <img src={form.logoUrl} alt="logo" className="w-full h-full object-contain p-1" />
+                      : <Building2 className="w-6 h-6 text-gray-600" />
+                    }
+                  </div>
+                  <button type="button" onClick={() => fileRef.current?.click()}
+                    className="flex items-center gap-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg">
+                    <Upload className="w-3.5 h-3.5" />
+                    {form.logoUrl ? 'Trocar' : 'Enviar logo'}
+                  </button>
+                  {form.logoUrl && (
+                    <button type="button" onClick={() => setForm(f => ({ ...f, logoUrl: '' }))}
+                      className="text-xs text-red-400 hover:text-red-300">Remover</button>
+                  )}
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Nome*" value={form.nome} onChange={v => setForm(f => ({ ...f, nome: v }))} />
                 <Field label="Slug*" value={form.slug} onChange={v => setForm(f => ({ ...f, slug: v }))} placeholder="meu-provedor" />

@@ -25,8 +25,11 @@ function BolaoMsg({ msg, agenteNome }) {
     <div className={clsx('flex mb-3', isCliente ? 'justify-start' : 'justify-end')}>
       <div className="max-w-[70%]">
         {!isCliente && (
-          <p className="text-xs text-gray-400 mb-1 text-right">
-            {isBot ? 'Bot' : (agenteNome || 'Agente')}
+          <p className="text-xs mb-1 text-right">
+            {isBot
+              ? <span className="text-gray-400">Bot</span>
+              : <span className="font-bold text-gray-700">{agenteNome || 'Agente'}</span>
+            }
           </p>
         )}
         <div className={clsx('rounded-2xl px-4 py-2.5 text-sm', {
