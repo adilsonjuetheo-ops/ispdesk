@@ -22,6 +22,9 @@ router.get('/', async (req, res) => {
   if (status) {
     conditions.push(eq(conversas.status, status));
   }
+  if (req.query.mine === 'true' && req.user.id) {
+    conditions.push(eq(conversas.agenteId, req.user.id));
+  }
 
   const rows = await db.select({
     id: conversas.id,

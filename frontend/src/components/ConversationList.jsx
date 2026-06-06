@@ -2,6 +2,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
 import { MapPin } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth.js';
 
 const STATUS_BADGE = {
   bot: 'bg-emerald-100 text-emerald-800',
@@ -18,42 +19,48 @@ const STATUS_LABEL = {
   encerrada: 'Encerrada',
 };
 
+const VIEW_LABEL = {
+  todos: 'Acontecendo agora',
+  fila: 'Fila',
+  mine: 'Meus atendimentos',
+  historico: 'Histórico',
+  filial: 'Filial',
+};
+
+function filtrar(conversas, view, filialId, userId) {
+  if (filialId) return conversas.filter(c => c.filialId === filialId);
+  switch (view) {
+    case 'fila':      return conversas.filter(c => c.status === 'aguardando' || c.status === 'aguardando_filial');
+    case 'mine':      return conversas.filter(c => c.agenteId === userId && c.status !== 'encerrada');
+    case 'historico': return conversas.filter(c => c.status === 'encerrada');
+    default:          return conversas.filter(c => c.status !== 'encerrada');
+  }
+}
+
 function Iniciais({ nome }) {
   const partes = (nome || '?').split(' ');
   const ini = partes.length >= 2 ? partes[0][0] + partes[1][0] : partes[0][0];
   return (
-    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-700 font-semibold text-sm shrink-0">
+    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-semibold text-sm shrink-0">
       {ini.toUpperCase()}
     </div>
   );
 }
 
-export default function ConversationList({ conversas, selecionada, onSelecionar, filtro, onFiltro }) {
-  const filtrados = filtro === 'todos' ? conversas : conversas.filter(c => c.status === filtro);
+export default function ConversationList({ conversas, selecionada, onSelecionar, view = 'todos', filialId }) {
+  const { user } = useAuth();
+  const filtrados = filtrar(conversas, view, filialId, user?.id);
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200" style={{ width: 280 }}>
-      {/* filtros */}
-      <div className="p-3 border-b border-gray-200">
-        <div className="flex gap-1">
-          {['todos', 'aguardando', 'bot', 'humano'].map(f => (
-            <button key={f} onClick={() => onFiltro(f)}
-              className={clsx('flex-1 py-1 text-xs font-medium rounded-md capitalize transition-colors', {
-                'bg-gray-900 text-white': filtro === f,
-                'text-gray-500 hover:text-gray-700': filtro !== f,
-              })}>
-              {f === 'todos' ? 'Todos' : STATUS_LABEL[f]}
-            </button>
-          ))}
-        </div>
+      <div className="px-4 py-3 border-b border-gray-100">
+        <h2 className="text-sm font-semibold text-gray-700">{VIEW_LABEL[view] || 'Conversas'}</h2>
+        <p className="text-xs text-gray-400 mt-0.5">{filtrados.length} conversa{filtrados.length !== 1 ? 's' : ''}</p>
       </div>
 
-      {/* lista */}
       <div className="flex-1 overflow-y-auto">
         {filtrados.length === 0 && (
-          <div className="p-6 text-center text-gray-400 text-sm">
-            Nenhuma conversa
-          </div>
+          <div className="p-6 text-center text-gray-400 text-sm">Nenhuma conversa</div>
         )}
         {filtrados.map(c => (
           <button key={c.id} onClick={() => onSelecionar(c)}

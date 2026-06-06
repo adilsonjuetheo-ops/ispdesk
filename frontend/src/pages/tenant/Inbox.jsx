@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../../lib/api.js';
 import { usePolling } from '../../hooks/usePolling.js';
 import ConversationList from '../../components/ConversationList.jsx';
@@ -9,12 +10,14 @@ import { MessageSquare } from 'lucide-react';
 export default function Inbox() {
   const [conversas, setConversas] = useState([]);
   const [selecionada, setSelecionada] = useState(null);
-  const [filtro, setFiltro] = useState('todos');
+  const [searchParams] = useSearchParams();
+
+  const view = searchParams.get('view') || 'todos';
+  const filialId = searchParams.get('filial') || null;
 
   const carregarConversas = useCallback(async () => {
     const { data } = await api.get('/conversations');
     setConversas(data);
-    // atualiza conversa selecionada se ela ainda existir
     if (selecionada) {
       const atualizada = data.find(c => c.id === selecionada.id);
       if (atualizada) setSelecionada(atualizada);
@@ -23,27 +26,21 @@ export default function Inbox() {
 
   usePolling(carregarConversas, 5000);
 
-  const handleSelecionar = c => setSelecionada(c);
-  const handleAtualizar = () => carregarConversas();
-
   return (
     <div className="flex h-full">
       <ConversationList
         conversas={conversas}
         selecionada={selecionada}
-        onSelecionar={handleSelecionar}
-        filtro={filtro}
-        onFiltro={setFiltro}
+        onSelecionar={setSelecionada}
+        view={filialId ? 'filial' : view}
+        filialId={filialId}
       />
 
       <div className="flex-1 flex overflow-hidden">
         {selecionada ? (
           <>
             <div className="flex-1 overflow-hidden">
-              <ChatWindow
-                conversa={selecionada}
-                onAtualizar={handleAtualizar}
-              />
+              <ChatWindow conversa={selecionada} onAtualizar={carregarConversas} />
             </div>
             <ClientInfoPanel conversa={selecionada} />
           </>
