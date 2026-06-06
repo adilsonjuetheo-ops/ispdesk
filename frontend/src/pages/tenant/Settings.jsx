@@ -151,8 +151,8 @@ export default function Settings() {
   const sinalizarMudancaFiliais = () =>
     window.dispatchEvent(new CustomEvent('ispdesk:filiais-updated'));
 
-  const handleAddFilial = async e => {
-    e.preventDefault();
+  const handleAddFilial = async (e) => {
+    e?.preventDefault();
     if (!formFilial.nome || !formFilial.cidade) {
       setErroFilial('Preencha o nome e a cidade da filial.');
       return;
@@ -440,24 +440,26 @@ export default function Settings() {
               </div>
             )}
 
-            <form onSubmit={handleAddFilial} className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap">
               <input value={formFilial.nome} onChange={e => setFormFilial(f => ({ ...f, nome: e.target.value }))}
                 placeholder="Nome da filial (ex: Araçuaí)"
-                className="flex-1 min-w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                className="flex-1 min-w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                onKeyDown={e => e.key === 'Enter' && handleAddFilial(e)} />
               <input value={formFilial.cidade} onChange={e => setFormFilial(f => ({ ...f, cidade: e.target.value }))}
                 placeholder="Cidade"
-                className="flex-1 min-w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                className="flex-1 min-w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                onKeyDown={e => e.key === 'Enter' && handleAddFilial(e)} />
               <select value={formFilial.uf} onChange={e => setFormFilial(f => ({ ...f, uf: e.target.value }))}
                 className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
                 <option value="">UF</option>
                 {ESTADOS_BR.map(uf => <option key={uf} value={uf}>{uf}</option>)}
               </select>
-              <button type="submit" disabled={savingFilial || !formFilial.nome || !formFilial.cidade}
+              <button type="button" onClick={handleAddFilial} disabled={savingFilial || !formFilial.nome || !formFilial.cidade}
                 className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-sm font-medium">
                 {savingFilial ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 Adicionar
               </button>
-            </form>
+            </div>
             {erroFilial && (
               <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erroFilial}</p>
             )}
