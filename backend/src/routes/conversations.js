@@ -1,12 +1,11 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { conversas, mensagens, clientes, tenantUsers, filiais } from '../db/schema.js';
+import { conversas, mensagens, clientes, tenantUsers, filiais, tenants } from '../db/schema.js';
 import { eq, and, desc, ne, count, inArray } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.js';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-import { tenants } from '../db/schema.js';
 
 const router = Router();
 router.use(autenticar);
@@ -215,6 +214,69 @@ router.post('/:id/send-media', upload.single('arquivo'), async (req, res) => {
   }).returning();
 
   res.json(msg);
+});
+
+// Nota interna (só visível para a equipe, não vai para o WhatsApp)
+router.post('/:id/note', async (req, res) => {
+  const { id } = req.params;
+  const { texto } = req.body;
+  if (!texto?.trim()) return res.status(400).json({ erro: 'Texto obrigatório' });
+
+  const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId)
+    return res.status(403).json({ erro: 'Acesso negado' });
+
+  const [msg] = await db.insert(mensagens).values({
+    conversaId: id,
+    origem: 'nota',
+    conteudo: texto,
+  }).returning();
+
+  res.json(msg);
+});
+
+// Transferir conversa para outro agente
+router.post('/:id/transfer', async (req, res) => {
+  const { id } = req.params;
+  const { agenteId } = req.body;
+  if (!agenteId) return res.status(400).json({ erro: 'agenteId obrigatório' });
+
+  const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId)
+    return res.status(403).json({ erro: 'Acesso negado' });
+
+  const [agente] = await db.select().from(tenantUsers).where(eq(tenantUsers.id, agenteId)).limit(1);
+  if (!agente) return res.status(404).json({ erro: 'Agente não encontrado' });
+
+  await db.update(conversas)
+    .set({ status: 'humano', agenteId })
+    .where(eq(conversas.id, id));
+
+  await db.insert(mensagens).values({
+    conversaId: id,
+    origem: 'bot',
+    conteudo: `[Sistema] Conversa transferida para ${agente.nome} por ${req.user.nome}.`,
+  });
+
+  res.json({ mensagem: 'Conversa transferida' });
+});
+
+// Atualizar tags da conversa
+router.patch('/:id/tags', async (req, res) => {
+  const { id } = req.params;
+  const { tags } = req.body;
+  if (!Array.isArray(tags)) return res.status(400).json({ erro: 'tags deve ser um array' });
+
+  const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId)
+    return res.status(403).json({ erro: 'Acesso negado' });
+
+  await db.update(conversas).set({ tags: JSON.stringify(tags) }).where(eq(conversas.id, id));
+
+  res.json({ tags });
 });
 
 export default router;

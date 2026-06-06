@@ -15,6 +15,23 @@ router.get('/me', autenticar, async (req, res) => {
   res.json(tenant);
 });
 
+// horário de atendimento — leitura pública (webhook precisa)
+router.get('/me/horarios', autenticar, async (req, res) => {
+  if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+  const [tenant] = await db.select({ horarios: tenants.horarios }).from(tenants)
+    .where(eq(tenants.id, req.user.tenantId)).limit(1);
+  res.json(tenant?.horarios || null);
+});
+
+router.put('/me/horarios', autenticar, async (req, res) => {
+  if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+  if (req.user.role !== 'admin') return res.status(403).json({ erro: 'Apenas admins' });
+  const { horarios } = req.body;
+  await db.update(tenants).set({ horarios: JSON.stringify(horarios), atualizadoEm: new Date() })
+    .where(eq(tenants.id, req.user.tenantId));
+  res.json({ horarios });
+});
+
 // rota de edição própria: admin pode editar seu tenant
 router.put('/me', autenticar, async (req, res) => {
   if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });

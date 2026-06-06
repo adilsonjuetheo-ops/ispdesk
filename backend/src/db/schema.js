@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, boolean, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, boolean, timestamp, jsonb, integer } from 'drizzle-orm/pg-core';
 
 export const tenants = pgTable('tenants', {
   id:                 uuid('id').primaryKey().defaultRandom(),
@@ -26,6 +26,7 @@ export const tenants = pgTable('tenants', {
   sgpApiKey:          text('sgp_api_key'),
   plano:              text('plano').default('basic'),
   ativo:              boolean('ativo').default(true),
+  horarios:           jsonb('horarios'),
   criadoEm:           timestamp('criado_em').defaultNow(),
   atualizadoEm:       timestamp('atualizado_em').defaultNow(),
 });
@@ -81,6 +82,7 @@ export const conversas = pgTable('conversas', {
   agenteId:      uuid('agente_id').references(() => tenantUsers.id),
   motivoHandoff: text('motivo_handoff'),
   resumoIa:      text('resumo_ia'),
+  tags:          jsonb('tags').default('[]'),
   iniciadaEm:    timestamp('iniciada_em').defaultNow(),
   encerradaEm:   timestamp('encerrada_em'),
 });
@@ -108,4 +110,13 @@ export const webhookLog = pgTable('webhook_log', {
   tenantId:    uuid('tenant_id').notNull().references(() => tenants.id),
   processado:  boolean('processado').default(false),
   recebidoEm:  timestamp('recebido_em').defaultNow(),
+});
+
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  userId:     uuid('user_id').notNull().references(() => tenantUsers.id, { onDelete: 'cascade' }),
+  tenantId:   uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  endpoint:   text('endpoint').notNull().unique(),
+  keys:       jsonb('keys').notNull(),
+  criadoEm:  timestamp('criado_em').defaultNow(),
 });

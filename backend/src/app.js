@@ -10,8 +10,10 @@ import conversationsRouter from './routes/conversations.js';
 import webhookRouter from './routes/webhook.js';
 import relatorioRouter from './routes/relatorio.js';
 import atalhoRouter from './routes/atalhos.js';
+import pushRouter from './routes/push.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
+import { runMigrations } from './db/migrations.js';
 
 const app = express();
 
@@ -32,6 +34,7 @@ app.use('/api/tenants', tenantsRouter);
 app.use('/api/conversations', conversationsRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/relatorio', relatorioRouter);
+app.use('/api/push', pushRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
@@ -41,8 +44,9 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`ISPDesk backend rodando na porta ${PORT}`);
+  await runMigrations();
   agendarLimpeza();
   agendarEncerramentoInativo();
 });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
+import { usePushNotifications } from '../../hooks/usePushNotifications.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
   Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap,
@@ -33,6 +34,7 @@ export default function TenantLayout() {
     return () => clearInterval(id);
   }, []);
 
+  usePushNotifications(!!user?.tenantId);
   const handleLogout = () => { logout(); navigate('/login'); };
 
   const params = new URLSearchParams(location.search);

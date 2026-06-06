@@ -1,7 +1,116 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock } from 'lucide-react';
+
+const DIAS = [
+  { key: 'dom', label: 'Domingo' },
+  { key: 'seg', label: 'Segunda' },
+  { key: 'ter', label: 'Terça' },
+  { key: 'qua', label: 'Quarta' },
+  { key: 'qui', label: 'Quinta' },
+  { key: 'sex', label: 'Sexta' },
+  { key: 'sab', label: 'Sábado' },
+];
+
+const HORARIO_DEFAULT = {
+  dom: { ativo: false, inicio: '08:00', fim: '18:00' },
+  seg: { ativo: true,  inicio: '08:00', fim: '18:00' },
+  ter: { ativo: true,  inicio: '08:00', fim: '18:00' },
+  qua: { ativo: true,  inicio: '08:00', fim: '18:00' },
+  qui: { ativo: true,  inicio: '08:00', fim: '18:00' },
+  sex: { ativo: true,  inicio: '08:00', fim: '18:00' },
+  sab: { ativo: false, inicio: '08:00', fim: '12:00' },
+};
+
+function HorariosSection() {
+  const [horarios, setHorarios] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [sucesso, setSucesso] = useState(false);
+  const [msgForaHorario, setMsgForaHorario] = useState('');
+
+  useEffect(() => {
+    api.get('/tenants/me/horarios').then(r => {
+      if (r.data) {
+        setHorarios(r.data.dias || HORARIO_DEFAULT);
+        setMsgForaHorario(r.data.msgForaHorario || '');
+      } else {
+        setHorarios(HORARIO_DEFAULT);
+      }
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const setDia = (key, campo, valor) =>
+    setHorarios(h => ({ ...h, [key]: { ...h[key], [campo]: valor } }));
+
+  const salvar = async () => {
+    setSaving(true);
+    try {
+      await api.put('/tenants/me/horarios', { horarios: { dias: horarios, msgForaHorario } });
+      setSucesso(true);
+      setTimeout(() => setSucesso(false), 3000);
+    } finally { setSaving(false); }
+  };
+
+  if (loading || !horarios) return null;
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-5">
+      <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+        <Clock className="w-4 h-4 text-gray-400" /> Horário de Atendimento
+      </h2>
+      <p className="text-xs text-gray-400 mb-4">
+        Fora do horário configurado, o bot responde automaticamente com a mensagem abaixo.
+      </p>
+
+      <div className="space-y-2 mb-4">
+        {DIAS.map(({ key, label }) => (
+          <div key={key} className="flex items-center gap-3">
+            <label className="flex items-center gap-2 w-24 shrink-0 cursor-pointer">
+              <input type="checkbox" checked={horarios[key]?.ativo || false}
+                onChange={e => setDia(key, 'ativo', e.target.checked)}
+                className="rounded" />
+              <span className={`text-sm ${horarios[key]?.ativo ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>{label}</span>
+            </label>
+            {horarios[key]?.ativo ? (
+              <>
+                <input type="time" value={horarios[key]?.inicio || '08:00'}
+                  onChange={e => setDia(key, 'inicio', e.target.value)}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <span className="text-gray-400 text-sm">até</span>
+                <input type="time" value={horarios[key]?.fim || '18:00'}
+                  onChange={e => setDia(key, 'fim', e.target.value)}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </>
+            ) : (
+              <span className="text-xs text-gray-300 italic">Fechado</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-4">
+        <label className="block text-xs text-gray-500 mb-1">Mensagem fora do horário</label>
+        <textarea value={msgForaHorario} onChange={e => setMsgForaHorario(e.target.value)} rows={3}
+          placeholder="Ex: Olá! Nosso atendimento funciona de segunda a sexta das 8h às 18h. Deixe sua mensagem e retornaremos em breve!"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
+      </div>
+
+      {sucesso && (
+        <div className="mb-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5 text-emerald-700 text-sm">
+          Horários salvos com sucesso!
+        </div>
+      )}
+
+      <button type="button" onClick={salvar} disabled={saving}
+        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        Salvar horários
+      </button>
+    </section>
+  );
+}
 
 const ESTADOS_BR = [
   'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
@@ -377,6 +486,8 @@ export default function Settings() {
         </form>
 
         {/* Alterar senha — fora do form principal */}
+        <HorariosSection />
+
         <form onSubmit={handleAlterarSenha} className="mt-5">
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">

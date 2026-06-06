@@ -3,10 +3,18 @@ import api from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { usePolling } from '../hooks/usePolling.js';
 import { useNotificationSound } from '../hooks/useNotificationSound.js';
-import { Send, UserCheck, Bot, X, Loader2, Paperclip, FileText, ImageIcon, Mic, Search } from 'lucide-react';
+import {
+  Send, UserCheck, Bot, X, Loader2, Paperclip, FileText,
+  ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag, Plus,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
+
+const TAGS_PRESET = [
+  'Suporte Técnico', 'Cobrança', 'Cancelamento', 'Instalação',
+  'Velocidade', 'Sem Sinal', 'Mudança de Plano', 'Outros',
+];
 
 function MidiaBolao({ conteudo, isCliente }) {
   const isImagem = conteudo.startsWith('[Imagem]');
@@ -17,7 +25,6 @@ function MidiaBolao({ conteudo, isCliente }) {
     ? 'bg-white border border-gray-200 text-gray-700'
     : 'bg-blue-50 border border-blue-100 text-blue-800';
   const label = isImagem ? 'Imagem enviada' : isAudio ? 'Áudio transcrito' : 'Documento enviado';
-
   return (
     <div className={`flex items-start gap-2 rounded-2xl px-3 py-2.5 text-sm max-w-[280px] ${cor}`}>
       <Icon className="w-5 h-5 shrink-0 opacity-60 mt-0.5" />
@@ -32,6 +39,7 @@ function MidiaBolao({ conteudo, isCliente }) {
 function BolaoMsg({ msg, agenteNome }) {
   const isCliente = msg.origem === 'cliente';
   const isBot = msg.origem === 'bot';
+  const isNota = msg.origem === 'nota';
   const isSistema = msg.conteudo.startsWith('[Sistema]');
   const isMidia = msg.conteudo.startsWith('[Arquivo]') || msg.conteudo.startsWith('[Imagem]') || msg.conteudo.startsWith('[Áudio]');
 
@@ -41,6 +49,23 @@ function BolaoMsg({ msg, agenteNome }) {
         <span className="bg-gray-200 text-gray-500 text-xs px-3 py-1 rounded-full">
           {msg.conteudo.replace('[Sistema] ', '')}
         </span>
+      </div>
+    );
+  }
+
+  if (isNota) {
+    return (
+      <div className="flex justify-center my-2">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-2 max-w-[80%]">
+          <div className="flex items-center gap-1.5 mb-1">
+            <StickyNote className="w-3 h-3 text-yellow-600" />
+            <span className="text-[10px] font-semibold text-yellow-700 uppercase tracking-wide">Nota interna</span>
+          </div>
+          <p className="text-xs text-yellow-900 whitespace-pre-wrap">{msg.conteudo}</p>
+          <p className="text-[10px] text-yellow-600 mt-1">
+            {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
+          </p>
+        </div>
       </div>
     );
   }
@@ -75,6 +100,104 @@ function BolaoMsg({ msg, agenteNome }) {
   );
 }
 
+function applyVars(texto, conversa) {
+  return texto
+    .replace(/\{\{nome\}\}/gi, conversa.clienteNome || '')
+    .replace(/\{\{contrato\}\}/gi, conversa.clienteContratoId || '')
+    .replace(/\{\{filial\}\}/gi, conversa.clienteFilial || conversa.filialNome || '');
+}
+
+function TagsBar({ conversa, onUpdate }) {
+  const tags = Array.isArray(conversa.tags) ? conversa.tags : [];
+  const [aberto, setAberto] = useState(false);
+
+  const toggleTag = async (tag) => {
+    const novo = tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag];
+    await api.patch(`/conversations/${conversa.id}/tags`, { tags: novo });
+    onUpdate();
+  };
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {tags.map(t => (
+        <span key={t}
+          onClick={() => toggleTag(t)}
+          className="inline-flex items-center gap-1 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full cursor-pointer hover:bg-indigo-200 transition-colors">
+          {t} <X className="w-2.5 h-2.5" />
+        </span>
+      ))}
+      <div className="relative">
+        <button onClick={() => setAberto(o => !o)}
+          className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 px-2 py-0.5 rounded-full transition-colors">
+          <Plus className="w-3 h-3" /> tag
+        </button>
+        {aberto && (
+          <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 p-2 min-w-[160px]">
+            {TAGS_PRESET.filter(t => !tags.includes(t)).map(t => (
+              <button key={t} onClick={() => { toggleTag(t); setAberto(false); }}
+                className="block w-full text-left text-xs px-3 py-1.5 hover:bg-indigo-50 rounded-lg text-gray-700">
+                {t}
+              </button>
+            ))}
+            {TAGS_PRESET.every(t => tags.includes(t)) && (
+              <p className="text-xs text-gray-400 px-3 py-1.5">Todas as tags adicionadas</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TransferModal({ conversa, tenantId, onClose, onTransferred }) {
+  const [agentes, setAgentes] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    api.get(`/tenants/${tenantId}/agents`).then(r =>
+      setAgentes(r.data.filter(a => a.ativo && a.id !== conversa.agenteId))
+    ).catch(() => {});
+  }, [tenantId, conversa.agenteId]);
+
+  const transferir = async (agenteId) => {
+    setLoading(true);
+    try {
+      await api.post(`/conversations/${conversa.id}/transfer`, { agenteId });
+      onTransferred();
+      onClose();
+    } catch { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-80 p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-800">Transferir conversa</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+        </div>
+        {agentes.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">Nenhum agente disponível</p>
+        ) : (
+          <div className="space-y-1">
+            {agentes.map(a => (
+              <button key={a.id} onClick={() => transferir(a.id)} disabled={loading}
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 rounded-xl transition-colors text-left">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm shrink-0">
+                  {(a.nome || '?')[0].toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{a.nome}</p>
+                  <p className="text-xs text-gray-400 capitalize">{a.role}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ChatWindow({ conversa, onAtualizar }) {
   const { user } = useAuth();
   const [msgs, setMsgs] = useState([]);
@@ -85,6 +208,7 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   const [aba, setAba] = useState('resposta');
   const [atalhosList, setAtalhosList] = useState([]);
   const [buscaAtalho, setBuscaAtalho] = useState('');
+  const [showTransfer, setShowTransfer] = useState(false);
   const bottomRef = useRef(null);
   const msgAreaRef = useRef(null);
   const fileRef = useRef(null);
@@ -164,7 +288,11 @@ export default function ChatWindow({ conversa, onAtualizar }) {
     if (!texto.trim() || enviando) return;
     setEnviando(true);
     try {
-      await api.post(`/conversations/${conversa.id}/send`, { texto });
+      if (aba === 'nota') {
+        await api.post(`/conversations/${conversa.id}/note`, { texto });
+      } else {
+        await api.post(`/conversations/${conversa.id}/send`, { texto });
+      }
       setTexto('');
       carregarMsgs();
     } catch (err) {
@@ -192,7 +320,7 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   };
 
   const selecionarAtalho = (atalho) => {
-    setTexto(atalho.conteudo);
+    setTexto(applyVars(atalho.conteudo, conversa));
     setAba('resposta');
     setBuscaAtalho('');
   };
@@ -203,39 +331,55 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   );
 
   const tabClass = (t) =>
-    `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+    `px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
       aba === t
         ? 'border-blue-600 text-blue-600'
         : 'border-transparent text-gray-500 hover:text-gray-700'
     }`;
 
+  const isNota = aba === 'nota';
+
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div>
-          <p className="font-semibold text-gray-800">{conversa.clienteNome || conversa.clienteWhatsapp}</p>
-          <p className="text-xs text-gray-400">{conversa.clienteWhatsapp}{conversa.clienteFilial ? ` · ${conversa.clienteFilial}` : ''}</p>
+      <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-gray-800">{conversa.clienteNome || conversa.clienteWhatsapp}</p>
+            <p className="text-xs text-gray-400">{conversa.clienteWhatsapp}{conversa.clienteFilial ? ` · ${conversa.clienteFilial}` : ''}</p>
+          </div>
+          <div className="flex gap-2 items-center">
+            {eHumano && (
+              <button onClick={() => setShowTransfer(true)}
+                className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                <ArrowRightLeft className="w-3.5 h-3.5" /> Transferir
+              </button>
+            )}
+            {podeAtuar && !eHumano && (
+              <button onClick={handleAsumir} disabled={acao}
+                className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                <UserCheck className="w-3.5 h-3.5" /> Assumir
+              </button>
+            )}
+            {eHumano && (
+              <>
+                <button onClick={handleLiberar} disabled={acao}
+                  className="flex items-center gap-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                  <Bot className="w-3.5 h-3.5" /> Liberar para bot
+                </button>
+                <button onClick={handleEncerrar} disabled={acao}
+                  className="flex items-center gap-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                  <X className="w-3.5 h-3.5" /> Encerrar
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
-          {podeAtuar && !eHumano && (
-            <button onClick={handleAsumir} disabled={acao}
-              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-              <UserCheck className="w-3.5 h-3.5" /> Assumir
-            </button>
-          )}
-          {eHumano && (
-            <>
-              <button onClick={handleLiberar} disabled={acao}
-                className="flex items-center gap-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-                <Bot className="w-3.5 h-3.5" /> Liberar para bot
-              </button>
-              <button onClick={handleEncerrar} disabled={acao}
-                className="flex items-center gap-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-                <X className="w-3.5 h-3.5" /> Encerrar
-              </button>
-            </>
-          )}
+
+        {/* Tags */}
+        <div className="flex items-center gap-1.5">
+          <Tag className="w-3 h-3 text-gray-300 shrink-0" />
+          <TagsBar conversa={conversa} onUpdate={onAtualizar} />
         </div>
       </div>
 
@@ -247,15 +391,13 @@ export default function ChatWindow({ conversa, onAtualizar }) {
 
       {/* área de input com tabs */}
       <div className="bg-white border-t border-gray-200">
-        {/* tabs — só aparecem quando agente assumiu */}
         {eHumano && (
           <div className="flex border-b border-gray-100 px-3">
-            <button className={tabClass('resposta')} onClick={() => setAba('resposta')}>
-              Resposta
+            <button className={tabClass('resposta')} onClick={() => setAba('resposta')}>Resposta</button>
+            <button className={tabClass('nota')} onClick={() => setAba('nota')}>
+              <span className="flex items-center gap-1"><StickyNote className="w-3 h-3" /> Nota</span>
             </button>
-            <button className={tabClass('atalhos')} onClick={() => setAba('atalhos')}>
-              Atalhos
-            </button>
+            <button className={tabClass('atalhos')} onClick={() => setAba('atalhos')}>Atalhos</button>
           </div>
         )}
 
@@ -282,11 +424,8 @@ export default function ChatWindow({ conversa, onAtualizar }) {
                 </p>
               ) : (
                 atalhosFiltrados.map(a => (
-                  <button
-                    key={a.id}
-                    onClick={() => selecionarAtalho(a)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0"
-                  >
+                  <button key={a.id} onClick={() => selecionarAtalho(a)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
                     <div className="flex items-center gap-2">
                       {a.atalho && (
                         <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded shrink-0">
@@ -295,7 +434,7 @@ export default function ChatWindow({ conversa, onAtualizar }) {
                       )}
                       <span className="text-sm font-medium text-gray-700 truncate">{a.titulo}</span>
                     </div>
-                    <p className="text-xs text-gray-400 truncate mt-0.5 pl-0">{a.conteudo}</p>
+                    <p className="text-xs text-gray-400 truncate mt-0.5">{a.conteudo}</p>
                   </button>
                 ))
               )}
@@ -303,38 +442,64 @@ export default function ChatWindow({ conversa, onAtualizar }) {
           </div>
         )}
 
-        {/* input Resposta */}
-        {(!eHumano || aba === 'resposta') && (
+        {/* input Resposta / Nota */}
+        {(!eHumano || aba === 'resposta' || aba === 'nota') && (
           <form onSubmit={handleEnviar} className="p-3 flex gap-2 items-center">
-            <input ref={fileRef} type="file" className="hidden"
-              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-              onChange={handleEnviarArquivo}
-              disabled={!eHumano}
-            />
-            <button type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={!eHumano || enviandoArquivo}
-              title="Enviar arquivo"
-              className="text-gray-400 hover:text-blue-600 disabled:opacity-30 transition-colors p-1 shrink-0">
-              {enviandoArquivo
-                ? <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                : <Paperclip className="w-5 h-5" />}
-            </button>
+            {!isNota && (
+              <>
+                <input ref={fileRef} type="file" className="hidden"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                  onChange={handleEnviarArquivo}
+                  disabled={!eHumano}
+                />
+                <button type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={!eHumano || enviandoArquivo}
+                  title="Enviar arquivo"
+                  className="text-gray-400 hover:text-blue-600 disabled:opacity-30 transition-colors p-1 shrink-0">
+                  {enviandoArquivo
+                    ? <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                    : <Paperclip className="w-5 h-5" />}
+                </button>
+              </>
+            )}
             <input
               type="text"
               value={texto}
               onChange={e => setTexto(e.target.value)}
-              disabled={!eHumano}
-              placeholder={eHumano ? 'Digite sua mensagem...' : 'Assuma a conversa para responder'}
-              className="flex-1 bg-gray-100 rounded-xl px-4 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+              disabled={!eHumano && !isNota}
+              placeholder={
+                isNota
+                  ? 'Nota interna (só a equipe vê)...'
+                  : eHumano ? 'Digite sua mensagem...' : 'Assuma a conversa para responder'
+              }
+              className={clsx(
+                'flex-1 rounded-xl px-4 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 disabled:opacity-50',
+                isNota
+                  ? 'bg-yellow-50 text-yellow-900 focus:ring-yellow-300'
+                  : 'bg-gray-100 text-gray-800 focus:ring-blue-400'
+              )}
             />
-            <button type="submit" disabled={!eHumano || !texto.trim() || enviando}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
+            <button type="submit"
+              disabled={(!eHumano && !isNota) || !texto.trim() || enviando}
+              className={clsx(
+                'disabled:opacity-40 text-white rounded-xl px-4 py-2 transition-colors shrink-0',
+                isNota ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'
+              )}>
               {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </form>
         )}
       </div>
+
+      {showTransfer && (
+        <TransferModal
+          conversa={conversa}
+          tenantId={user?.tenantId}
+          onClose={() => setShowTransfer(false)}
+          onTransferred={() => { onAtualizar(); carregarMsgs(); }}
+        />
+      )}
     </div>
   );
 }

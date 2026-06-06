@@ -5,6 +5,8 @@ import { eq, and, ne } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { enviarMensagem, transcreverAudioMeta } from '../services/whatsapp.js';
 import { realizarHandoff } from '../services/handoff.js';
+import { enviarPushParaTenant } from '../services/pushNotification.js';
+import { dentroDoHorario } from '../services/horarios.js';
 
 const router = Router();
 
@@ -129,6 +131,13 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     wamid,
   });
 
+  // Notificação push para agentes do tenant
+  enviarPushParaTenant(tenant.id, {
+    title: cliente.nome !== remetente ? cliente.nome : 'Nova mensagem',
+    body: isAudio ? '🎤 Áudio recebido' : texto.slice(0, 100),
+    tag: conversa.id,
+  }).catch(() => {});
+
   // Se aguardando seleção de filial, processa a escolha
   if (conversa.status === 'aguardando_filial') {
     await processarSelecaoFilial(tenant, conversa, cliente, texto, remetente);
@@ -137,6 +146,15 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
 
   // Se humano está atendendo, não aciona IA
   if (conversa.status === 'humano') return;
+
+  // Verifica horário de atendimento
+  if (!dentroDoHorario(tenant.horarios)) {
+    const msg = tenant.horarios?.msgForaHorario ||
+      'Nosso atendimento está encerrado no momento. Em breve retornaremos!';
+    await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msg });
+    try { await enviarMensagem(tenant, remetente, msg); } catch {}
+    return;
+  }
 
   // Verifica se tenant tem filiais e se conversa já tem filial atribuída
   if (!conversa.filialId) {
