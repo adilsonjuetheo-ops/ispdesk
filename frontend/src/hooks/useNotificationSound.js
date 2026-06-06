@@ -3,12 +3,16 @@ import { useRef, useCallback } from 'react';
 export function useNotificationSound() {
   const ctxRef = useRef(null);
 
-  return useCallback(() => {
+  return useCallback(async () => {
     try {
       if (!ctxRef.current) {
         ctxRef.current = new (window.AudioContext || window.webkitAudioContext)();
       }
       const ctx = ctxRef.current;
+
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
