@@ -172,7 +172,12 @@ router.post('/:id/send', async (req, res) => {
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
 
-  await enviarMensagem(tenant, cliente.whatsapp, texto);
+  try {
+    await enviarMensagem(tenant, cliente.whatsapp, texto);
+  } catch (err) {
+    console.error('Erro enviarMensagem:', err.message);
+    return res.status(502).json({ erro: err.message });
+  }
 
   const [msg] = await db.insert(mensagens).values({
     conversaId: id,
