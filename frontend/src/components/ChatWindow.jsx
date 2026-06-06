@@ -167,6 +167,8 @@ export default function ChatWindow({ conversa, onAtualizar }) {
       await api.post(`/conversations/${conversa.id}/send`, { texto });
       setTexto('');
       carregarMsgs();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao enviar mensagem. Verifique o token do WhatsApp.');
     } finally { setEnviando(false); }
   };
 
