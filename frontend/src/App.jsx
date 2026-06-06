@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth.js';
 import Login from './pages/Login.jsx';
+import Privacidade from './pages/Privacidade.jsx';
 import Dashboard from './pages/superadmin/Dashboard.jsx';
 import Tenants from './pages/superadmin/Tenants.jsx';
 import TenantDetail from './pages/superadmin/TenantDetail.jsx';
@@ -29,6 +30,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/privacidade" element={<Privacidade />} />
         <Route path="/" element={<RootRedirect />} />
 
         <Route path="/admin" element={
