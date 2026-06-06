@@ -30,6 +30,7 @@ router.get('/', async (req, res) => {
     filialId: conversas.filialId,
     filialNome: filiais.nome,
     agenteId: conversas.agenteId,
+    agenteNome: tenantUsers.nome,
     motivoHandoff: conversas.motivoHandoff,
     resumoIa: conversas.resumoIa,
     iniciadaEm: conversas.iniciadaEm,
@@ -39,10 +40,12 @@ router.get('/', async (req, res) => {
     clienteWhatsapp: clientes.whatsapp,
     clienteFilial: clientes.filialNome,
     clienteStatus: clientes.statusContrato,
+    clienteContratoId: clientes.contratoId,
   })
   .from(conversas)
   .innerJoin(clientes, eq(conversas.clienteId, clientes.id))
   .leftJoin(filiais, eq(conversas.filialId, filiais.id))
+  .leftJoin(tenantUsers, eq(conversas.agenteId, tenantUsers.id))
   .where(conditions.length ? and(...conditions) : undefined)
   .orderBy(desc(conversas.iniciadaEm));
 

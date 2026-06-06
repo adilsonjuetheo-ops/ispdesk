@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { db } from '../db/index.js';
-import { superAdmins, tenantUsers } from '../db/schema.js';
+import { superAdmins, tenantUsers, tenants } from '../db/schema.js';
 import { eq, count } from 'drizzle-orm';
 
 const router = Router();
@@ -32,8 +32,13 @@ router.post('/login', async (req, res) => {
   const ok = await bcrypt.compare(senha, tu.senhaHash);
   if (!ok) return res.status(401).json({ erro: 'Credenciais inválidas' });
 
-  const token = gerarToken({ id: tu.id, email: tu.email, nome: tu.nome, role: tu.role, tenantId: tu.tenantId, filialId: tu.filialId || null });
-  return res.json({ token, user: { id: tu.id, email: tu.email, nome: tu.nome, role: tu.role, tenantId: tu.tenantId, filialId: tu.filialId || null } });
+  const [tenant] = await db.select({ sgpTipo: tenants.sgpTipo, nomeAssistente: tenants.nomeAssistente })
+    .from(tenants).where(eq(tenants.id, tu.tenantId)).limit(1);
+  const sgpTipo = tenant?.sgpTipo || null;
+
+  const payload = { id: tu.id, email: tu.email, nome: tu.nome, role: tu.role, tenantId: tu.tenantId, filialId: tu.filialId || null, sgpTipo };
+  const token = gerarToken(payload);
+  return res.json({ token, user: payload });
 });
 
 // rota de setup — cria primeiro super admin se não existir nenhum
