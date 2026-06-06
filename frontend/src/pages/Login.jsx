@@ -35,7 +35,7 @@ export default function Login() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <img src="/logoisp.png" alt="ISPDesk" className="h-24 mx-auto mb-4 drop-shadow-lg" />
+          <img src="/logoisp.png" alt="ISPDesk" className="h-24 mx-auto mb-4 drop-shadow-lg rounded-2xl" />
           <p className="text-gray-400 text-sm">Plataforma de atendimento para provedores</p>
         </div>
 
