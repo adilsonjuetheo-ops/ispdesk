@@ -1,4 +1,5 @@
-import { Phone, MapPin, FileText, Cpu, User, Hash, Wifi, Building2 } from 'lucide-react';
+import { useState } from 'react';
+import { Phone, MapPin, Cpu, User, Hash, Wifi, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.js';
 
 const SGP_BADGE = {
@@ -24,14 +25,14 @@ function Iniciais({ nome }) {
   );
 }
 
-function Row({ icon: Icon, label, value, mono }) {
+function Row({ icon: Icon, label, value, mono, expandido }) {
   if (!value) return null;
   return (
     <div className="flex items-start gap-2.5 py-2 border-b border-gray-100 last:border-0">
       <Icon className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
       <div className="min-w-0">
         <p className="text-[10px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">{label}</p>
-        <p className={`text-xs text-gray-700 break-all leading-snug ${mono ? 'font-mono' : ''}`}>{value}</p>
+        <p className={`text-xs text-gray-700 leading-snug ${mono ? 'font-mono' : ''} ${expandido ? 'break-all' : 'truncate'}`}>{value}</p>
       </div>
     </div>
   );
@@ -39,6 +40,7 @@ function Row({ icon: Icon, label, value, mono }) {
 
 export default function ClientInfoPanel({ conversa }) {
   const { user } = useAuth();
+  const [expandido, setExpandido] = useState(false);
   if (!conversa) return null;
 
   const sgpTipo = user?.sgpTipo;
@@ -47,16 +49,25 @@ export default function ClientInfoPanel({ conversa }) {
   const filialExibida = conversa.filialNome || conversa.clienteFilial;
 
   return (
-    <div className="w-56 shrink-0 bg-white border-l border-gray-200 overflow-y-auto flex flex-col">
+    <div className={`${expandido ? 'w-80' : 'w-56'} shrink-0 bg-white border-l border-gray-200 overflow-y-auto flex flex-col transition-[width] duration-200`}>
 
       {/* Cabeçalho */}
       <div className="p-4 border-b border-gray-100">
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">Informações do cliente</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Informações do cliente</p>
+          <button
+            onClick={() => setExpandido(e => !e)}
+            title={expandido ? 'Recolher painel' : 'Expandir painel'}
+            className="text-gray-300 hover:text-gray-500 transition-colors"
+          >
+            {expandido ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+          </button>
+        </div>
 
         <div className="flex items-center gap-3 mb-3">
           <Iniciais nome={conversa.clienteNome} />
           <div className="min-w-0">
-            <p className="font-semibold text-gray-800 text-sm leading-tight truncate">
+            <p className={`font-semibold text-gray-800 text-sm leading-tight ${expandido ? '' : 'truncate'}`}>
               {conversa.clienteNome || 'Desconhecido'}
             </p>
             {sgpBadge && (
@@ -78,9 +89,9 @@ export default function ClientInfoPanel({ conversa }) {
       <div className="px-4 py-2">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Contato</p>
         <div>
-          <Row icon={Phone}    label="WhatsApp"  value={conversa.clienteWhatsapp} mono />
-          <Row icon={Hash}     label="Contrato"  value={conversa.clienteContratoId} mono />
-          <Row icon={MapPin}   label="Filial SGP" value={conversa.clienteFilial} />
+          <Row icon={Phone}    label="WhatsApp"  value={conversa.clienteWhatsapp} mono expandido={expandido} />
+          <Row icon={Hash}     label="Contrato"  value={conversa.clienteContratoId} mono expandido={expandido} />
+          <Row icon={MapPin}   label="Filial SGP" value={conversa.clienteFilial} expandido={expandido} />
         </div>
       </div>
 
@@ -88,8 +99,8 @@ export default function ClientInfoPanel({ conversa }) {
       <div className="px-4 py-2 border-t border-gray-100">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Atribuição</p>
         <div>
-          <Row icon={User}      label="Atendente" value={conversa.agenteNome || 'Nenhum'} />
-          <Row icon={Building2} label="Filial"    value={filialExibida} />
+          <Row icon={User}      label="Atendente" value={conversa.agenteNome || 'Nenhum'} expandido={expandido} />
+          <Row icon={Building2} label="Filial"    value={filialExibida} expandido={expandido} />
         </div>
       </div>
 
