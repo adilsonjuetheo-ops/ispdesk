@@ -5,6 +5,7 @@ import cors from 'cors';
 import authRouter from './routes/auth.js';
 import tenantsRouter from './routes/tenants.js';
 import agentsRouter from './routes/agents.js';
+import filiaisRouter from './routes/filiais.js';
 import conversationsRouter from './routes/conversations.js';
 import webhookRouter from './routes/webhook.js';
 
@@ -22,6 +23,7 @@ app.use(express.json());
 app.use('/api/auth', authRouter);
 app.use('/api/tenants', tenantsRouter);
 app.use('/api/tenants/:tenantId/agents', agentsRouter);
+app.use('/api/tenants/:tenantId/filiais', filiaisRouter);
 app.use('/api/conversations', conversationsRouter);
 app.use('/api/webhook', webhookRouter);
 

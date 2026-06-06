@@ -14,6 +14,7 @@ router.get('/', async (req, res) => {
     nome: tenantUsers.nome,
     email: tenantUsers.email,
     role: tenantUsers.role,
+    filialId: tenantUsers.filialId,
     ativo: tenantUsers.ativo,
     criadoEm: tenantUsers.criadoEm,
   }).from(tenantUsers).where(eq(tenantUsers.tenantId, req.params.tenantId));
@@ -22,7 +23,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { nome, email, senha, role } = req.body;
+  const { nome, email, senha, role, filialId } = req.body;
   if (!nome || !email || !senha) return res.status(400).json({ erro: 'nome, email e senha obrigatórios' });
   if (senha.length < 6) return res.status(400).json({ erro: 'Senha mínimo 6 caracteres' });
 
@@ -33,11 +34,13 @@ router.post('/', async (req, res) => {
     email,
     senhaHash,
     role: role || 'agente',
+    filialId: filialId || null,
   }).returning({
     id: tenantUsers.id,
     nome: tenantUsers.nome,
     email: tenantUsers.email,
     role: tenantUsers.role,
+    filialId: tenantUsers.filialId,
     ativo: tenantUsers.ativo,
     criadoEm: tenantUsers.criadoEm,
   });
@@ -46,15 +49,14 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-  const { nome, email, senha, role, ativo } = req.body;
-  const updates = { nome, email, role, ativo };
+  const { nome, email, senha, role, ativo, filialId } = req.body;
+  const updates = { nome, email, role, ativo, filialId: filialId || null };
 
   if (senha) {
     if (senha.length < 6) return res.status(400).json({ erro: 'Senha mínimo 6 caracteres' });
     updates.senhaHash = await bcrypt.hash(senha, 10);
   }
 
-  // remove campos undefined
   Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
 
   const [agente] = await db.update(tenantUsers)
@@ -65,6 +67,7 @@ router.put('/:id', async (req, res) => {
       nome: tenantUsers.nome,
       email: tenantUsers.email,
       role: tenantUsers.role,
+      filialId: tenantUsers.filialId,
       ativo: tenantUsers.ativo,
     });
 

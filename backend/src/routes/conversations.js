@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { conversas, mensagens, clientes, tenantUsers } from '../db/schema.js';
+import { conversas, mensagens, clientes, tenantUsers, filiais } from '../db/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 import { enviarMensagem } from '../services/whatsapp.js';
@@ -15,6 +15,9 @@ router.get('/', async (req, res) => {
 
   if (req.user.role !== 'superadmin') {
     conditions.push(eq(conversas.tenantId, req.user.tenantId));
+    if (req.user.filialId) {
+      conditions.push(eq(conversas.filialId, req.user.filialId));
+    }
   }
   if (status) {
     conditions.push(eq(conversas.status, status));
@@ -24,6 +27,8 @@ router.get('/', async (req, res) => {
     id: conversas.id,
     tenantId: conversas.tenantId,
     status: conversas.status,
+    filialId: conversas.filialId,
+    filialNome: filiais.nome,
     agenteId: conversas.agenteId,
     motivoHandoff: conversas.motivoHandoff,
     resumoIa: conversas.resumoIa,
@@ -37,6 +42,7 @@ router.get('/', async (req, res) => {
   })
   .from(conversas)
   .innerJoin(clientes, eq(conversas.clienteId, clientes.id))
+  .leftJoin(filiais, eq(conversas.filialId, filiais.id))
   .where(conditions.length ? and(...conditions) : undefined)
   .orderBy(desc(conversas.iniciadaEm));
 
@@ -75,7 +81,6 @@ router.post('/:id/assume', async (req, res) => {
   const textoSistema = `[Sistema] Atendente ${req.user.nome} assumiu a conversa.`;
   await db.insert(mensagens).values({ conversaId: id, origem: 'bot', conteudo: textoSistema });
 
-  // notifica cliente via WhatsApp
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
   if (tenant?.whatsappToken && cliente?.whatsapp) {

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Plus, X, Loader2, Pencil, UserX } from 'lucide-react';
+import { Plus, X, Loader2, Pencil, UserX, MapPin } from 'lucide-react';
 
-const FORM_VAZIO = { nome: '', email: '', senha: '', confirmar: '', role: 'agente' };
+const FORM_VAZIO = { nome: '', email: '', senha: '', confirmar: '', role: 'agente', filialId: '' };
 
 export default function Agents() {
   const { user } = useAuth();
   const [agentes, setAgentes] = useState([]);
+  const [filiais, setFiliais] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -18,7 +19,10 @@ export default function Agents() {
   const carregar = () =>
     api.get(`/tenants/${user.tenantId}/agents`).then(r => setAgentes(r.data)).finally(() => setLoading(false));
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => {
+    carregar();
+    api.get(`/tenants/${user.tenantId}/filiais`).then(r => setFiliais(r.data.filter(f => f.ativo)));
+  }, []);
 
   const abrirNovo = () => {
     setEditando(null);
@@ -29,7 +33,7 @@ export default function Agents() {
 
   const abrirEditar = ag => {
     setEditando(ag);
-    setForm({ nome: ag.nome, email: ag.email, senha: '', confirmar: '', role: ag.role });
+    setForm({ nome: ag.nome, email: ag.email, senha: '', confirmar: '', role: ag.role, filialId: ag.filialId || '' });
     setErro('');
     setModal(true);
   };
@@ -42,7 +46,7 @@ export default function Agents() {
 
     setSaving(true);
     try {
-      const payload = { nome: form.nome, email: form.email, role: form.role };
+      const payload = { nome: form.nome, email: form.email, role: form.role, filialId: form.filialId || null };
       if (form.senha) payload.senha = form.senha;
 
       if (editando) {
@@ -66,6 +70,8 @@ export default function Agents() {
     carregar();
   };
 
+  const filialNome = id => filiais.find(f => f.id === id)?.nome;
+
   if (loading) return <div className="p-8 text-gray-400">Carregando...</div>;
 
   return (
@@ -86,6 +92,7 @@ export default function Agents() {
           <thead>
             <tr className="text-gray-400 text-xs uppercase border-b border-gray-200">
               <th className="text-left px-5 py-3">Funcionário</th>
+              <th className="text-left px-5 py-3">Filial</th>
               <th className="text-left px-5 py-3">Papel</th>
               <th className="text-left px-5 py-3">Status</th>
               <th className="px-5 py-3"></th>
@@ -104,6 +111,15 @@ export default function Agents() {
                       <p className="text-xs text-gray-400">{ag.email}</p>
                     </div>
                   </div>
+                </td>
+                <td className="px-5 py-3">
+                  {ag.filialId ? (
+                    <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded flex items-center gap-1 w-fit">
+                      <MapPin className="w-3 h-3" />{filialNome(ag.filialId) || '—'}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">Todas</span>
+                  )}
                 </td>
                 <td className="px-5 py-3">
                   <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded capitalize">{ag.role}</span>
@@ -155,6 +171,18 @@ export default function Agents() {
                   <option value="admin">Admin</option>
                 </select>
               </div>
+              {filiais.length > 0 && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Filial / Cidade</label>
+                  <select value={form.filialId} onChange={e => setForm(f => ({ ...f, filialId: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="">Todas as filiais</option>
+                    {filiais.map(f => (
+                      <option key={f.id} value={f.id}>{f.nome} — {f.cidade}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {erro && <p className="text-red-500 text-sm">{erro}</p>}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setModal(false)}

@@ -30,9 +30,20 @@ export const tenants = pgTable('tenants', {
   atualizadoEm:       timestamp('atualizado_em').defaultNow(),
 });
 
+export const filiais = pgTable('filiais', {
+  id:       uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  nome:     text('nome').notNull(),
+  cidade:   text('cidade').notNull(),
+  uf:       text('uf'),
+  ativo:    boolean('ativo').default(true),
+  criadoEm: timestamp('criado_em').defaultNow(),
+});
+
 export const tenantUsers = pgTable('tenant_users', {
   id:        uuid('id').primaryKey().defaultRandom(),
   tenantId:  uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  filialId:  uuid('filial_id').references(() => filiais.id),
   nome:      text('nome').notNull(),
   email:     text('email').notNull(),
   senhaHash: text('senha_hash').notNull(),
@@ -65,6 +76,7 @@ export const conversas = pgTable('conversas', {
   id:            uuid('id').primaryKey().defaultRandom(),
   tenantId:      uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   clienteId:     uuid('cliente_id').notNull().references(() => clientes.id),
+  filialId:      uuid('filial_id').references(() => filiais.id),
   status:        text('status').default('bot'),
   agenteId:      uuid('agente_id').references(() => tenantUsers.id),
   motivoHandoff: text('motivo_handoff'),

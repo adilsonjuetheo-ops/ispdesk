@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { tenants, clientes, conversas, mensagens, webhookLog } from '../db/schema.js';
+import { tenants, clientes, conversas, mensagens, webhookLog, filiais } from '../db/schema.js';
 import { eq, and, ne } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { enviarMensagem } from '../services/whatsapp.js';
@@ -8,7 +8,6 @@ import { realizarHandoff } from '../services/handoff.js';
 
 const router = Router();
 
-// verificação Meta
 router.get('/', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -21,7 +20,6 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  // responde 200 imediatamente para Meta não reenviar
   res.sendStatus(200);
 
   try {
@@ -36,7 +34,6 @@ router.post('/', async (req, res) => {
         const msgs = value.messages;
         if (!msgs?.length) continue;
 
-        // busca tenant pelo number_id
         const [tenant] = await db.select().from(tenants)
           .where(and(eq(tenants.whatsappNumberId, phoneNumberId), eq(tenants.ativo, true)))
           .limit(1);
@@ -49,11 +46,10 @@ router.post('/', async (req, res) => {
           const texto = msg.text?.body;
           if (!texto) continue;
 
-          // idempotência
           try {
             await db.insert(webhookLog).values({ wamid, tenantId: tenant.id });
           } catch {
-            continue; // já processado
+            continue;
           }
 
           await processarWebhookMsg(tenant, remetente, texto, wamid);
@@ -65,8 +61,11 @@ router.post('/', async (req, res) => {
   }
 });
 
+function normalizar(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 async function processarWebhookMsg(tenant, remetente, texto, wamid) {
-  // busca ou cria cliente
   let [cliente] = await db.select().from(clientes)
     .where(and(eq(clientes.tenantId, tenant.id), eq(clientes.whatsapp, remetente)))
     .limit(1);
@@ -81,7 +80,6 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid) {
     await db.update(clientes).set({ ultimoContato: new Date() }).where(eq(clientes.id, cliente.id));
   }
 
-  // busca conversa aberta ou cria nova
   let [conversa] = await db.select().from(conversas)
     .where(and(
       eq(conversas.tenantId, tenant.id),
@@ -98,7 +96,6 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid) {
     }).returning();
   }
 
-  // salva mensagem do cliente
   await db.insert(mensagens).values({
     conversaId: conversa.id,
     origem: 'cliente',
@@ -106,10 +103,49 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid) {
     wamid,
   });
 
-  // se humano está atendendo, não aciona IA
+  // Se aguardando seleção de filial, processa a escolha
+  if (conversa.status === 'aguardando_filial') {
+    await processarSelecaoFilial(tenant, conversa, cliente, texto, remetente);
+    return;
+  }
+
+  // Se humano está atendendo, não aciona IA
   if (conversa.status === 'humano') return;
 
-  // chama IA
+  // Verifica se tenant tem filiais e se conversa já tem filial atribuída
+  if (!conversa.filialId) {
+    const filiaisAtivas = await db.select().from(filiais)
+      .where(and(eq(filiais.tenantId, tenant.id), eq(filiais.ativo, true)))
+      .orderBy(filiais.nome);
+
+    if (filiaisAtivas.length > 0) {
+      // Tenta roteamento automático via SGP
+      let filialId = null;
+      if (cliente.filialNome) {
+        const match = filiaisAtivas.find(f =>
+          normalizar(f.nome).includes(normalizar(cliente.filialNome)) ||
+          normalizar(f.cidade).includes(normalizar(cliente.filialNome)) ||
+          normalizar(cliente.filialNome).includes(normalizar(f.cidade))
+        );
+        if (match) filialId = match.id;
+      }
+
+      if (filialId) {
+        await db.update(conversas).set({ filialId }).where(eq(conversas.id, conversa.id));
+        conversa = { ...conversa, filialId };
+      } else {
+        // Pede ao cliente que selecione a filial
+        const opcoes = filiaisAtivas.map((f, i) => `${i + 1} - ${f.nome}`).join('\n');
+        const msgMenu = `Para direcionar seu atendimento, informe o número da sua cidade:\n\n${opcoes}`;
+        await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msgMenu });
+        try { await enviarMensagem(tenant, remetente, msgMenu); } catch (e) { console.error(e.message); }
+        await db.update(conversas).set({ status: 'aguardando_filial' }).where(eq(conversas.id, conversa.id));
+        return;
+      }
+    }
+  }
+
+  // Chama IA
   const historico = await db.select().from(mensagens)
     .where(eq(mensagens.conversaId, conversa.id))
     .orderBy(mensagens.enviadaEm);
@@ -131,6 +167,41 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid) {
 
   if (resultado.devePelearHumano) {
     await realizarHandoff(tenant, conversa, cliente, resultado.motivo);
+  }
+}
+
+async function processarSelecaoFilial(tenant, conversa, cliente, texto, remetente) {
+  const filiaisAtivas = await db.select().from(filiais)
+    .where(and(eq(filiais.tenantId, tenant.id), eq(filiais.ativo, true)))
+    .orderBy(filiais.nome);
+
+  const num = parseInt(texto.trim());
+  if (!isNaN(num) && num >= 1 && num <= filiaisAtivas.length) {
+    const escolhida = filiaisAtivas[num - 1];
+    await db.update(conversas)
+      .set({ filialId: escolhida.id, status: 'bot' })
+      .where(eq(conversas.id, conversa.id));
+
+    const historico = await db.select().from(mensagens)
+      .where(eq(mensagens.conversaId, conversa.id))
+      .orderBy(mensagens.enviadaEm);
+
+    const conversaAtualizada = { ...conversa, filialId: escolhida.id, status: 'bot' };
+    const resultado = await processarMensagem(tenant, conversaAtualizada, historico, texto, remetente);
+
+    if (resultado.resposta) {
+      await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: resultado.resposta });
+      try { await enviarMensagem(tenant, remetente, resultado.resposta); } catch (e) { console.error(e.message); }
+    }
+
+    if (resultado.devePelearHumano) {
+      await realizarHandoff(tenant, conversaAtualizada, cliente, resultado.motivo);
+    }
+  } else {
+    const opcoes = filiaisAtivas.map((f, i) => `${i + 1} - ${f.nome}`).join('\n');
+    const msg = `Por favor, responda apenas com o número da sua cidade:\n\n${opcoes}`;
+    await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msg });
+    try { await enviarMensagem(tenant, remetente, msg); } catch (e) { console.error(e.message); }
   }
 }
 

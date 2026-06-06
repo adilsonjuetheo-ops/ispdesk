@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2 } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin } from 'lucide-react';
 
 const ESTADOS_BR = [
   'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
@@ -19,11 +19,37 @@ export default function Settings() {
   const [copiado, setCopiado] = useState(false);
   const fileRef = useRef(null);
 
+  const [filiais, setFiliais] = useState([]);
+  const [formFilial, setFormFilial] = useState({ nome: '', cidade: '', uf: '' });
+  const [savingFilial, setSavingFilial] = useState(false);
+
+  const carregarFiliais = () =>
+    api.get(`/tenants/${user.tenantId}/filiais`).then(r => setFiliais(r.data));
+
   useEffect(() => {
     api.get('/tenants/me')
       .then(r => setTenant(r.data))
       .finally(() => setLoading(false));
+    carregarFiliais();
   }, []);
+
+  const handleAddFilial = async e => {
+    e.preventDefault();
+    if (!formFilial.nome || !formFilial.cidade) return;
+    setSavingFilial(true);
+    try {
+      await api.post(`/tenants/${user.tenantId}/filiais`, formFilial);
+      setFormFilial({ nome: '', cidade: '', uf: '' });
+      carregarFiliais();
+    } finally {
+      setSavingFilial(false);
+    }
+  };
+
+  const handleRemoverFilial = async id => {
+    await api.delete(`/tenants/${user.tenantId}/filiais/${id}`);
+    carregarFiliais();
+  };
 
   const set = (campo, valor) => setTenant(t => ({ ...t, [campo]: valor }));
 
@@ -241,6 +267,53 @@ export default function Settings() {
               onChange={e => set('systemPrompt', e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
               placeholder="Você é o assistente virtual do provedor de internet [nome]. Sua função é ajudar os clientes com dúvidas sobre..." />
+          </section>
+
+          {/* filiais */}
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-indigo-500" /> Filiais / Cidades de atendimento
+            </h2>
+            <p className="text-xs text-gray-400 mb-4">
+              Cadastre as cidades que seu provedor atende. O bot vai perguntar ao cliente qual cidade ele é e rotear o atendimento para os agentes da filial correspondente.
+            </p>
+
+            {filiais.filter(f => f.ativo).length > 0 && (
+              <div className="mb-4 space-y-2">
+                {filiais.filter(f => f.ativo).map(f => (
+                  <div key={f.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-indigo-500" />
+                      <span className="text-sm font-medium text-gray-800">{f.nome}</span>
+                      <span className="text-xs text-gray-400">{f.cidade}{f.uf ? ` — ${f.uf}` : ''}</span>
+                    </div>
+                    <button type="button" onClick={() => handleRemoverFilial(f.id)}
+                      className="text-gray-400 hover:text-red-500 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <form onSubmit={handleAddFilial} className="flex gap-2 flex-wrap">
+              <input value={formFilial.nome} onChange={e => setFormFilial(f => ({ ...f, nome: e.target.value }))}
+                placeholder="Nome da filial (ex: Araçuaí)"
+                className="flex-1 min-w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <input value={formFilial.cidade} onChange={e => setFormFilial(f => ({ ...f, cidade: e.target.value }))}
+                placeholder="Cidade"
+                className="flex-1 min-w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <select value={formFilial.uf} onChange={e => setFormFilial(f => ({ ...f, uf: e.target.value }))}
+                className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value="">UF</option>
+                {ESTADOS_BR.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+              </select>
+              <button type="submit" disabled={savingFilial || !formFilial.nome || !formFilial.cidade}
+                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                {savingFilial ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Adicionar
+              </button>
+            </form>
           </section>
 
           {/* webhook token */}

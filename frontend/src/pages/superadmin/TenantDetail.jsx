@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
-import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2 } from 'lucide-react';
+import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2, MapPin } from 'lucide-react';
 
 export default function TenantDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [tenant, setTenant] = useState(null);
   const [agentes, setAgentes] = useState([]);
+  const [filiais, setFiliais] = useState([]);
+  const [formFilial, setFormFilial] = useState({ nome: '', cidade: '', uf: '' });
+  const [savingFilial, setSavingFilial] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sucesso, setSucesso] = useState('');
@@ -25,13 +28,32 @@ export default function TenantDetail() {
     reader.readAsDataURL(file);
   };
 
+  const carregarFiliais = () =>
+    api.get(`/tenants/${id}/filiais`).then(r => setFiliais(r.data));
+
+  const handleAddFilial = async e => {
+    e.preventDefault();
+    if (!formFilial.nome || !formFilial.cidade) return;
+    setSavingFilial(true);
+    try {
+      await api.post(`/tenants/${id}/filiais`, formFilial);
+      setFormFilial({ nome: '', cidade: '', uf: '' });
+      carregarFiliais();
+    } finally { setSavingFilial(false); }
+  };
+
+  const handleRemoverFilial = async filialId => {
+    await api.delete(`/tenants/${id}/filiais/${filialId}`);
+    carregarFiliais();
+  };
+
   const carregar = () =>
     api.get(`/tenants/${id}`).then(r => {
       setTenant(r.data);
       setAgentes(r.data.agentes || []);
     }).finally(() => setLoading(false));
 
-  useEffect(() => { carregar(); }, [id]);
+  useEffect(() => { carregar(); carregarFiliais(); }, [id]);
 
   const handleSalvarTenant = async e => {
     e.preventDefault();
@@ -188,6 +210,47 @@ export default function TenantDetail() {
           Salvar
         </button>
       </form>
+
+      {/* filiais */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6">
+        <h2 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-indigo-400" /> Filiais / Cidades
+        </h2>
+
+        {filiais.filter(f => f.ativo).length > 0 && (
+          <div className="mb-4 space-y-2">
+            {filiais.filter(f => f.ativo).map(f => (
+              <div key={f.id} className="flex items-center justify-between bg-gray-900 rounded-lg px-3 py-2 border border-gray-700">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="text-sm text-white font-medium">{f.nome}</span>
+                  <span className="text-xs text-gray-400">{f.cidade}{f.uf ? ` — ${f.uf}` : ''}</span>
+                </div>
+                <button onClick={() => handleRemoverFilial(f.id)} className="text-gray-500 hover:text-red-400">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={handleAddFilial} className="flex gap-2 flex-wrap">
+          <input value={formFilial.nome} onChange={e => setFormFilial(f => ({ ...f, nome: e.target.value }))}
+            placeholder="Nome (ex: Araçuaí)"
+            className="flex-1 min-w-32 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <input value={formFilial.cidade} onChange={e => setFormFilial(f => ({ ...f, cidade: e.target.value }))}
+            placeholder="Cidade"
+            className="flex-1 min-w-28 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <input value={formFilial.uf} onChange={e => setFormFilial(f => ({ ...f, uf: e.target.value }))}
+            placeholder="UF" maxLength={2}
+            className="w-16 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button type="submit" disabled={savingFilial || !formFilial.nome || !formFilial.cidade}
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-sm font-medium">
+            {savingFilial ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+            Adicionar
+          </button>
+        </form>
+      </div>
 
       {/* funcionários */}
       <div className="bg-gray-800 rounded-xl border border-gray-700">

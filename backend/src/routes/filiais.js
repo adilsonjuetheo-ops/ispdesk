@@ -1,0 +1,48 @@
+import { Router } from 'express';
+import { db } from '../db/index.js';
+import { filiais } from '../db/schema.js';
+import { eq, and } from 'drizzle-orm';
+import { autenticar, apenasAdmin, mesmotenant } from '../middleware/auth.js';
+
+const router = Router({ mergeParams: true });
+router.use(autenticar);
+
+router.get('/', async (req, res) => {
+  const rows = await db.select().from(filiais)
+    .where(eq(filiais.tenantId, req.params.tenantId))
+    .orderBy(filiais.nome);
+  res.json(rows);
+});
+
+router.post('/', apenasAdmin, mesmotenant, async (req, res) => {
+  const { nome, cidade, uf } = req.body;
+  if (!nome || !cidade) return res.status(400).json({ erro: 'nome e cidade obrigatórios' });
+  const [filial] = await db.insert(filiais).values({
+    tenantId: req.params.tenantId, nome, cidade, uf,
+  }).returning();
+  res.status(201).json(filial);
+});
+
+router.put('/:id', apenasAdmin, mesmotenant, async (req, res) => {
+  const { nome, cidade, uf, ativo } = req.body;
+  const updates = {};
+  if (nome !== undefined) updates.nome = nome;
+  if (cidade !== undefined) updates.cidade = cidade;
+  if (uf !== undefined) updates.uf = uf;
+  if (ativo !== undefined) updates.ativo = ativo;
+  const [filial] = await db.update(filiais)
+    .set(updates)
+    .where(and(eq(filiais.id, req.params.id), eq(filiais.tenantId, req.params.tenantId)))
+    .returning();
+  if (!filial) return res.status(404).json({ erro: 'Filial não encontrada' });
+  res.json(filial);
+});
+
+router.delete('/:id', apenasAdmin, mesmotenant, async (req, res) => {
+  await db.update(filiais)
+    .set({ ativo: false })
+    .where(and(eq(filiais.id, req.params.id), eq(filiais.tenantId, req.params.tenantId)));
+  res.json({ mensagem: 'Filial desativada' });
+});
+
+export default router;

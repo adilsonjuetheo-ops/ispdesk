@@ -1,14 +1,22 @@
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
+import { MapPin } from 'lucide-react';
 
 const STATUS_BADGE = {
   bot: 'bg-emerald-100 text-emerald-800',
   aguardando: 'bg-amber-100 text-amber-800',
+  aguardando_filial: 'bg-purple-100 text-purple-800',
   humano: 'bg-blue-100 text-blue-800',
   encerrada: 'bg-gray-100 text-gray-600',
 };
-const STATUS_LABEL = { bot: 'Bot', aguardando: 'Aguardando', humano: 'Humano', encerrada: 'Encerrada' };
+const STATUS_LABEL = {
+  bot: 'Bot',
+  aguardando: 'Aguardando',
+  aguardando_filial: 'Sel. cidade',
+  humano: 'Humano',
+  encerrada: 'Encerrada',
+};
 
 function Iniciais({ nome }) {
   const partes = (nome || '?').split(' ');
@@ -60,11 +68,16 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                   {formatDistanceToNow(new Date(c.iniciadaEm), { locale: ptBR, addSuffix: true })}
                 </span>
               </div>
-              {c.clienteFilial && (
+              {c.filialNome && (
+                <p className="text-xs text-indigo-600 font-medium flex items-center gap-0.5 truncate">
+                  <MapPin className="w-3 h-3 shrink-0" />{c.filialNome}
+                </p>
+              )}
+              {!c.filialNome && c.clienteFilial && (
                 <p className="text-xs text-gray-400 truncate">{c.clienteFilial}</p>
               )}
-              <span className={clsx('inline-block text-xs px-1.5 py-0.5 rounded-full mt-1', STATUS_BADGE[c.status])}>
-                {STATUS_LABEL[c.status]}
+              <span className={clsx('inline-block text-xs px-1.5 py-0.5 rounded-full mt-1', STATUS_BADGE[c.status] || STATUS_BADGE.bot)}>
+                {STATUS_LABEL[c.status] || c.status}
               </span>
             </div>
           </button>

@@ -32,8 +32,8 @@ router.post('/login', async (req, res) => {
   const ok = await bcrypt.compare(senha, tu.senhaHash);
   if (!ok) return res.status(401).json({ erro: 'Credenciais inválidas' });
 
-  const token = gerarToken({ id: tu.id, email: tu.email, nome: tu.nome, role: tu.role, tenantId: tu.tenantId });
-  return res.json({ token, user: { id: tu.id, email: tu.email, nome: tu.nome, role: tu.role, tenantId: tu.tenantId } });
+  const token = gerarToken({ id: tu.id, email: tu.email, nome: tu.nome, role: tu.role, tenantId: tu.tenantId, filialId: tu.filialId || null });
+  return res.json({ token, user: { id: tu.id, email: tu.email, nome: tu.nome, role: tu.role, tenantId: tu.tenantId, filialId: tu.filialId || null } });
 });
 
 // rota de setup — cria primeiro super admin se não existir nenhum
