@@ -8,6 +8,17 @@ import {
 } from 'lucide-react';
 import api from '../../lib/api.js';
 
+const AVATAR_COLORS = [
+  '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b',
+  '#10b981', '#3b82f6', '#ef4444', '#14b8a6',
+];
+
+function avatarColor(nome) {
+  let hash = 0;
+  for (const c of nome) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
 export default function TenantLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -15,6 +26,7 @@ export default function TenantLayout() {
   const [tenant, setTenant] = useState(null);
   const [filiais, setFiliais] = useState([]);
   const [counts, setCounts] = useState({ todos: 0, mine: 0, fila: 0, porFilial: {} });
+  const [online, setOnline] = useState([]);
 
   useEffect(() => {
     api.get('/tenants/me').then(r => setTenant(r.data)).catch(() => {});
@@ -40,6 +52,22 @@ export default function TenantLayout() {
     const id = setInterval(fetchCounts, 10000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const ping = () => api.post('/presence/ping').catch(() => {});
+    const fetchOnline = () =>
+      api.get('/presence').then(r => setOnline(r.data)).catch(() => {});
+
+    ping();
+    fetchOnline();
+
+    const pingId = setInterval(ping, 30000);
+    const pollId = setInterval(fetchOnline, 15000);
+
+    return () => { clearInterval(pingId); clearInterval(pollId); };
+  }, [user?.id]);
 
   usePushNotifications(!!user?.tenantId);
   const handleLogout = () => { logout(); navigate('/login'); };
@@ -159,6 +187,31 @@ export default function TenantLayout() {
             </div>
           )}
         </nav>
+
+        {/* Online agora */}
+        {online.length > 0 && (
+          <div className="px-3 pt-2 pb-1 border-t border-gray-100">
+            <p className="text-xs text-gray-400 mb-2">Online agora</p>
+            <div className="flex flex-wrap gap-1.5">
+              {online.map(u => (
+                <div key={u.id} className="relative group">
+                  <div
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${
+                      u.id === user?.id ? 'ring-2 ring-offset-1 ring-blue-400' : ''
+                    }`}
+                    style={{ backgroundColor: avatarColor(u.nome) }}
+                  >
+                    {u.nome[0].toUpperCase()}
+                  </div>
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+                  <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded-lg px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
+                    {u.nome}{u.id === user?.id ? ' (você)' : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="p-3 border-t border-gray-200">
           {user?.role === 'admin' && (

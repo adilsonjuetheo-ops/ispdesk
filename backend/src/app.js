@@ -11,6 +11,7 @@ import webhookRouter from './routes/webhook.js';
 import relatorioRouter from './routes/relatorio.js';
 import atalhoRouter from './routes/atalhos.js';
 import pushRouter from './routes/push.js';
+import presenceRouter from './routes/presence.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
 import { runMigrations } from './db/migrations.js';
@@ -35,6 +36,7 @@ app.use('/api/conversations', conversationsRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/relatorio', relatorioRouter);
 app.use('/api/push', pushRouter);
+app.use('/api/presence', presenceRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
