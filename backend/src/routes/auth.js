@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { db } from '../db/index.js';
 import { superAdmins, tenantUsers, tenants } from '../db/schema.js';
 import { eq, count } from 'drizzle-orm';
+import { autenticar } from '../middleware/auth.js';
 
 const router = Router();
 
