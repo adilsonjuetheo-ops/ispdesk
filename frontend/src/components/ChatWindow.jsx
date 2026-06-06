@@ -1,23 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
-import { Send, UserCheck, Bot, X, Loader2, Paperclip, FileText, ImageIcon, Mic, ClipboardList } from 'lucide-react';
+import { Send, UserCheck, Bot, X, Loader2, Paperclip, FileText, ImageIcon, Mic, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
-
-const FORMULARIO_CADASTRO = `📝 Formulário de Cadastro
-Por favor, preencha os campos abaixo para darmos continuidade ao seu atendimento:
-
-👤 Nome completo:
-🆔 CPF:
-🪪 RG:
-📅 Data de nascimento:
-📧 E-mail:
-📱 Celular:
-📍 Endereço completo:
-📦 Plano escolhido:
-🗓️ Data de vencimento preferida:`;
 
 function MidiaBolao({ conteudo, isCliente }) {
   const isImagem = conteudo.startsWith('[Imagem]');
@@ -70,7 +57,7 @@ function BolaoMsg({ msg, agenteNome }) {
         {isMidia ? (
           <MidiaBolao conteudo={msg.conteudo} isCliente={isCliente} />
         ) : (
-          <div className={clsx('rounded-2xl px-4 py-2.5 text-sm', {
+          <div className={clsx('rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap', {
             'bg-white border border-gray-200 text-gray-800 rounded-tl-sm': isCliente,
             'bg-emerald-50 text-emerald-900 rounded-tr-sm border border-emerald-100': isBot,
             'bg-blue-50 text-blue-900 rounded-tr-sm border border-blue-100': !isCliente && !isBot,
@@ -93,6 +80,9 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   const [enviando, setEnviando] = useState(false);
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const [acao, setAcao] = useState(false);
+  const [aba, setAba] = useState('resposta');
+  const [atalhosList, setAtalhosList] = useState([]);
+  const [buscaAtalho, setBuscaAtalho] = useState('');
   const bottomRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -102,11 +92,17 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   useEffect(() => {
     setMsgs([]);
     carregarMsgs();
+    setAba('resposta');
   }, [conversa.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [msgs]);
+
+  useEffect(() => {
+    if (!user?.tenantId) return;
+    api.get(`/tenants/${user.tenantId}/atalhos`).then(r => setAtalhosList(r.data)).catch(() => {});
+  }, [user?.tenantId]);
 
   const podeAtuar = conversa.status !== 'encerrada';
   const eHumano = conversa.status === 'humano';
@@ -159,6 +155,24 @@ export default function ChatWindow({ conversa, onAtualizar }) {
     }
   };
 
+  const selecionarAtalho = (atalho) => {
+    setTexto(atalho.conteudo);
+    setAba('resposta');
+    setBuscaAtalho('');
+  };
+
+  const atalhosFiltrados = atalhosList.filter(a =>
+    a.titulo.toLowerCase().includes(buscaAtalho.toLowerCase()) ||
+    (a.atalho || '').toLowerCase().includes(buscaAtalho.toLowerCase())
+  );
+
+  const tabClass = (t) =>
+    `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+      aba === t
+        ? 'border-blue-600 text-blue-600'
+        : 'border-transparent text-gray-500 hover:text-gray-700'
+    }`;
+
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* header */}
@@ -195,49 +209,96 @@ export default function ChatWindow({ conversa, onAtualizar }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* atalhos rápidos */}
-      {eHumano && (
-        <div className="bg-white border-t border-gray-100 px-3 pt-2 pb-0 flex gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setTexto(FORMULARIO_CADASTRO)}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-full px-3 py-1 transition-colors"
-          >
-            <ClipboardList className="w-3.5 h-3.5" />
-            Formulário de cadastro
-          </button>
-        </div>
-      )}
+      {/* área de input com tabs */}
+      <div className="bg-white border-t border-gray-200">
+        {/* tabs — só aparecem quando agente assumiu */}
+        {eHumano && (
+          <div className="flex border-b border-gray-100 px-3">
+            <button className={tabClass('resposta')} onClick={() => setAba('resposta')}>
+              Resposta
+            </button>
+            <button className={tabClass('atalhos')} onClick={() => setAba('atalhos')}>
+              Atalhos
+            </button>
+          </div>
+        )}
 
-      {/* input */}
-      <form onSubmit={handleEnviar} className="bg-white border-t border-gray-200 p-3 flex gap-2 items-center">
-        <input ref={fileRef} type="file" className="hidden"
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-          onChange={handleEnviarArquivo}
-          disabled={!eHumano}
-        />
-        <button type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={!eHumano || enviandoArquivo}
-          title="Enviar arquivo"
-          className="text-gray-400 hover:text-blue-600 disabled:opacity-30 transition-colors p-1 shrink-0">
-          {enviandoArquivo
-            ? <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-            : <Paperclip className="w-5 h-5" />}
-        </button>
-        <input
-          type="text"
-          value={texto}
-          onChange={e => setTexto(e.target.value)}
-          disabled={!eHumano}
-          placeholder={eHumano ? 'Digite sua mensagem...' : 'Assuma a conversa para responder'}
-          className="flex-1 bg-gray-100 rounded-xl px-4 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
-        />
-        <button type="submit" disabled={!eHumano || !texto.trim() || enviando}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
-          {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        </button>
-      </form>
+        {/* painel Atalhos */}
+        {eHumano && aba === 'atalhos' && (
+          <div className="max-h-56 flex flex-col">
+            <div className="px-3 pt-2 pb-1">
+              <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1.5">
+                <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Pesquisar atalhos..."
+                  value={buscaAtalho}
+                  onChange={e => setBuscaAtalho(e.target.value)}
+                  className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {atalhosFiltrados.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">
+                  {atalhosList.length === 0 ? 'Nenhum atalho configurado' : 'Nenhum resultado'}
+                </p>
+              ) : (
+                atalhosFiltrados.map(a => (
+                  <button
+                    key={a.id}
+                    onClick={() => selecionarAtalho(a)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0"
+                  >
+                    <div className="flex items-center gap-2">
+                      {a.atalho && (
+                        <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded shrink-0">
+                          {a.atalho}
+                        </span>
+                      )}
+                      <span className="text-sm font-medium text-gray-700 truncate">{a.titulo}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 truncate mt-0.5 pl-0">{a.conteudo}</p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* input Resposta */}
+        {(!eHumano || aba === 'resposta') && (
+          <form onSubmit={handleEnviar} className="p-3 flex gap-2 items-center">
+            <input ref={fileRef} type="file" className="hidden"
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+              onChange={handleEnviarArquivo}
+              disabled={!eHumano}
+            />
+            <button type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={!eHumano || enviandoArquivo}
+              title="Enviar arquivo"
+              className="text-gray-400 hover:text-blue-600 disabled:opacity-30 transition-colors p-1 shrink-0">
+              {enviandoArquivo
+                ? <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                : <Paperclip className="w-5 h-5" />}
+            </button>
+            <input
+              type="text"
+              value={texto}
+              onChange={e => setTexto(e.target.value)}
+              disabled={!eHumano}
+              placeholder={eHumano ? 'Digite sua mensagem...' : 'Assuma a conversa para responder'}
+              className="flex-1 bg-gray-100 rounded-xl px-4 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+            />
+            <button type="submit" disabled={!eHumano || !texto.trim() || enviando}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
+              {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

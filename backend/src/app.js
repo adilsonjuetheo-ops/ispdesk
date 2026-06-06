@@ -9,6 +9,7 @@ import filiaisRouter from './routes/filiais.js';
 import conversationsRouter from './routes/conversations.js';
 import webhookRouter from './routes/webhook.js';
 import relatorioRouter from './routes/relatorio.js';
+import atalhoRouter from './routes/atalhos.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
 
@@ -30,6 +31,7 @@ app.use('/api/tenants/:tenantId/filiais', filiaisRouter);
 app.use('/api/conversations', conversationsRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/relatorio', relatorioRouter);
+app.use('/api/tenants/:tenantId/atalhos', atalhoRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

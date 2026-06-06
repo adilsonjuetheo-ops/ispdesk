@@ -94,6 +94,15 @@ export const mensagens = pgTable('mensagens', {
   enviadaEm:  timestamp('enviada_em').defaultNow(),
 });
 
+export const atalhos = pgTable('atalhos', {
+  id:       uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  titulo:   text('titulo').notNull(),
+  atalho:   text('atalho'),
+  conteudo: text('conteudo').notNull(),
+  criadoEm: timestamp('criado_em').defaultNow(),
+});
+
 export const webhookLog = pgTable('webhook_log', {
   wamid:       text('wamid').primaryKey(),
   tenantId:    uuid('tenant_id').notNull().references(() => tenants.id),

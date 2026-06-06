@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
-  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare,
+  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap,
 } from 'lucide-react';
 import api from '../../lib/api.js';
 
@@ -142,6 +142,9 @@ export default function TenantLayout() {
               </NavLink>
               <NavLink to="/agents" className={navClass}>
                 <Users className="w-4 h-4" /> Equipe
+              </NavLink>
+              <NavLink to="/atalhos" className={navClass}>
+                <Zap className="w-4 h-4" /> Atalhos
               </NavLink>
             </div>
           )}
