@@ -25,13 +25,13 @@ app.use('/api/webhook', express.json());
 app.use(express.json());
 
 app.use('/api/auth', authRouter);
-app.use('/api/tenants', tenantsRouter);
 app.use('/api/tenants/:tenantId/agents', agentsRouter);
 app.use('/api/tenants/:tenantId/filiais', filiaisRouter);
+app.use('/api/tenants/:tenantId/atalhos', atalhoRouter);
+app.use('/api/tenants', tenantsRouter);
 app.use('/api/conversations', conversationsRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/relatorio', relatorioRouter);
-app.use('/api/tenants/:tenantId/atalhos', atalhoRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
