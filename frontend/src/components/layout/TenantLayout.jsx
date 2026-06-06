@@ -23,7 +23,9 @@ export default function TenantLayout() {
   useEffect(() => {
     if (!user?.tenantId) return;
     const fetchFiliais = () =>
-      api.get(`/tenants/${user.tenantId}/filiais`).then(r => setFiliais(r.data)).catch(() => {});
+      api.get(`/tenants/${user.tenantId}/filiais`)
+        .then(r => { console.log('[filiais]', r.data); setFiliais(r.data); })
+        .catch(err => console.error('[filiais] erro:', err?.response?.status, err?.message));
     fetchFiliais();
     const id = setInterval(fetchFiliais, 30000);
     window.addEventListener('ispdesk:filiais-updated', fetchFiliais);

@@ -153,7 +153,10 @@ export default function Settings() {
 
   const handleAddFilial = async e => {
     e.preventDefault();
-    if (!formFilial.nome || !formFilial.cidade) return;
+    if (!formFilial.nome || !formFilial.cidade) {
+      setErroFilial('Preencha o nome e a cidade da filial.');
+      return;
+    }
     setSavingFilial(true);
     setErroFilial('');
     try {
