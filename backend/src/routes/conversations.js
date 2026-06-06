@@ -12,7 +12,7 @@ router.use(autenticar);
 
 router.get('/counts', async (req, res) => {
   const tenantId = req.user.tenantId;
-  if (!tenantId) return res.json({ todos: 0, mine: 0, fila: 0 });
+  if (!tenantId) return res.json({ todos: 0, mine: 0, fila: 0, porFilial: {} });
 
   const [r1] = await db.select({ total: count() }).from(conversas)
     .where(and(eq(conversas.tenantId, tenantId), ne(conversas.status, 'encerrada')));
@@ -23,7 +23,16 @@ router.get('/counts', async (req, res) => {
   const [r3] = await db.select({ total: count() }).from(conversas)
     .where(and(eq(conversas.tenantId, tenantId), inArray(conversas.status, ['aguardando', 'aguardando_filial'])));
 
-  res.json({ todos: Number(r1.total), mine: Number(r2.total), fila: Number(r3.total) });
+  const filialRows = await db.select({ filialId: conversas.filialId, total: count() }).from(conversas)
+    .where(and(eq(conversas.tenantId, tenantId), ne(conversas.status, 'encerrada')))
+    .groupBy(conversas.filialId);
+
+  const porFilial = {};
+  for (const r of filialRows) {
+    if (r.filialId) porFilial[r.filialId] = Number(r.total);
+  }
+
+  res.json({ todos: Number(r1.total), mine: Number(r2.total), fila: Number(r3.total), porFilial });
 });
 
 router.get('/', async (req, res) => {

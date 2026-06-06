@@ -14,7 +14,7 @@ export default function TenantLayout() {
   const location = useLocation();
   const [tenant, setTenant] = useState(null);
   const [filiais, setFiliais] = useState([]);
-  const [counts, setCounts] = useState({ todos: 0, mine: 0, fila: 0 });
+  const [counts, setCounts] = useState({ todos: 0, mine: 0, fila: 0, porFilial: {} });
 
   useEffect(() => {
     api.get('/tenants/me').then(r => setTenant(r.data)).catch(() => {});
@@ -22,7 +22,11 @@ export default function TenantLayout() {
 
   useEffect(() => {
     if (!user?.tenantId) return;
-    api.get(`/tenants/${user.tenantId}/filiais`).then(r => setFiliais(r.data)).catch(() => {});
+    const fetchFiliais = () =>
+      api.get(`/tenants/${user.tenantId}/filiais`).then(r => setFiliais(r.data)).catch(() => {});
+    fetchFiliais();
+    const id = setInterval(fetchFiliais, 30000);
+    return () => clearInterval(id);
   }, [user?.tenantId]);
 
   useEffect(() => {
@@ -124,12 +128,13 @@ export default function TenantLayout() {
                 Filiais
               </p>
               <div className="space-y-0.5">
-                {filiais.map(f =>
+                {filiais.filter(f => f.ativo).map(f =>
                   subItem(
                     isFilialActive(f.id),
                     () => navigate(`/inbox?filial=${f.id}`),
                     MapPin,
                     f.nome,
+                    counts.porFilial?.[f.id] || 0,
                   )
                 )}
               </div>
