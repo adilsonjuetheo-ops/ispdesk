@@ -5,7 +5,10 @@ import { FORMULARIO_CADASTRO } from '../constants/formularios.js';
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // clienteWhatsapp: número do remetente vindo direto do payload do webhook
+const TAGS_VALIDAS = ['Suporte Técnico','Cobrança','Cancelamento','Instalação','Velocidade','Sem Sinal','Mudança de Plano','Outros'];
+
 export async function processarMensagem(tenant, conversa, historico, novaMensagem, clienteWhatsapp) {
+  const primeiraMsg = historico.filter(m => m.origem === 'cliente').length <= 1;
 
   // 1. Busca dados do cliente no SGP em tempo real
   const contextoSgp = await buscarContextoSgp(tenant, clienteWhatsapp);
@@ -22,6 +25,7 @@ INSTRUÇÕES IMPORTANTES:
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
 - Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem.
 - Se o cliente solicitar instalação ou contratar um plano e NÃO houver dados cadastrais dele (cliente sem contrato no sistema), envie exatamente o formulário abaixo e aguarde o preenchimento:
+${primeiraMsg ? `- Na PRIMEIRA mensagem do cliente, identifique o assunto principal e inclua ao final da resposta (linha separada): TAG:categoria — onde categoria é exatamente uma de: ${TAGS_VALIDAS.join(', ')}.` : ''}
 
 ${FORMULARIO_CADASTRO}
 
@@ -88,15 +92,26 @@ ASSISTENTE: ${tenant.nomeAssistente}`;
     .map(b => b.text)
     .join('');
 
-  // 8. Detecta handoff
-  if (texto.includes('ACTION:HANDOFF:')) {
-    const motivo = texto.split('ACTION:HANDOFF:')[1].split('\n')[0].trim();
+  // 8. Extrai TAG automática (só presente na primeira mensagem)
+  let tag = null;
+  let textoLimpo = texto;
+  const tagMatch = texto.match(/\nTAG:(.+)$/m);
+  if (tagMatch) {
+    const candidata = tagMatch[1].trim();
+    if (TAGS_VALIDAS.includes(candidata)) tag = candidata;
+    textoLimpo = texto.replace(tagMatch[0], '').trim();
+  }
+
+  // 9. Detecta handoff
+  if (textoLimpo.includes('ACTION:HANDOFF:')) {
+    const motivo = textoLimpo.split('ACTION:HANDOFF:')[1].split('\n')[0].trim();
     return {
-      resposta: texto.split('ACTION:HANDOFF:')[0].trim(),
+      resposta: textoLimpo.split('ACTION:HANDOFF:')[0].trim(),
       devePelearHumano: true,
       motivo,
+      tag,
     };
   }
 
-  return { resposta: texto, devePelearHumano: false };
+  return { resposta: textoLimpo, devePelearHumano: false, tag };
 }

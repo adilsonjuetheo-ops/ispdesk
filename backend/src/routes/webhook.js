@@ -196,6 +196,15 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
 
   const resultado = await processarMensagem(tenant, conversa, historico, texto, remetente);
 
+  if (resultado.tag) {
+    const tagsAtuais = Array.isArray(conversa.tags) ? conversa.tags : [];
+    if (tagsAtuais.length === 0) {
+      await db.update(conversas)
+        .set({ tags: JSON.stringify([resultado.tag]) })
+        .where(eq(conversas.id, conversa.id));
+    }
+  }
+
   if (resultado.resposta) {
     await db.insert(mensagens).values({
       conversaId: conversa.id,
