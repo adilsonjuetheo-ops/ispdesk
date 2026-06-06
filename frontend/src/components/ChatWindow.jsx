@@ -1,15 +1,35 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
-import { Send, UserCheck, Bot, X, Loader2 } from 'lucide-react';
+import { Send, UserCheck, Bot, X, Loader2, Paperclip, FileText, ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
+
+function MidiaBolao({ conteudo, isCliente }) {
+  const isImagem = conteudo.startsWith('[Imagem]');
+  const nome = conteudo.replace(/^\[(Imagem|Arquivo)\] /, '');
+  const Icon = isImagem ? ImageIcon : FileText;
+  const cor = isCliente
+    ? 'bg-white border border-gray-200 text-gray-700'
+    : 'bg-blue-50 border border-blue-100 text-blue-800';
+
+  return (
+    <div className={`flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm max-w-[260px] ${cor}`}>
+      <Icon className="w-8 h-8 shrink-0 opacity-60" />
+      <div className="min-w-0">
+        <p className="font-medium truncate text-xs">{nome}</p>
+        <p className="text-xs opacity-60 mt-0.5">{isImagem ? 'Imagem enviada' : 'Documento enviado'}</p>
+      </div>
+    </div>
+  );
+}
 
 function BolaoMsg({ msg, agenteNome }) {
   const isCliente = msg.origem === 'cliente';
   const isBot = msg.origem === 'bot';
   const isSistema = msg.conteudo.startsWith('[Sistema]');
+  const isMidia = msg.conteudo.startsWith('[Arquivo]') || msg.conteudo.startsWith('[Imagem]');
 
   if (isSistema) {
     return (
@@ -32,13 +52,17 @@ function BolaoMsg({ msg, agenteNome }) {
             }
           </p>
         )}
-        <div className={clsx('rounded-2xl px-4 py-2.5 text-sm', {
-          'bg-white border border-gray-200 text-gray-800 rounded-tl-sm': isCliente,
-          'bg-emerald-50 text-emerald-900 rounded-tr-sm border border-emerald-100': isBot,
-          'bg-blue-50 text-blue-900 rounded-tr-sm border border-blue-100': !isCliente && !isBot,
-        })}>
-          {msg.conteudo}
-        </div>
+        {isMidia ? (
+          <MidiaBolao conteudo={msg.conteudo} isCliente={isCliente} />
+        ) : (
+          <div className={clsx('rounded-2xl px-4 py-2.5 text-sm', {
+            'bg-white border border-gray-200 text-gray-800 rounded-tl-sm': isCliente,
+            'bg-emerald-50 text-emerald-900 rounded-tr-sm border border-emerald-100': isBot,
+            'bg-blue-50 text-blue-900 rounded-tr-sm border border-blue-100': !isCliente && !isBot,
+          })}>
+            {msg.conteudo}
+          </div>
+        )}
         <p className={clsx('text-xs text-gray-400 mt-1', isCliente ? 'text-left' : 'text-right')}>
           {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
         </p>
@@ -52,8 +76,10 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   const [msgs, setMsgs] = useState([]);
   const [texto, setTexto] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const [acao, setAcao] = useState(false);
   const bottomRef = useRef(null);
+  const fileRef = useRef(null);
 
   const carregarMsgs = () =>
     api.get(`/conversations/${conversa.id}/messages`).then(r => setMsgs(r.data));
@@ -69,33 +95,23 @@ export default function ChatWindow({ conversa, onAtualizar }) {
 
   const podeAtuar = conversa.status !== 'encerrada';
   const eHumano = conversa.status === 'humano';
-  const podeEscrever = eHumano;
 
   const handleAsumir = async () => {
     setAcao(true);
-    try {
-      await api.post(`/conversations/${conversa.id}/assume`);
-      onAtualizar();
-      carregarMsgs();
-    } finally { setAcao(false); }
+    try { await api.post(`/conversations/${conversa.id}/assume`); onAtualizar(); carregarMsgs(); }
+    finally { setAcao(false); }
   };
 
   const handleLiberar = async () => {
     setAcao(true);
-    try {
-      await api.post(`/conversations/${conversa.id}/release`);
-      onAtualizar();
-      carregarMsgs();
-    } finally { setAcao(false); }
+    try { await api.post(`/conversations/${conversa.id}/release`); onAtualizar(); carregarMsgs(); }
+    finally { setAcao(false); }
   };
 
   const handleEncerrar = async () => {
     setAcao(true);
-    try {
-      await api.post(`/conversations/${conversa.id}/close`);
-      onAtualizar();
-      carregarMsgs();
-    } finally { setAcao(false); }
+    try { await api.post(`/conversations/${conversa.id}/close`); onAtualizar(); carregarMsgs(); }
+    finally { setAcao(false); }
   };
 
   const handleEnviar = async e => {
@@ -107,6 +123,25 @@ export default function ChatWindow({ conversa, onAtualizar }) {
       setTexto('');
       carregarMsgs();
     } finally { setEnviando(false); }
+  };
+
+  const handleEnviarArquivo = async e => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    setEnviandoArquivo(true);
+    try {
+      const form = new FormData();
+      form.append('arquivo', arquivo);
+      await api.post(`/conversations/${conversa.id}/send-media`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      carregarMsgs();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao enviar arquivo');
+    } finally {
+      setEnviandoArquivo(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -121,21 +156,18 @@ export default function ChatWindow({ conversa, onAtualizar }) {
           {podeAtuar && !eHumano && (
             <button onClick={handleAsumir} disabled={acao}
               className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-              <UserCheck className="w-3.5 h-3.5" />
-              Assumir
+              <UserCheck className="w-3.5 h-3.5" /> Assumir
             </button>
           )}
           {eHumano && (
             <>
               <button onClick={handleLiberar} disabled={acao}
                 className="flex items-center gap-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-                <Bot className="w-3.5 h-3.5" />
-                Liberar para bot
+                <Bot className="w-3.5 h-3.5" /> Liberar para bot
               </button>
               <button onClick={handleEncerrar} disabled={acao}
                 className="flex items-center gap-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-                <X className="w-3.5 h-3.5" />
-                Encerrar
+                <X className="w-3.5 h-3.5" /> Encerrar
               </button>
             </>
           )}
@@ -144,24 +176,36 @@ export default function ChatWindow({ conversa, onAtualizar }) {
 
       {/* mensagens */}
       <div className="flex-1 overflow-y-auto p-4">
-        {msgs.map(m => (
-          <BolaoMsg key={m.id} msg={m} agenteNome={user?.nome} />
-        ))}
+        {msgs.map(m => <BolaoMsg key={m.id} msg={m} agenteNome={user?.nome} />)}
         <div ref={bottomRef} />
       </div>
 
       {/* input */}
-      <form onSubmit={handleEnviar} className="bg-white border-t border-gray-200 p-3 flex gap-2">
+      <form onSubmit={handleEnviar} className="bg-white border-t border-gray-200 p-3 flex gap-2 items-center">
+        <input ref={fileRef} type="file" className="hidden"
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+          onChange={handleEnviarArquivo}
+          disabled={!eHumano}
+        />
+        <button type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={!eHumano || enviandoArquivo}
+          title="Enviar arquivo"
+          className="text-gray-400 hover:text-blue-600 disabled:opacity-30 transition-colors p-1 shrink-0">
+          {enviandoArquivo
+            ? <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+            : <Paperclip className="w-5 h-5" />}
+        </button>
         <input
           type="text"
           value={texto}
           onChange={e => setTexto(e.target.value)}
-          disabled={!podeEscrever}
-          placeholder={podeEscrever ? 'Digite sua mensagem...' : 'Assuma a conversa para responder'}
+          disabled={!eHumano}
+          placeholder={eHumano ? 'Digite sua mensagem...' : 'Assuma a conversa para responder'}
           className="flex-1 bg-gray-100 rounded-xl px-4 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
         />
-        <button type="submit" disabled={!podeEscrever || !texto.trim() || enviando}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl px-4 py-2 transition-colors">
+        <button type="submit" disabled={!eHumano || !texto.trim() || enviando}
+          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
           {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>
       </form>

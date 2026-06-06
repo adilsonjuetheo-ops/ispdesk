@@ -3,7 +3,9 @@ import { db } from '../db/index.js';
 import { conversas, mensagens, clientes, tenantUsers, filiais } from '../db/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
-import { enviarMensagem } from '../services/whatsapp.js';
+import multer from 'multer';
+import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.js';
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 import { tenants } from '../db/schema.js';
 
 const router = Router();
@@ -160,6 +162,35 @@ router.post('/:id/send', async (req, res) => {
     conversaId: id,
     origem: 'agente',
     conteudo: texto,
+  }).returning();
+
+  res.json(msg);
+});
+
+router.post('/:id/send-media', upload.single('arquivo'), async (req, res) => {
+  const { id } = req.params;
+  const arquivo = req.file;
+  if (!arquivo) return res.status(400).json({ erro: 'Arquivo obrigatório' });
+
+  const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId)
+    return res.status(403).json({ erro: 'Acesso negado' });
+  if (conversa.status !== 'humano')
+    return res.status(400).json({ erro: 'Só agentes podem enviar em conversas humanas' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+
+  const tipo = arquivo.mimetype.startsWith('image/') ? 'image' : 'document';
+  const { id: mediaId } = await uploadMidia(tenant, arquivo.buffer, arquivo.mimetype, arquivo.originalname);
+  await enviarMidia(tenant, cliente.whatsapp, mediaId, tipo, arquivo.originalname);
+
+  const prefixo = tipo === 'image' ? '[Imagem]' : '[Arquivo]';
+  const [msg] = await db.insert(mensagens).values({
+    conversaId: id,
+    origem: 'agente',
+    conteudo: `${prefixo} ${arquivo.originalname}`,
   }).returning();
 
   res.json(msg);
