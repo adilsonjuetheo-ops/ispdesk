@@ -23,7 +23,7 @@ export default function SuperAdminLayout() {
       {/* sidebar */}
       <aside className="w-56 bg-gray-900 border-r border-gray-800 flex flex-col">
         <div className="p-4 border-b border-gray-800">
-          <img src="/logo.png" alt="ISPDesk" className="h-9 w-auto mb-1" />
+          <img src="/logoisp.png" alt="ISPDesk" className="h-9 w-auto mb-1" />
           <div className="text-xs text-gray-500 mt-1">Super Admin</div>
         </div>
 
