@@ -9,6 +9,7 @@ import filiaisRouter from './routes/filiais.js';
 import conversationsRouter from './routes/conversations.js';
 import webhookRouter from './routes/webhook.js';
 import relatorioRouter from './routes/relatorio.js';
+import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 
 const app = express();
 
@@ -37,4 +38,7 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`ISPDesk backend rodando na porta ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`ISPDesk backend rodando na porta ${PORT}`);
+  agendarLimpeza();
+});

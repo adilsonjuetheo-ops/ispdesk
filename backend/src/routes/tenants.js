@@ -114,4 +114,9 @@ router.delete('/:id', async (req, res) => {
   res.json({ mensagem: 'Provedor desativado' });
 });
 
+router.delete('/:id/excluir', async (req, res) => {
+  await db.delete(tenants).where(eq(tenants.id, req.params.id));
+  res.json({ mensagem: 'Provedor excluído permanentemente' });
+});
+
 export default router;

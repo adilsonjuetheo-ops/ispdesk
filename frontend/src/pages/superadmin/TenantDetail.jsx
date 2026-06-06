@@ -1,7 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
-import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2, MapPin } from 'lucide-react';
+import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2, MapPin, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
+
+const PLANOS = [
+  { value: 'basic',      label: 'Basic',      preco: 'R$149,90/mês', cor: 'text-gray-300'  },
+  { value: 'pro',        label: 'Pro',         preco: 'R$299,90/mês', cor: 'text-blue-400'  },
+  { value: 'enterprise', label: 'Enterprise',  preco: 'R$549,90/mês', cor: 'text-amber-400' },
+];
+
+const PLANO_BADGE = {
+  basic:      'bg-gray-700 text-gray-300',
+  pro:        'bg-blue-900/50 text-blue-300 border border-blue-700',
+  enterprise: 'bg-amber-900/50 text-amber-300 border border-amber-700',
+};
 
 export default function TenantDetail() {
   const { id } = useParams();
@@ -18,6 +30,9 @@ export default function TenantDetail() {
   const [modalAgente, setModalAgente] = useState(false);
   const [formAgente, setFormAgente] = useState({ nome: '', email: '', senha: '', role: 'agente' });
   const [editandoAgente, setEditandoAgente] = useState(null);
+  const [modalExcluir, setModalExcluir] = useState(false);
+  const [confirmaExcluir, setConfirmaExcluir] = useState('');
+  const [excluindo, setExcluindo] = useState(false);
   const fileRef = useRef(null);
 
   const handleLogoUpload = e => {
@@ -70,6 +85,12 @@ export default function TenantDetail() {
     }
   };
 
+  const handleToggleAtivo = async () => {
+    const novoAtivo = !tenant.ativo;
+    await api.put(`/tenants/${id}`, { ...tenant, ativo: novoAtivo });
+    setTenant(t => ({ ...t, ativo: novoAtivo }));
+  };
+
   const handleSalvarAgente = async e => {
     e.preventDefault();
     setSaving(true);
@@ -102,8 +123,23 @@ export default function TenantDetail() {
     carregar();
   };
 
+  const handleExcluirDefinitivo = async () => {
+    if (confirmaExcluir !== tenant.nome) return;
+    setExcluindo(true);
+    try {
+      await api.delete(`/tenants/${id}/excluir`);
+      navigate('/admin/tenants');
+    } catch {
+      setErro('Erro ao excluir provedor');
+      setExcluindo(false);
+    }
+  };
+
   if (loading) return <div className="p-8 text-gray-400">Carregando...</div>;
   if (!tenant) return <div className="p-8 text-red-400">Provedor não encontrado</div>;
+
+  const planoBadge = PLANO_BADGE[tenant.plano] || PLANO_BADGE.basic;
+  const planoInfo = PLANOS.find(p => p.value === tenant.plano);
 
   return (
     <div className="p-8 max-w-4xl">
@@ -111,8 +147,28 @@ export default function TenantDetail() {
         <ArrowLeft className="w-4 h-4" /> Voltar
       </button>
 
-      <h1 className="text-2xl font-bold text-white mb-8">{tenant.nome}</h1>
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-white">{tenant.nome}</h1>
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${planoBadge}`}>
+            {planoInfo?.label || tenant.plano} · {planoInfo?.preco}
+          </span>
+        </div>
+        <button
+          onClick={handleToggleAtivo}
+          className={`flex items-center gap-2 text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
+            tenant.ativo
+              ? 'bg-emerald-900/40 text-emerald-300 hover:bg-red-900/40 hover:text-red-300'
+              : 'bg-red-900/40 text-red-300 hover:bg-emerald-900/40 hover:text-emerald-300'
+          }`}
+        >
+          {tenant.ativo ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+          {tenant.ativo ? 'Ativo' : 'Inativo'}
+        </button>
+      </div>
 
+      {/* Formulário principal */}
       <form onSubmit={handleSalvarTenant} className="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6">
         <h2 className="text-white font-semibold mb-4">Dados do provedor</h2>
 
@@ -149,14 +205,15 @@ export default function TenantDetail() {
             <label className="block text-xs text-gray-400 mb-1">Plano</label>
             <select value={tenant.plano} onChange={e => setTenant(t => ({ ...t, plano: e.target.value }))}
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm">
-              <option value="basic">Basic</option>
-              <option value="pro">Pro</option>
-              <option value="enterprise">Enterprise</option>
+              {PLANOS.map(p => (
+                <option key={p.value} value={p.value}>{p.label} — {p.preco}</option>
+              ))}
             </select>
           </div>
           <Field dark label="WhatsApp Number ID" value={tenant.whatsappNumberId || ''} onChange={v => setTenant(t => ({ ...t, whatsappNumberId: v }))} />
           <Field dark label="WhatsApp Token" value={tenant.whatsappToken || ''} onChange={v => setTenant(t => ({ ...t, whatsappToken: v }))} />
         </div>
+
         {/* SGP */}
         <div className="mb-4">
           <label className="block text-xs text-gray-400 mb-1">Sistema de gestão (SGP)</label>
@@ -179,9 +236,9 @@ export default function TenantDetail() {
             <div className="mt-2">
               <Field dark
                 label={
-                  tenant.sgpTipo === 'atlaz'    ? 'Token Atlaz' :
-                  tenant.sgpTipo === 'ixc'      ? 'Credencial IXC (usuário:token)' :
-                  tenant.sgpTipo === 'mkauth'   ? 'Auth token MK-Auth' :
+                  tenant.sgpTipo === 'atlaz'  ? 'Token Atlaz' :
+                  tenant.sgpTipo === 'ixc'    ? 'Credencial IXC (usuário:token)' :
+                  tenant.sgpTipo === 'mkauth' ? 'Auth token MK-Auth' :
                   'Token de autenticação'
                 }
                 value={tenant.sgpApiKey || ''}
@@ -198,10 +255,12 @@ export default function TenantDetail() {
             onChange={e => setTenant(t => ({ ...t, systemPrompt: e.target.value }))}
             className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
+
         <div className="mb-4 p-3 bg-gray-900 rounded-lg border border-gray-700">
           <p className="text-xs text-gray-500 mb-1">Webhook Verify Token (gerado automaticamente)</p>
           <code className="text-xs text-indigo-300 break-all">{tenant.webhookVerifyToken}</code>
         </div>
+
         {sucesso && <p className="text-emerald-400 text-sm mb-3">{sucesso}</p>}
         {erro && <p className="text-red-400 text-sm mb-3">{erro}</p>}
         <button type="submit" disabled={saving}
@@ -253,7 +312,7 @@ export default function TenantDetail() {
       </div>
 
       {/* funcionários */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700">
+      <div className="bg-gray-800 rounded-xl border border-gray-700 mb-6">
         <div className="flex items-center justify-between p-5 border-b border-gray-700">
           <h2 className="text-white font-semibold">Funcionários</h2>
           <button onClick={() => { setEditandoAgente(null); setFormAgente({ nome: '', email: '', senha: '', role: 'agente' }); setModalAgente(true); }}
@@ -294,6 +353,71 @@ export default function TenantDetail() {
         </table>
       </div>
 
+      {/* Zona de perigo */}
+      <div className="bg-gray-800 rounded-xl border border-red-900/50 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <AlertTriangle className="w-4 h-4 text-red-400" />
+          <h2 className="text-red-400 font-semibold">Zona de perigo</h2>
+        </div>
+        <p className="text-gray-400 text-sm mb-4">
+          Excluir o provedor remove permanentemente todos os dados: conversas, mensagens, clientes e funcionários.
+          Esta ação é <strong className="text-red-400">irreversível</strong>.
+        </p>
+        <button
+          onClick={() => { setConfirmaExcluir(''); setModalExcluir(true); }}
+          className="flex items-center gap-2 bg-red-900/30 hover:bg-red-900/60 border border-red-700 text-red-400 hover:text-red-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+          Excluir provedor definitivamente
+        </button>
+      </div>
+
+      {/* Modal: confirmar exclusão */}
+      {modalExcluir && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-2xl w-full max-w-md border border-red-800">
+            <div className="flex items-center justify-between p-5 border-b border-gray-700">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+                <h2 className="text-white font-semibold">Confirmar exclusão</h2>
+              </div>
+              <button onClick={() => setModalExcluir(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <p className="text-gray-300 text-sm mb-1">
+                Todos os dados de <strong className="text-white">{tenant.nome}</strong> serão apagados permanentemente.
+              </p>
+              <p className="text-gray-400 text-sm mb-4">
+                Digite o nome do provedor para confirmar:
+              </p>
+              <input
+                value={confirmaExcluir}
+                onChange={e => setConfirmaExcluir(e.target.value)}
+                placeholder={tenant.nome}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+              <div className="flex gap-3">
+                <button onClick={() => setModalExcluir(false)}
+                  className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 rounded-lg text-sm hover:bg-gray-800">
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleExcluirDefinitivo}
+                  disabled={confirmaExcluir !== tenant.nome || excluindo}
+                  className="flex-1 bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  {excluindo && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Excluir definitivamente
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: agente */}
       {modalAgente && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-2xl w-full max-w-sm border border-gray-700">
