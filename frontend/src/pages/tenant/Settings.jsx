@@ -131,6 +131,7 @@ export default function Settings() {
   const [filiais, setFiliais] = useState([]);
   const [formFilial, setFormFilial] = useState({ nome: '', cidade: '', uf: '' });
   const [savingFilial, setSavingFilial] = useState(false);
+  const [erroFilial, setErroFilial] = useState('');
 
   const [formSenha, setFormSenha] = useState({ senhaAtual: '', novaSenha: '', confirmar: '' });
   const [savingSenha, setSavingSenha] = useState(false);
@@ -154,11 +155,14 @@ export default function Settings() {
     e.preventDefault();
     if (!formFilial.nome || !formFilial.cidade) return;
     setSavingFilial(true);
+    setErroFilial('');
     try {
       await api.post(`/tenants/${user.tenantId}/filiais`, formFilial);
       setFormFilial({ nome: '', cidade: '', uf: '' });
       carregarFiliais();
       sinalizarMudancaFiliais();
+    } catch (err) {
+      setErroFilial(err.response?.data?.erro || `Erro ${err.response?.status || ''}: ${err.message}`);
     } finally {
       setSavingFilial(false);
     }
@@ -451,6 +455,9 @@ export default function Settings() {
                 Adicionar
               </button>
             </form>
+            {erroFilial && (
+              <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erroFilial}</p>
+            )}
           </section>
 
           {/* webhook token */}

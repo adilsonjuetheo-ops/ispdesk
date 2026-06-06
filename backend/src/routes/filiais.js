@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db/index.js';
 import { filiais } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
-import { autenticar, apenasAdmin, mesmotenant } from '../middleware/auth.js';
+import { autenticar, apenasAdmin } from '../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
 router.use(autenticar);
@@ -14,16 +14,24 @@ router.get('/', async (req, res) => {
   res.json(rows);
 });
 
-router.post('/', apenasAdmin, mesmotenant, async (req, res) => {
+router.post('/', apenasAdmin, async (req, res) => {
+  const tenantId = req.params.tenantId;
+  // garante que admin só cria filiais do próprio tenant
+  if (req.user.role !== 'superadmin' && req.user.tenantId !== tenantId) {
+    return res.status(403).json({ erro: 'Acesso negado a este provedor' });
+  }
   const { nome, cidade, uf } = req.body;
   if (!nome || !cidade) return res.status(400).json({ erro: 'nome e cidade obrigatórios' });
   const [filial] = await db.insert(filiais).values({
-    tenantId: req.params.tenantId, nome, cidade, uf,
+    tenantId, nome, cidade, uf,
   }).returning();
   res.status(201).json(filial);
 });
 
-router.put('/:id', apenasAdmin, mesmotenant, async (req, res) => {
+router.put('/:id', apenasAdmin, async (req, res) => {
+  if (req.user.role !== 'superadmin' && req.user.tenantId !== req.params.tenantId) {
+    return res.status(403).json({ erro: 'Acesso negado' });
+  }
   const { nome, cidade, uf, ativo } = req.body;
   const updates = {};
   if (nome !== undefined) updates.nome = nome;
@@ -38,7 +46,10 @@ router.put('/:id', apenasAdmin, mesmotenant, async (req, res) => {
   res.json(filial);
 });
 
-router.delete('/:id', apenasAdmin, mesmotenant, async (req, res) => {
+router.delete('/:id', apenasAdmin, async (req, res) => {
+  if (req.user.role !== 'superadmin' && req.user.tenantId !== req.params.tenantId) {
+    return res.status(403).json({ erro: 'Acesso negado' });
+  }
   await db.update(filiais)
     .set({ ativo: false })
     .where(and(eq(filiais.id, req.params.id), eq(filiais.tenantId, req.params.tenantId)));
