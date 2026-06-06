@@ -5,16 +5,11 @@ import { usePolling } from '../hooks/usePolling.js';
 import { useNotificationSound } from '../hooks/useNotificationSound.js';
 import {
   Send, UserCheck, Bot, X, Loader2, Paperclip, FileText,
-  ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag, Plus,
+  ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
-
-const TAGS_PRESET = [
-  'Suporte Técnico', 'Cobrança', 'Cancelamento', 'Instalação',
-  'Velocidade', 'Sem Sinal', 'Mudança de Plano', 'Outros',
-];
 
 function MidiaBolao({ conteudo, isCliente }) {
   const isImagem = conteudo.startsWith('[Imagem]');
@@ -109,42 +104,26 @@ function applyVars(texto, conversa) {
 
 function TagsBar({ conversa, onUpdate }) {
   const tags = Array.isArray(conversa.tags) ? conversa.tags : [];
-  const [aberto, setAberto] = useState(false);
 
-  const toggleTag = async (tag) => {
-    const novo = tags.includes(tag) ? tags.filter(t => t !== tag) : [...tags, tag];
+  const removerTag = async (tag) => {
+    const novo = tags.filter(t => t !== tag);
     await api.patch(`/conversations/${conversa.id}/tags`, { tags: novo });
     onUpdate();
   };
+
+  if (tags.length === 0) return null;
 
   return (
     <div className="flex items-center gap-1 flex-wrap">
       {tags.map(t => (
         <span key={t}
-          onClick={() => toggleTag(t)}
-          className="inline-flex items-center gap-1 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full cursor-pointer hover:bg-indigo-200 transition-colors">
-          {t} <X className="w-2.5 h-2.5" />
+          className="inline-flex items-center gap-1 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+          {t}
+          <button onClick={() => removerTag(t)} className="hover:text-indigo-900 transition-colors">
+            <X className="w-2.5 h-2.5" />
+          </button>
         </span>
       ))}
-      <div className="relative">
-        <button onClick={() => setAberto(o => !o)}
-          className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 px-2 py-0.5 rounded-full transition-colors">
-          <Plus className="w-3 h-3" /> tag
-        </button>
-        {aberto && (
-          <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 p-2 min-w-[160px]">
-            {TAGS_PRESET.filter(t => !tags.includes(t)).map(t => (
-              <button key={t} onClick={() => { toggleTag(t); setAberto(false); }}
-                className="block w-full text-left text-xs px-3 py-1.5 hover:bg-indigo-50 rounded-lg text-gray-700">
-                {t}
-              </button>
-            ))}
-            {TAGS_PRESET.every(t => tags.includes(t)) && (
-              <p className="text-xs text-gray-400 px-3 py-1.5">Todas as tags adicionadas</p>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -376,11 +355,13 @@ export default function ChatWindow({ conversa, onAtualizar }) {
           </div>
         </div>
 
-        {/* Tags */}
-        <div className="flex items-center gap-1.5">
-          <Tag className="w-3 h-3 text-gray-300 shrink-0" />
-          <TagsBar conversa={conversa} onUpdate={onAtualizar} />
-        </div>
+        {/* Tags (só exibe se houver tags) */}
+        {Array.isArray(conversa.tags) && conversa.tags.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <Tag className="w-3 h-3 text-gray-300 shrink-0" />
+            <TagsBar conversa={conversa} onUpdate={onAtualizar} />
+          </div>
+        )}
       </div>
 
       {/* mensagens */}
