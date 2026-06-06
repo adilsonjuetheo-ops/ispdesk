@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock } from 'lucide-react';
 
 const ESTADOS_BR = [
   'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
@@ -22,6 +22,11 @@ export default function Settings() {
   const [filiais, setFiliais] = useState([]);
   const [formFilial, setFormFilial] = useState({ nome: '', cidade: '', uf: '' });
   const [savingFilial, setSavingFilial] = useState(false);
+
+  const [formSenha, setFormSenha] = useState({ senhaAtual: '', novaSenha: '', confirmar: '' });
+  const [savingSenha, setSavingSenha] = useState(false);
+  const [sucessoSenha, setSucessoSenha] = useState('');
+  const [erroSenha, setErroSenha] = useState('');
 
   const carregarFiliais = () =>
     api.get(`/tenants/${user.tenantId}/filiais`).then(r => setFiliais(r.data));
@@ -89,6 +94,24 @@ export default function Settings() {
     navigator.clipboard.writeText(texto);
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2000);
+  };
+
+  const handleAlterarSenha = async e => {
+    e.preventDefault();
+    setErroSenha(''); setSucessoSenha('');
+    if (formSenha.novaSenha.length < 6) return setErroSenha('Nova senha: mínimo 6 caracteres');
+    if (formSenha.novaSenha !== formSenha.confirmar) return setErroSenha('As senhas não conferem');
+    setSavingSenha(true);
+    try {
+      await api.put('/auth/change-password', { senhaAtual: formSenha.senhaAtual, novaSenha: formSenha.novaSenha });
+      setSucessoSenha('Senha alterada com sucesso!');
+      setFormSenha({ senhaAtual: '', novaSenha: '', confirmar: '' });
+      setTimeout(() => setSucessoSenha(''), 4000);
+    } catch (err) {
+      setErroSenha(err.response?.data?.erro || 'Erro ao alterar senha');
+    } finally {
+      setSavingSenha(false);
+    }
   };
 
   if (loading) return <div className="p-8 text-gray-400">Carregando...</div>;
@@ -352,6 +375,45 @@ export default function Settings() {
             Salvar configurações
           </button>
         </form>
+
+        {/* Alterar senha — fora do form principal */}
+        <form onSubmit={handleAlterarSenha} className="mt-5">
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+              <Lock className="w-4 h-4 text-gray-400" /> Alterar minha senha
+            </h2>
+            <p className="text-xs text-gray-400 mb-4">
+              Para sua segurança, informe a senha atual antes de definir uma nova.
+            </p>
+            <div className="space-y-3 max-w-sm">
+              <Field label="Senha atual" type="password" value={formSenha.senhaAtual}
+                onChange={v => setFormSenha(f => ({ ...f, senhaAtual: v }))} />
+              <Field label="Nova senha" type="password" value={formSenha.novaSenha}
+                onChange={v => setFormSenha(f => ({ ...f, novaSenha: v }))}
+                placeholder="Mínimo 6 caracteres" />
+              <Field label="Confirmar nova senha" type="password" value={formSenha.confirmar}
+                onChange={v => setFormSenha(f => ({ ...f, confirmar: v }))} />
+            </div>
+
+            {sucessoSenha && (
+              <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5 text-emerald-700 text-sm">
+                {sucessoSenha}
+              </div>
+            )}
+            {erroSenha && (
+              <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-red-600 text-sm">
+                {erroSenha}
+              </div>
+            )}
+
+            <button type="submit" disabled={savingSenha || !formSenha.senhaAtual || !formSenha.novaSenha}
+              className="mt-4 flex items-center gap-2 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+              {savingSenha ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+              Alterar senha
+            </button>
+          </section>
+        </form>
+
       </div>
     </div>
   );

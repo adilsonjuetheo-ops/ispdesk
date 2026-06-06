@@ -41,6 +41,26 @@ router.post('/login', async (req, res) => {
   return res.json({ token, user: payload });
 });
 
+router.put('/change-password', autenticar, async (req, res) => {
+  const { senhaAtual, novaSenha } = req.body;
+  if (!senhaAtual || !novaSenha) return res.status(400).json({ erro: 'Campos obrigatórios' });
+  if (novaSenha.length < 6) return res.status(400).json({ erro: 'Nova senha: mínimo 6 caracteres' });
+
+  if (req.user.role === 'superadmin') {
+    const [sa] = await db.select().from(superAdmins).where(eq(superAdmins.id, req.user.id)).limit(1);
+    if (!sa || !await bcrypt.compare(senhaAtual, sa.senhaHash))
+      return res.status(401).json({ erro: 'Senha atual incorreta' });
+    await db.update(superAdmins).set({ senhaHash: await bcrypt.hash(novaSenha, 10) }).where(eq(superAdmins.id, req.user.id));
+  } else {
+    const [tu] = await db.select().from(tenantUsers).where(eq(tenantUsers.id, req.user.id)).limit(1);
+    if (!tu || !await bcrypt.compare(senhaAtual, tu.senhaHash))
+      return res.status(401).json({ erro: 'Senha atual incorreta' });
+    await db.update(tenantUsers).set({ senhaHash: await bcrypt.hash(novaSenha, 10) }).where(eq(tenantUsers.id, req.user.id));
+  }
+
+  res.json({ mensagem: 'Senha alterada com sucesso' });
+});
+
 // rota de setup — cria primeiro super admin se não existir nenhum
 router.post('/setup', async (req, res) => {
   const [{ total }] = await db.select({ total: count() }).from(superAdmins);

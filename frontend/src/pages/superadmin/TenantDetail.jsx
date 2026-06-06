@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
-import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2, MapPin, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2, MapPin, AlertTriangle, ToggleLeft, ToggleRight, KeyRound } from 'lucide-react';
 
 const PLANOS = [
   { value: 'basic',      label: 'Basic',      preco: 'R$149,90/mês', cor: 'text-gray-300'  },
@@ -33,6 +33,11 @@ export default function TenantDetail() {
   const [modalExcluir, setModalExcluir] = useState(false);
   const [confirmaExcluir, setConfirmaExcluir] = useState('');
   const [excluindo, setExcluindo] = useState(false);
+
+  const [modalResetSenha, setModalResetSenha] = useState(null); // agente selecionado
+  const [novaSenhaReset, setNovaSenhaReset] = useState('');
+  const [savingReset, setSavingReset] = useState(false);
+  const [erroReset, setErroReset] = useState('');
   const fileRef = useRef(null);
 
   const handleLogoUpload = e => {
@@ -121,6 +126,26 @@ export default function TenantDetail() {
   const desativar = async ag => {
     await api.delete(`/tenants/${id}/agents/${ag.id}`);
     carregar();
+  };
+
+  const handleResetSenha = async () => {
+    if (!novaSenhaReset || novaSenhaReset.length < 6) return setErroReset('Mínimo 6 caracteres');
+    setSavingReset(true);
+    setErroReset('');
+    try {
+      await api.put(`/tenants/${id}/agents/${modalResetSenha.id}`, {
+        nome: modalResetSenha.nome,
+        email: modalResetSenha.email,
+        role: modalResetSenha.role,
+        senha: novaSenhaReset,
+      });
+      setModalResetSenha(null);
+      setNovaSenhaReset('');
+    } catch (err) {
+      setErroReset(err.response?.data?.erro || 'Erro ao redefinir senha');
+    } finally {
+      setSavingReset(false);
+    }
   };
 
   const handleExcluirDefinitivo = async () => {
@@ -344,6 +369,10 @@ export default function TenantDetail() {
                   </span>
                 </td>
                 <td className="px-5 py-3 flex gap-2 justify-end">
+                  <button onClick={() => { setModalResetSenha(ag); setNovaSenhaReset(''); setErroReset(''); }}
+                    title="Redefinir senha" className="text-gray-400 hover:text-amber-400">
+                    <KeyRound className="w-3.5 h-3.5" />
+                  </button>
                   <button onClick={() => abrirEditar(ag)} className="text-gray-400 hover:text-white"><Pencil className="w-3.5 h-3.5" /></button>
                   <button onClick={() => desativar(ag)} className="text-gray-400 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
                 </td>
@@ -410,6 +439,42 @@ export default function TenantDetail() {
                 >
                   {excluindo && <Loader2 className="w-4 h-4 animate-spin" />}
                   Excluir definitivamente
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: redefinir senha */}
+      {modalResetSenha && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-2xl w-full max-w-sm border border-gray-700">
+            <div className="flex items-center justify-between p-5 border-b border-gray-700">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-amber-400" />
+                <h2 className="text-white font-semibold">Redefinir senha</h2>
+              </div>
+              <button onClick={() => setModalResetSenha(null)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <p className="text-gray-400 text-sm mb-4">
+                Nova senha para <strong className="text-white">{modalResetSenha.nome}</strong>
+              </p>
+              <Field dark label="Nova senha (mín. 6 caracteres)" type="password"
+                value={novaSenhaReset} onChange={setNovaSenhaReset} placeholder="••••••••" />
+              {erroReset && <p className="text-red-400 text-sm mt-2">{erroReset}</p>}
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => setModalResetSenha(null)}
+                  className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 rounded-lg text-sm hover:bg-gray-800">
+                  Cancelar
+                </button>
+                <button onClick={handleResetSenha} disabled={savingReset || !novaSenhaReset}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
+                  {savingReset && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Redefinir
                 </button>
               </div>
             </div>
