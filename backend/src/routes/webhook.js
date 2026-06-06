@@ -3,7 +3,7 @@ import { db } from '../db/index.js';
 import { tenants, clientes, conversas, mensagens, webhookLog, filiais } from '../db/schema.js';
 import { eq, and, ne } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
-import { enviarMensagem } from '../services/whatsapp.js';
+import { enviarMensagem, transcreverAudioMeta } from '../services/whatsapp.js';
 import { realizarHandoff } from '../services/handoff.js';
 
 const router = Router();
@@ -40,11 +40,37 @@ router.post('/', async (req, res) => {
         if (!tenant) continue;
 
         for (const msg of msgs) {
-          if (msg.type !== 'text') continue;
           const wamid = msg.id;
           const remetente = msg.from;
-          const texto = msg.text?.body;
-          if (!texto) continue;
+
+          // Ligações: avisa e ignora
+          if (msg.type === 'call') {
+            try { await enviarMensagem(tenant, remetente, 'Este número não atende ligações. Por favor, envie uma mensagem de texto ou áudio. 😊'); } catch {}
+            continue;
+          }
+
+          let texto = null;
+          let isAudio = false;
+
+          if (msg.type === 'text') {
+            texto = msg.text?.body;
+            if (!texto) continue;
+          } else if (msg.type === 'audio') {
+            const mediaId = msg.audio?.id;
+            if (!mediaId) continue;
+            try {
+              texto = await transcreverAudioMeta(tenant, mediaId);
+              if (!texto) continue;
+              isAudio = true;
+            } catch (err) {
+              console.error('[Webhook] Erro ao transcrever áudio:', err.message);
+              try { await enviarMensagem(tenant, remetente, 'Recebi seu áudio, mas não consegui processá-lo. Por favor, tente enviar uma mensagem de texto.'); } catch {}
+              continue;
+            }
+          } else {
+            // Ignora outros tipos silenciosamente (imagem, vídeo, sticker, etc.)
+            continue;
+          }
 
           try {
             await db.insert(webhookLog).values({ wamid, tenantId: tenant.id });
@@ -52,7 +78,7 @@ router.post('/', async (req, res) => {
             continue;
           }
 
-          await processarWebhookMsg(tenant, remetente, texto, wamid);
+          await processarWebhookMsg(tenant, remetente, texto, wamid, isAudio);
         }
       }
     }
@@ -65,7 +91,7 @@ function normalizar(s) {
   return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-async function processarWebhookMsg(tenant, remetente, texto, wamid) {
+async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false) {
   let [cliente] = await db.select().from(clientes)
     .where(and(eq(clientes.tenantId, tenant.id), eq(clientes.whatsapp, remetente)))
     .limit(1);
@@ -99,7 +125,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid) {
   await db.insert(mensagens).values({
     conversaId: conversa.id,
     origem: 'cliente',
-    conteudo: texto,
+    conteudo: isAudio ? `[Áudio] ${texto}` : texto,
     wamid,
   });
 

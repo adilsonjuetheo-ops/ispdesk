@@ -1,25 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
-import { Send, UserCheck, Bot, X, Loader2, Paperclip, FileText, ImageIcon } from 'lucide-react';
+import { Send, UserCheck, Bot, X, Loader2, Paperclip, FileText, ImageIcon, Mic } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
 
 function MidiaBolao({ conteudo, isCliente }) {
   const isImagem = conteudo.startsWith('[Imagem]');
-  const nome = conteudo.replace(/^\[(Imagem|Arquivo)\] /, '');
-  const Icon = isImagem ? ImageIcon : FileText;
+  const isAudio = conteudo.startsWith('[Áudio]');
+  const nome = conteudo.replace(/^\[(Imagem|Arquivo|Áudio)\] /, '');
+  const Icon = isImagem ? ImageIcon : isAudio ? Mic : FileText;
   const cor = isCliente
     ? 'bg-white border border-gray-200 text-gray-700'
     : 'bg-blue-50 border border-blue-100 text-blue-800';
+  const label = isImagem ? 'Imagem enviada' : isAudio ? 'Áudio transcrito' : 'Documento enviado';
 
   return (
-    <div className={`flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm max-w-[260px] ${cor}`}>
-      <Icon className="w-8 h-8 shrink-0 opacity-60" />
+    <div className={`flex items-start gap-2 rounded-2xl px-3 py-2.5 text-sm max-w-[280px] ${cor}`}>
+      <Icon className="w-5 h-5 shrink-0 opacity-60 mt-0.5" />
       <div className="min-w-0">
-        <p className="font-medium truncate text-xs">{nome}</p>
-        <p className="text-xs opacity-60 mt-0.5">{isImagem ? 'Imagem enviada' : 'Documento enviado'}</p>
+        <p className="text-xs opacity-60 mb-0.5 font-medium">{label}</p>
+        <p className="text-xs leading-relaxed">{nome}</p>
       </div>
     </div>
   );
@@ -29,7 +31,7 @@ function BolaoMsg({ msg, agenteNome }) {
   const isCliente = msg.origem === 'cliente';
   const isBot = msg.origem === 'bot';
   const isSistema = msg.conteudo.startsWith('[Sistema]');
-  const isMidia = msg.conteudo.startsWith('[Arquivo]') || msg.conteudo.startsWith('[Imagem]');
+  const isMidia = msg.conteudo.startsWith('[Arquivo]') || msg.conteudo.startsWith('[Imagem]') || msg.conteudo.startsWith('[Áudio]');
 
   if (isSistema) {
     return (
