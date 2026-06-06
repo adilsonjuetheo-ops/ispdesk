@@ -1,0 +1,90 @@
+import { pgTable, uuid, text, boolean, timestamp, jsonb } from 'drizzle-orm/pg-core';
+
+export const tenants = pgTable('tenants', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  slug:               text('slug').notNull().unique(),
+  nome:               text('nome').notNull(),
+  nomeFantasia:       text('nome_fantasia'),
+  logoUrl:            text('logo_url'),
+  corPrimaria:        text('cor_primaria').default('#0066CC'),
+  cnpj:               text('cnpj'),
+  telefone:           text('telefone'),
+  whatsappContato:    text('whatsapp_contato'),
+  email:              text('email'),
+  website:            text('website'),
+  endereco:           text('endereco'),
+  cidade:             text('cidade'),
+  uf:                 text('uf'),
+  cep:                text('cep'),
+  whatsappNumberId:   text('whatsapp_number_id').unique(),
+  whatsappToken:      text('whatsapp_token'),
+  webhookVerifyToken: text('webhook_verify_token').notNull(),
+  systemPrompt:       text('system_prompt').notNull(),
+  nomeAssistente:     text('nome_assistente').default('Assistente'),
+  sgpTipo:            text('sgp_tipo'),   // 'atlaz' | 'ixc' | 'mkauth' | 'generico'
+  sgpApiUrl:          text('sgp_api_url'),
+  sgpApiKey:          text('sgp_api_key'),
+  plano:              text('plano').default('basic'),
+  ativo:              boolean('ativo').default(true),
+  criadoEm:           timestamp('criado_em').defaultNow(),
+  atualizadoEm:       timestamp('atualizado_em').defaultNow(),
+});
+
+export const tenantUsers = pgTable('tenant_users', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  nome:      text('nome').notNull(),
+  email:     text('email').notNull(),
+  senhaHash: text('senha_hash').notNull(),
+  role:      text('role').default('agente'),
+  ativo:     boolean('ativo').default(true),
+  criadoEm:  timestamp('criado_em').defaultNow(),
+});
+
+export const superAdmins = pgTable('super_admins', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  email:     text('email').notNull().unique(),
+  senhaHash: text('senha_hash').notNull(),
+  nome:      text('nome').notNull(),
+  criadoEm:  timestamp('criado_em').defaultNow(),
+});
+
+export const clientes = pgTable('clientes', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  tenantId:       uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  whatsapp:       text('whatsapp').notNull(),
+  nome:           text('nome'),
+  contratoId:     text('contrato_id'),
+  statusContrato: text('status_contrato'),
+  filialNome:     text('filial_nome'),
+  ultimoContato:  timestamp('ultimo_contato'),
+  criadoEm:       timestamp('criado_em').defaultNow(),
+});
+
+export const conversas = pgTable('conversas', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  tenantId:      uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  clienteId:     uuid('cliente_id').notNull().references(() => clientes.id),
+  status:        text('status').default('bot'),
+  agenteId:      uuid('agente_id').references(() => tenantUsers.id),
+  motivoHandoff: text('motivo_handoff'),
+  resumoIa:      text('resumo_ia'),
+  iniciadaEm:    timestamp('iniciada_em').defaultNow(),
+  encerradaEm:   timestamp('encerrada_em'),
+});
+
+export const mensagens = pgTable('mensagens', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  conversaId: uuid('conversa_id').notNull().references(() => conversas.id, { onDelete: 'cascade' }),
+  origem:     text('origem').notNull(),
+  conteudo:   text('conteudo').notNull(),
+  wamid:      text('wamid').unique(),
+  enviadaEm:  timestamp('enviada_em').defaultNow(),
+});
+
+export const webhookLog = pgTable('webhook_log', {
+  wamid:       text('wamid').primaryKey(),
+  tenantId:    uuid('tenant_id').notNull().references(() => tenants.id),
+  processado:  boolean('processado').default(false),
+  recebidoEm:  timestamp('recebido_em').defaultNow(),
+});

@@ -1,0 +1,117 @@
+import { Router } from 'express';
+import { db } from '../db/index.js';
+import { tenants, tenantUsers, conversas } from '../db/schema.js';
+import { eq, count, and } from 'drizzle-orm';
+import { autenticar, apenasSuper } from '../middleware/auth.js';
+import crypto from 'crypto';
+
+const router = Router();
+
+// rota de auto-consulta: admin/agente pode ver seu próprio tenant
+router.get('/me', autenticar, async (req, res) => {
+  if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, req.user.tenantId)).limit(1);
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+  res.json(tenant);
+});
+
+// rota de edição própria: admin pode editar seu tenant
+router.put('/me', autenticar, async (req, res) => {
+  if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+  if (req.user.role !== 'admin') return res.status(403).json({ erro: 'Apenas admins podem editar' });
+  const {
+    nome, nomeFantasia, logoUrl, corPrimaria,
+    cnpj, telefone, whatsappContato, email, website,
+    endereco, cidade, uf, cep,
+    whatsappNumberId, whatsappToken, systemPrompt, nomeAssistente,
+    sgpTipo, sgpApiUrl, sgpApiKey,
+  } = req.body;
+  const [tenant] = await db.update(tenants)
+    .set({
+      nome, nomeFantasia, logoUrl, corPrimaria,
+      cnpj, telefone, whatsappContato, email, website,
+      endereco, cidade, uf, cep,
+      whatsappNumberId, whatsappToken, systemPrompt, nomeAssistente,
+      sgpTipo, sgpApiUrl, sgpApiKey,
+      atualizadoEm: new Date(),
+    })
+    .where(eq(tenants.id, req.user.tenantId))
+    .returning();
+  res.json(tenant);
+});
+
+router.use(autenticar, apenasSuper);
+
+router.get('/', async (req, res) => {
+  const rows = await db.select().from(tenants).orderBy(tenants.criadoEm);
+  res.json(rows);
+});
+
+router.post('/', async (req, res) => {
+  const { slug, nome, logoUrl, corPrimaria, whatsappNumberId, whatsappToken,
+          systemPrompt, nomeAssistente, sgpApiUrl, sgpApiKey, plano } = req.body;
+
+  if (!slug || !nome || !systemPrompt) {
+    return res.status(400).json({ erro: 'slug, nome e systemPrompt são obrigatórios' });
+  }
+
+  const webhookVerifyToken = crypto.randomBytes(20).toString('hex');
+
+  const [tenant] = await db.insert(tenants).values({
+    slug, nome, logoUrl, corPrimaria, whatsappNumberId, whatsappToken,
+    webhookVerifyToken, systemPrompt, nomeAssistente, sgpApiUrl, sgpApiKey, plano,
+  }).returning();
+
+  res.status(201).json(tenant);
+});
+
+router.get('/:id', async (req, res) => {
+  const [tenant] = await db.select().from(tenants)
+    .where(eq(tenants.id, req.params.id)).limit(1);
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+
+  const agentes = await db.select({
+    id: tenantUsers.id,
+    nome: tenantUsers.nome,
+    email: tenantUsers.email,
+    role: tenantUsers.role,
+    ativo: tenantUsers.ativo,
+    criadoEm: tenantUsers.criadoEm,
+  }).from(tenantUsers).where(eq(tenantUsers.tenantId, req.params.id));
+
+  res.json({ ...tenant, agentes });
+});
+
+router.put('/:id', async (req, res) => {
+  const {
+    slug, nome, nomeFantasia, logoUrl, corPrimaria,
+    cnpj, telefone, whatsappContato, email, website,
+    endereco, cidade, uf, cep,
+    whatsappNumberId, whatsappToken,
+    systemPrompt, nomeAssistente, sgpTipo, sgpApiUrl, sgpApiKey, plano, ativo,
+  } = req.body;
+
+  const [tenant] = await db.update(tenants)
+    .set({
+      slug, nome, nomeFantasia, logoUrl, corPrimaria,
+      cnpj, telefone, whatsappContato, email, website,
+      endereco, cidade, uf, cep,
+      whatsappNumberId, whatsappToken,
+      systemPrompt, nomeAssistente, sgpTipo, sgpApiUrl, sgpApiKey, plano, ativo,
+      atualizadoEm: new Date(),
+    })
+    .where(eq(tenants.id, req.params.id))
+    .returning();
+
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+  res.json(tenant);
+});
+
+router.delete('/:id', async (req, res) => {
+  await db.update(tenants)
+    .set({ ativo: false, atualizadoEm: new Date() })
+    .where(eq(tenants.id, req.params.id));
+  res.json({ mensagem: 'Provedor desativado' });
+});
+
+export default router;

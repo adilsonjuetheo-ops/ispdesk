@@ -1,0 +1,153 @@
+import { useState, useEffect } from 'react';
+import api from '../../lib/api.js';
+import { useNavigate } from 'react-router-dom';
+import { Plus, X, Loader2, Building2 } from 'lucide-react';
+
+const FORM_VAZIO = {
+  slug: '', nome: '', corPrimaria: '#0066CC', whatsappNumberId: '',
+  whatsappToken: '', systemPrompt: '', nomeAssistente: 'Assistente', plano: 'basic',
+};
+
+export default function Tenants() {
+  const [tenants, setTenants] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState(FORM_VAZIO);
+  const [saving, setSaving] = useState(false);
+  const [erro, setErro] = useState('');
+  const navigate = useNavigate();
+
+  const carregar = () => api.get('/tenants').then(r => setTenants(r.data));
+  useEffect(() => { carregar(); }, []);
+
+  const handleSalvar = async e => {
+    e.preventDefault();
+    setSaving(true);
+    setErro('');
+    try {
+      await api.post('/tenants', form);
+      setModal(false);
+      setForm(FORM_VAZIO);
+      carregar();
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Erro ao salvar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-8">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Provedores</h1>
+          <p className="text-gray-400 text-sm mt-1">{tenants.length} provedores cadastrados</p>
+        </div>
+        <button
+          onClick={() => setModal(true)}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Novo provedor
+        </button>
+      </div>
+
+      <div className="grid gap-4">
+        {tenants.map(t => (
+          <div key={t.id} className="bg-gray-800 rounded-xl border border-gray-700 p-5 flex items-center justify-between hover:border-gray-600 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                style={{ backgroundColor: t.corPrimaria }}>
+                {t.nome[0]}
+              </div>
+              <div>
+                <p className="text-white font-medium">{t.nome}</p>
+                <p className="text-gray-500 text-xs">{t.slug} · {t.plano}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={`text-xs px-2 py-1 rounded-full ${t.ativo ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
+                {t.ativo ? 'Ativo' : 'Inativo'}
+              </span>
+              <button
+                onClick={() => navigate(`/admin/tenants/${t.id}`)}
+                className="text-indigo-400 hover:text-indigo-300 text-sm font-medium"
+              >
+                Gerenciar →
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {modal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-2xl w-full max-w-lg border border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-700">
+              <h2 className="text-white font-semibold">Novo provedor</h2>
+              <button onClick={() => setModal(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSalvar} className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Nome*" value={form.nome} onChange={v => setForm(f => ({ ...f, nome: v }))} />
+                <Field label="Slug*" value={form.slug} onChange={v => setForm(f => ({ ...f, slug: v }))} placeholder="meu-provedor" />
+              </div>
+              <Field label="Nome do assistente" value={form.nomeAssistente} onChange={v => setForm(f => ({ ...f, nomeAssistente: v }))} />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Cor primária</label>
+                  <input type="color" value={form.corPrimaria}
+                    onChange={e => setForm(f => ({ ...f, corPrimaria: e.target.value }))}
+                    className="w-full h-10 rounded-lg border border-gray-700 bg-gray-800 cursor-pointer" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Plano</label>
+                  <select value={form.plano} onChange={e => setForm(f => ({ ...f, plano: e.target.value }))}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm">
+                    <option value="basic">Basic</option>
+                    <option value="pro">Pro</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+                </div>
+              </div>
+              <Field label="WhatsApp Number ID" value={form.whatsappNumberId}
+                onChange={v => setForm(f => ({ ...f, whatsappNumberId: v }))} />
+              <Field label="WhatsApp Token" value={form.whatsappToken}
+                onChange={v => setForm(f => ({ ...f, whatsappToken: v }))} />
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">System Prompt*</label>
+                <textarea rows={5} value={form.systemPrompt}
+                  onChange={e => setForm(f => ({ ...f, systemPrompt: e.target.value }))}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Você é um assistente virtual do provedor..." />
+              </div>
+              {erro && <p className="text-red-400 text-sm">{erro}</p>}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-800 text-sm">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={saving}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Criar provedor
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, placeholder, type = 'text' }) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-400 mb-1">{label}</label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+    </div>
+  );
+}
