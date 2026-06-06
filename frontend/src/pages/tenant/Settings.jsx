@@ -147,6 +147,9 @@ export default function Settings() {
     carregarFiliais();
   }, []);
 
+  const sinalizarMudancaFiliais = () =>
+    window.dispatchEvent(new CustomEvent('ispdesk:filiais-updated'));
+
   const handleAddFilial = async e => {
     e.preventDefault();
     if (!formFilial.nome || !formFilial.cidade) return;
@@ -155,6 +158,7 @@ export default function Settings() {
       await api.post(`/tenants/${user.tenantId}/filiais`, formFilial);
       setFormFilial({ nome: '', cidade: '', uf: '' });
       carregarFiliais();
+      sinalizarMudancaFiliais();
     } finally {
       setSavingFilial(false);
     }
@@ -163,6 +167,7 @@ export default function Settings() {
   const handleRemoverFilial = async id => {
     await api.delete(`/tenants/${user.tenantId}/filiais/${id}`);
     carregarFiliais();
+    sinalizarMudancaFiliais();
   };
 
   const set = (campo, valor) => setTenant(t => ({ ...t, [campo]: valor }));

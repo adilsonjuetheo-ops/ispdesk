@@ -26,7 +26,8 @@ export default function TenantLayout() {
       api.get(`/tenants/${user.tenantId}/filiais`).then(r => setFiliais(r.data)).catch(() => {});
     fetchFiliais();
     const id = setInterval(fetchFiliais, 30000);
-    return () => clearInterval(id);
+    window.addEventListener('ispdesk:filiais-updated', fetchFiliais);
+    return () => { clearInterval(id); window.removeEventListener('ispdesk:filiais-updated', fetchFiliais); };
   }, [user?.tenantId]);
 
   useEffect(() => {
