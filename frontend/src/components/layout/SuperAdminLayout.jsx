@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
-import { Wifi, LayoutDashboard, Building2, LogOut } from 'lucide-react';
+import { LayoutDashboard, Building2, LogOut } from 'lucide-react';
 
 export default function SuperAdminLayout() {
   const { user, logout } = useAuth();
@@ -23,13 +23,8 @@ export default function SuperAdminLayout() {
       {/* sidebar */}
       <aside className="w-56 bg-gray-900 border-r border-gray-800 flex flex-col">
         <div className="p-4 border-b border-gray-800">
-          <div className="flex items-center gap-2">
-            <div className="bg-indigo-600 rounded-lg p-1.5">
-              <Wifi className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-white">ISPDesk</span>
-          </div>
-          <div className="mt-1 text-xs text-gray-500 pl-9">Super Admin</div>
+          <img src="/logo.png" alt="ISPDesk" className="h-9 w-auto mb-1" />
+          <div className="text-xs text-gray-500 mt-1">Super Admin</div>
         </div>
 
         <nav className="flex-1 p-3 space-y-1">

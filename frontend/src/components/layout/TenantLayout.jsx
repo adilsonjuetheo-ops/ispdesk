@@ -53,7 +53,7 @@ export default function TenantLayout() {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-gray-800 truncate leading-tight">
-                  {tenant?.nomeFantasia || tenant?.nome || 'ISPDesk'}
+                  {tenant?.nomeFantasia || tenant?.nome}
                 </p>
                 <p className="text-xs text-gray-400">Painel de atendimento</p>
               </div>

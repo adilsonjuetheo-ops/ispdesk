@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import api from '../lib/api.js';
-import { Wifi, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -35,12 +35,7 @@ export default function Login() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <div className="bg-indigo-600 rounded-xl p-2">
-              <Wifi className="w-7 h-7 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-white">ISPDesk</span>
-          </div>
+          <img src="/logo.png" alt="ISPDesk" className="h-24 mx-auto mb-4 drop-shadow-lg" />
           <p className="text-gray-400 text-sm">Plataforma de atendimento para provedores</p>
         </div>
 
@@ -85,7 +80,7 @@ export default function Login() {
         </form>
 
         <p className="text-center text-gray-600 text-xs mt-6">
-          ISPDesk v1.0 — Para provedores de MG
+          ISPDesk © {new Date().getFullYear()} — Plataforma SaaS para ISPs
         </p>
       </div>
     </div>
