@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidade — ISPDesk</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; background: #fff; line-height: 1.7; }
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; border-bottom: 1px solid #e2e8f0; }
+    .nav-logo { font-size: 1.25rem; font-weight: 700; color: #2563eb; text-decoration: none; }
+    nav a.back { text-decoration: none; color: #64748b; font-size: 0.875rem; }
+    nav a.back:hover { color: #2563eb; }
+    main { max-width: 780px; margin: 0 auto; padding: 3rem 2rem 5rem; }
+    h1 { font-size: 2rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem; }
+    .updated { color: #94a3b8; font-size: 0.875rem; margin-bottom: 2.5rem; }
+    h2 { font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 2rem 0 0.75rem; border-left: 3px solid #2563eb; padding-left: 0.75rem; }
+    p { color: #475569; margin-bottom: 0.75rem; font-size: 0.95rem; }
+    ul { margin: 0.5rem 0 0.75rem 1.5rem; color: #475569; font-size: 0.95rem; }
+    ul li { margin-bottom: 0.4rem; }
+    a { color: #2563eb; }
+    .highlight { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem 1.25rem; margin: 1.5rem 0; font-size: 0.9rem; color: #1e40af; }
+    footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 1.5rem 2rem; text-align: center; }
+    footer a { color: #64748b; text-decoration: none; font-size: 0.875rem; margin: 0 0.75rem; }
+    footer p { color: #94a3b8; font-size: 0.8rem; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="nav-logo">ISPDesk</a>
+    <a href="/" class="back">← Voltar ao início</a>
+  </nav>
+
+  <main>
+    <h1>Política de Privacidade</h1>
+    <p class="updated">Última atualização: junho de 2025</p>
+
+    <div class="highlight">
+      Esta política explica como o ISPDesk coleta, usa, armazena e protege os dados pessoais tratados por meio da nossa plataforma, em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018) e com os termos de uso da API do WhatsApp Business da Meta Platforms, Inc.
+    </div>
+
+    <h2>1. Quem somos</h2>
+    <p>O ISPDesk é uma plataforma SaaS (Software como Serviço) que fornece ferramentas de atendimento ao cliente via WhatsApp para provedores de internet (ISPs) brasileiros. Atuamos como <strong>operador de dados</strong> em relação às mensagens e informações dos clientes finais dos provedores, e como <strong>controlador de dados</strong> em relação às informações dos provedores (empresas) que contratam o ISPDesk.</p>
+    <p>Para dúvidas sobre esta política, entre em contato: <a href="mailto:privacidade@adilsondev.com.br">privacidade@adilsondev.com.br</a></p>
+
+    <h2>2. Dados que coletamos</h2>
+    <p><strong>Dos provedores de internet (clientes do ISPDesk):</strong></p>
+    <ul>
+      <li>Razão social, CNPJ, nome do responsável e e-mail</li>
+      <li>Credenciais de acesso à plataforma (senha armazenada com hash bcrypt)</li>
+      <li>Configurações do sistema: token da API do WhatsApp, número de telefone, chave do SGP</li>
+      <li>Dados de uso da plataforma (logs de acesso, ações realizadas)</li>
+    </ul>
+    <p><strong>Dos clientes finais dos provedores (usuários do WhatsApp):</strong></p>
+    <ul>
+      <li>Número de telefone WhatsApp</li>
+      <li>Nome de perfil do WhatsApp (quando disponível no payload do webhook)</li>
+      <li>Conteúdo das mensagens trocadas durante o atendimento</li>
+      <li>Dados do contrato de internet obtidos do SGP do provedor (nome, CPF/CNPJ, status do contrato, filial)</li>
+      <li>Tags e categorias atribuídas ao atendimento</li>
+      <li>Áudios transcritos via serviço de speech-to-text (quando o cliente envia áudio)</li>
+    </ul>
+
+    <h2>3. Como usamos os dados</h2>
+    <ul>
+      <li>Prestar o serviço de atendimento ao cliente contratado pelo provedor</li>
+      <li>Identificar o cliente no sistema de gestão (SGP) do provedor para fornecer suporte contextualizado</li>
+      <li>Alimentar o assistente de inteligência artificial com contexto relevante para cada atendimento</li>
+      <li>Registrar histórico de atendimentos para fins de auditoria e qualidade</li>
+      <li>Enviar 2ª via de boleto, código PIX ou notificações autorizadas pelo provedor</li>
+      <li>Melhorar a qualidade e a segurança da plataforma</li>
+    </ul>
+    <p>Não utilizamos dados de clientes finais para fins publicitários ou comerciais próprios.</p>
+
+    <h2>4. Uso da API do WhatsApp Business (Meta)</h2>
+    <p>O ISPDesk utiliza a <strong>API do WhatsApp Cloud</strong> da Meta Platforms, Inc. para envio e recebimento de mensagens. O uso desta API está sujeito às <a href="https://www.whatsapp.com/legal/business-policy" target="_blank">Políticas Comerciais do WhatsApp</a> e aos <a href="https://developers.facebook.com/terms/" target="_blank">Termos de Serviço da Plataforma Meta para Desenvolvedores</a>.</p>
+    <p>Cada provedor de internet utiliza sua própria conta do WhatsApp Business registrada na Meta. O ISPDesk processa os webhooks recebidos da Meta para exibir as mensagens no painel de atendimento e acionar o assistente de IA.</p>
+    <p>O conteúdo das mensagens é transmitido de forma criptografada via HTTPS e armazenado em banco de dados com controle de acesso por tenant (provedor).</p>
+
+    <h2>5. Inteligência Artificial</h2>
+    <p>O assistente virtual do ISPDesk é alimentado pela API da Anthropic (Claude). Para gerar respostas, o sistema envia ao modelo de IA:</p>
+    <ul>
+      <li>As últimas mensagens da conversa (até 10 mensagens)</li>
+      <li>O contexto do cliente obtido do SGP do provedor</li>
+      <li>As instruções do provedor (system prompt configurado pelo próprio provedor)</li>
+    </ul>
+    <p>Nenhum dado sensível (senhas, tokens de API) é enviado à API de IA. O uso da API da Anthropic está sujeito à <a href="https://www.anthropic.com/privacy" target="_blank">Política de Privacidade da Anthropic</a>.</p>
+
+    <h2>6. Compartilhamento de dados</h2>
+    <p>Os dados são compartilhados exclusivamente com:</p>
+    <ul>
+      <li><strong>Meta Platforms (WhatsApp):</strong> para envio e recebimento de mensagens via API oficial</li>
+      <li><strong>Anthropic:</strong> para processamento de linguagem natural (assistente de IA)</li>
+      <li><strong>Neon (banco de dados PostgreSQL):</strong> armazenamento seguro dos dados da plataforma</li>
+      <li><strong>SGP do provedor:</strong> consulta de dados do cliente para fins de atendimento</li>
+    </ul>
+    <p>Não vendemos, alugamos ou cedemos dados a terceiros para fins de marketing.</p>
+
+    <h2>7. Retenção de dados</h2>
+    <ul>
+      <li><strong>Mensagens e histórico de atendimentos:</strong> retidos enquanto o contrato do provedor estiver ativo. Após encerramento, os dados são mantidos por até 90 dias e depois excluídos.</li>
+      <li><strong>Dados de clientes finais:</strong> retidos pelo mesmo período que o histórico de atendimentos.</li>
+      <li><strong>Dados de acesso (logs):</strong> retidos por até 12 meses para fins de segurança e auditoria.</li>
+    </ul>
+
+    <h2>8. Direitos dos titulares (LGPD)</h2>
+    <p>Os clientes finais dos provedores podem exercer os seguintes direitos junto ao provedor de internet contratante, que é o controlador dos dados nessa relação:</p>
+    <ul>
+      <li>Confirmação da existência de tratamento</li>
+      <li>Acesso aos dados</li>
+      <li>Correção de dados incompletos ou inexatos</li>
+      <li>Eliminação dos dados</li>
+      <li>Portabilidade dos dados</li>
+      <li>Revogação do consentimento</li>
+    </ul>
+    <p>Os provedores de internet (clientes do ISPDesk) podem exercer seus direitos diretamente pelo e-mail: <a href="mailto:privacidade@adilsondev.com.br">privacidade@adilsondev.com.br</a></p>
+
+    <h2>9. Segurança</h2>
+    <ul>
+      <li>Comunicação criptografada via HTTPS/TLS em todos os endpoints</li>
+      <li>Senhas armazenadas com hash bcrypt</li>
+      <li>Tokens de API armazenados criptografados no banco de dados</li>
+      <li>Isolamento de dados por tenant (cada provedor acessa apenas seus próprios dados)</li>
+      <li>Acesso ao banco de dados restrito a servidores autorizados</li>
+    </ul>
+
+    <h2>10. Cookies</h2>
+    <p>O ISPDesk utiliza apenas cookies de sessão estritamente necessários para manter o usuário autenticado na plataforma. Não utilizamos cookies de rastreamento ou publicidade.</p>
+
+    <h2>11. Alterações nesta política</h2>
+    <p>Esta política pode ser atualizada periodicamente. Notificaremos os provedores cadastrados sobre alterações relevantes por e-mail. A versão mais recente estará sempre disponível nesta página.</p>
+
+    <h2>12. Contato</h2>
+    <p>Para exercer direitos sobre seus dados ou esclarecer dúvidas sobre esta política:</p>
+    <ul>
+      <li>E-mail: <a href="mailto:privacidade@adilsondev.com.br">privacidade@adilsondev.com.br</a></li>
+      <li>Site: <a href="https://ispdesk.adilsondev.com.br">ispdesk.adilsondev.com.br</a></li>
+    </ul>
+  </main>
+
+  <footer>
+    <div>
+      <a href="/">Início</a>
+      <a href="/termos">Termos de Uso</a>
+      <a href="mailto:privacidade@adilsondev.com.br">Contato</a>
+    </div>
+    <p>&copy; 2025 ISPDesk. Todos os direitos reservados.</p>
+  </footer>
+
+</body>
+</html>
