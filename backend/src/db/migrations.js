@@ -23,6 +23,21 @@ export async function runMigrations() {
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS ultima_msg_origem text`;
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS ultima_msg_nome text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS horarios jsonb`;
+    // Backfill ultima_mensagem para conversas sem preview (a partir da última mensagem existente)
+    await sql`
+      UPDATE conversas SET
+        ultima_mensagem = subq.conteudo,
+        ultima_msg_em   = subq.enviada_em,
+        ultima_msg_origem = subq.origem
+      FROM (
+        SELECT DISTINCT ON (conversa_id)
+          conversa_id, conteudo, enviada_em, origem
+        FROM mensagens
+        ORDER BY conversa_id, enviada_em DESC
+      ) subq
+      WHERE conversas.id = subq.conversa_id
+        AND conversas.ultima_mensagem IS NULL
+    `;
     await sql`
       CREATE TABLE IF NOT EXISTS push_subscriptions (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
