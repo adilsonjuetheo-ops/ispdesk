@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { differenceInMinutes } from 'date-fns';
 import clsx from 'clsx';
-import { Search, Check } from 'lucide-react';
+import { Search, Check, User } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.js';
 
 const AVATAR_COLORS = [
@@ -182,7 +182,10 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                   className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
                   style={{ backgroundColor: avatarColor(nomeExib) }}
                 >
-                  {iniciais(nomeExib)}
+                  {c.clienteNome && c.clienteNome !== c.clienteWhatsapp
+                    ? iniciais(c.clienteNome)
+                    : <User className="w-5 h-5 text-white" />
+                  }
                 </div>
                 {/* Badge WhatsApp */}
                 <span className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] bg-[#25D366] rounded-full border-2 border-white flex items-center justify-center">
