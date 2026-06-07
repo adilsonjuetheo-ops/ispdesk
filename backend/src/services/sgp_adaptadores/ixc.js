@@ -35,23 +35,8 @@ export class IxcAdaptador extends SgpAdaptador {
     return res.json();
   }
 
-  async buscarContexto(whatsapp) {
-    const tel = this.normalizarTelefone(whatsapp);
-
-    const data = await this.#get('cliente', {
-      qtype: 'cliente.celular',
-      query: tel,
-      oper: '=',
-      page: 1,
-      rp: 1,
-    }).catch(() => ({ registros: [] }));
-
-    if (!data.registros?.length) {
-      return 'DADOS DO CLIENTE: Número não encontrado no IXC. Peça o CPF.';
-    }
-
-    const c = data.registros[0];
-
+  // Monta contexto completo a partir do registro de cliente já buscado
+  async #buildContexto(c) {
     const contData = await this.#get('cliente_contrato', {
       qtype: 'cliente_contrato.id_cliente',
       query: c.id,
@@ -104,9 +89,11 @@ export class IxcAdaptador extends SgpAdaptador {
     if (aVencer.length > 0) {
       const prox = aVencer[0];
       const temPix = prox.pix_copia_cola || prox.pix_qrcode || prox.pix;
-      linhas.push(`PRÓXIMA FATURA: ${this.formatarData(prox.data_vencimento)} | ${this.formatarMoeda(prox.valor)}` +
+      linhas.push(
+        `PRÓXIMA FATURA: ${this.formatarData(prox.data_vencimento)} | ${this.formatarMoeda(prox.valor)}` +
         (prox.linha_digitavel ? ' | Boleto disponível' : '') +
-        (temPix               ? ' | PIX disponível'   : ''));
+        (temPix               ? ' | PIX disponível'   : '')
+      );
       linhas.push('');
     }
 
@@ -129,6 +116,35 @@ export class IxcAdaptador extends SgpAdaptador {
     linhas.push('=== FIM ===');
 
     return linhas.join('\n');
+  }
+
+  async buscarContexto(whatsapp) {
+    const tel = this.normalizarTelefone(whatsapp);
+    const data = await this.#get('cliente', {
+      qtype: 'cliente.celular',
+      query: tel,
+      oper: '=',
+      page: 1,
+      rp: 1,
+    }).catch(() => ({ registros: [] }));
+
+    if (!data.registros?.length) {
+      return 'DADOS DO CLIENTE: Número não encontrado no IXC. Peça o CPF ou CNPJ para localizar.';
+    }
+    return this.#buildContexto(data.registros[0]);
+  }
+
+  async buscarContextoPorDocumento(doc) {
+    const data = await this.#get('cliente', {
+      qtype: 'cliente.cnpj_cpf',
+      query: doc,
+      oper: '=',
+      page: 1,
+      rp: 1,
+    }).catch(() => ({ registros: [] }));
+
+    if (!data.registros?.length) return null;
+    return this.#buildContexto(data.registros[0]);
   }
 
   async buscarDados(whatsapp) {

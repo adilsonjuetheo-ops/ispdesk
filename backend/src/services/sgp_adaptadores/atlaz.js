@@ -26,19 +26,8 @@ export class AtlazAdaptador extends SgpAdaptador {
     return res.json();
   }
 
-  async buscarContexto(whatsapp) {
-    const tel = this.normalizarTelefone(whatsapp);
-
-    const clienteData = await this.#get('/consultacliente', {
-      telefone: tel,
-      testar_com_e_sem_nono_digito: 'true',
-      ocultar_contratos_desativados: 1,
-    });
-
-    if (clienteData.success !== 'true') {
-      return 'DADOS DO CLIENTE: Número não encontrado no Atlaz. Peça o CPF para localizar.';
-    }
-
+  // Monta contexto completo (com faturas) a partir do retorno de /consultacliente
+  async #buildContexto(clienteData) {
     const a = clienteData.assinante;
     const pontos = clienteData.pontos_de_acesso || [];
     const pontoAtivo = pontos.find(p => p.status === 'Ativo') || pontos[0];
@@ -104,6 +93,28 @@ export class AtlazAdaptador extends SgpAdaptador {
     linhas.push('=== FIM ===');
 
     return linhas.join('\n');
+  }
+
+  async buscarContexto(whatsapp) {
+    const tel = this.normalizarTelefone(whatsapp);
+    const clienteData = await this.#get('/consultacliente', {
+      telefone: tel,
+      testar_com_e_sem_nono_digito: 'true',
+      ocultar_contratos_desativados: 1,
+    });
+    if (clienteData.success !== 'true') {
+      return 'DADOS DO CLIENTE: Número não encontrado no Atlaz. Peça o CPF ou CNPJ para localizar.';
+    }
+    return this.#buildContexto(clienteData);
+  }
+
+  async buscarContextoPorDocumento(doc) {
+    const clienteData = await this.#get('/consultacliente', {
+      cpf_cnpj: doc,
+      ocultar_contratos_desativados: 1,
+    }).catch(() => ({ success: 'false' }));
+    if (clienteData.success !== 'true') return null;
+    return this.#buildContexto(clienteData);
   }
 
   async buscarDados(whatsapp) {

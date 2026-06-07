@@ -48,6 +48,15 @@ export async function executarTool(toolName, toolInput, tenant) {
   const sgp = criarSgp(tenant);
   if (!sgp) return 'SGP não configurado para este provedor.';
   try {
+    if (toolName === 'buscar_por_documento') {
+      const doc = (toolInput.documento || '').replace(/\D/g, '');
+      if (!doc) return 'Documento inválido. Solicite o CPF ou CNPJ novamente.';
+      const contexto = await sgp.buscarContextoPorDocumento(doc);
+      if (!contexto) {
+        return 'Cliente não encontrado com este CPF/CNPJ. Trata-se de um cliente novo — transfira para atendente humano realizar o cadastro. ACTION:HANDOFF:cliente novo — encaminhar para cadastro';
+      }
+      return contexto;
+    }
     return await sgp.executarTool(toolName, toolInput);
   } catch (err) {
     console.error(`[SGP:${tenant.sgpTipo}] Erro tool ${toolName}:`, err.message);

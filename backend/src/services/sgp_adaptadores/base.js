@@ -15,6 +15,11 @@ export class SgpAdaptador {
     return null;
   }
 
+  // Retorna contexto completo (texto para a IA) buscando por CPF/CNPJ, ou null se não encontrado
+  async buscarContextoPorDocumento(doc) {
+    return null;
+  }
+
   tools() {
     return TOOLS_PADRAO;
   }
@@ -38,6 +43,19 @@ export class SgpAdaptador {
 }
 
 export const TOOLS_PADRAO = [
+  {
+    name: 'buscar_por_documento',
+    description:
+      'Busca dados completos do cliente no sistema usando CPF ou CNPJ. ' +
+      'Use quando o cliente não foi encontrado pelo número de WhatsApp e forneceu o documento.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        documento: { type: 'string', description: 'CPF ou CNPJ do cliente (com ou sem formatação)' },
+      },
+      required: ['documento'],
+    },
+  },
   {
     name: 'desbloquear_cliente',
     description:

@@ -26,15 +26,7 @@ export class MkAuthAdaptador extends SgpAdaptador {
     return res.json();
   }
 
-  async buscarContexto(whatsapp) {
-    const tel = this.normalizarTelefone(whatsapp);
-
-    const data = await this.#get('/api/cliente/buscar', { celular: tel }).catch(() => null);
-
-    if (!data?.id) {
-      return 'DADOS DO CLIENTE: Número não encontrado no MK-Auth. Peça o CPF.';
-    }
-
+  async #buildContexto(data) {
     const fatData = await this.#get('/api/financeiro/aberto', {
       id_cliente: data.id,
     }).catch(() => ({ faturas: [] }));
@@ -74,6 +66,22 @@ export class MkAuthAdaptador extends SgpAdaptador {
     linhas.push('=== FIM ===');
 
     return linhas.join('\n');
+  }
+
+  async buscarContexto(whatsapp) {
+    const tel = this.normalizarTelefone(whatsapp);
+    const data = await this.#get('/api/cliente/buscar', { celular: tel }).catch(() => null);
+
+    if (!data?.id) {
+      return 'DADOS DO CLIENTE: Número não encontrado no MK-Auth. Peça o CPF ou CNPJ para localizar.';
+    }
+    return this.#buildContexto(data);
+  }
+
+  async buscarContextoPorDocumento(doc) {
+    const data = await this.#get('/api/cliente/buscar', { cpf: doc }).catch(() => null);
+    if (!data?.id) return null;
+    return this.#buildContexto(data);
   }
 
   async buscarDados(whatsapp) {

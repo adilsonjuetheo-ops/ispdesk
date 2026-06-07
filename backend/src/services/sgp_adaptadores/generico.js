@@ -1,7 +1,8 @@
 import { SgpAdaptador } from './base.js';
 
-// O provedor implementa estes 4 endpoints no sistema dele:
+// O provedor implementa estes endpoints no sistema dele:
 //   POST {sgp_api_url}/consultar    body: { token, whatsapp }
+//   POST {sgp_api_url}/consultar    body: { token, cpf_cnpj }  (busca por documento)
 //   POST {sgp_api_url}/desbloquear  body: { token, id_cliente, id_contrato }
 //   POST {sgp_api_url}/segunda_via  body: { token, id_cliente }
 //   POST {sgp_api_url}/chamado      body: { token, id_contrato, detalhes }
@@ -21,16 +22,7 @@ export class GenericoAdaptador extends SgpAdaptador {
     return res.json();
   }
 
-  async buscarContexto(whatsapp) {
-    const data = await this.#chamar('consultar', { whatsapp }).catch(() => null);
-
-    if (!data?.sucesso) {
-      return 'DADOS DO CLIENTE: Não encontrado no sistema. Peça o CPF.';
-    }
-
-    const d = data.dados;
-
-    // Se o sistema já retornar bloco formatado para a IA, usa direto
+  #formatarContexto(d) {
     if (d.contexto_ia) return d.contexto_ia;
 
     return [
@@ -44,6 +36,20 @@ export class GenericoAdaptador extends SgpAdaptador {
       `ID_INTERNO: id_cliente=${d.id_cliente} | id_contrato=${d.id_contrato || ''}`,
       '=== FIM ===',
     ].join('\n');
+  }
+
+  async buscarContexto(whatsapp) {
+    const data = await this.#chamar('consultar', { whatsapp }).catch(() => null);
+    if (!data?.sucesso) {
+      return 'DADOS DO CLIENTE: Não encontrado no sistema. Peça o CPF ou CNPJ para localizar.';
+    }
+    return this.#formatarContexto(data.dados);
+  }
+
+  async buscarContextoPorDocumento(doc) {
+    const data = await this.#chamar('consultar', { cpf_cnpj: doc }).catch(() => null);
+    if (!data?.sucesso) return null;
+    return this.#formatarContexto(data.dados);
   }
 
   async buscarDados(whatsapp) {

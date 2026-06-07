@@ -1,6 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { buscarContextoSgp, getTools, executarTool } from './sgp.js';
-import { FORMULARIO_CADASTRO } from '../constants/formularios.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -24,10 +23,11 @@ INSTRUÇÕES IMPORTANTES:
 - Se não conseguir resolver após usar as ferramentas: escreva ACTION:HANDOFF:motivo detalhado
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
 - Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem.
-- Se o cliente solicitar instalação ou contratar um plano e NÃO houver dados cadastrais dele (cliente sem contrato no sistema), envie exatamente o formulário abaixo e aguarde o preenchimento:
+- Se o cliente NÃO for encontrado pelo número de WhatsApp: peça APENAS o CPF ou CNPJ para localizá-lo no sistema.
+- Ao receber o CPF ou CNPJ: use a ferramenta buscar_por_documento imediatamente.
+- Se o cliente NÃO for encontrado mesmo com CPF/CNPJ (cliente novo): informe que vai transferir para um atendente realizar o cadastro e escreva ACTION:HANDOFF:cliente novo — encaminhar para cadastro
+- NUNCA envie formulários de cadastro — isso é responsabilidade exclusiva do atendente humano.
 ${primeiraMsg ? `- Na PRIMEIRA mensagem do cliente, identifique o assunto principal e inclua ao final da resposta (linha separada): TAG:categoria — onde categoria é exatamente uma de: ${TAGS_VALIDAS.join(', ')}.` : ''}
-
-${FORMULARIO_CADASTRO}
 
 PROVEDOR: ${tenant.nome}
 ASSISTENTE: ${tenant.nomeAssistente}`;
