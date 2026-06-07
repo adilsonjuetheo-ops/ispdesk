@@ -239,6 +239,7 @@ router.post('/:id/send-media', upload.single('arquivo'), async (req, res) => {
     conversaId: id,
     origem: 'agente',
     conteudo,
+    midiaUrl: tipo === 'image' ? mediaId : null,
   }).returning();
 
   await db.update(conversas).set({
@@ -249,6 +250,38 @@ router.post('/:id/send-media', upload.single('arquivo'), async (req, res) => {
   }).where(eq(conversas.id, id));
 
   res.json(msg);
+});
+
+// Proxy de mídia — baixa imagem/arquivo do Meta e serve ao frontend
+router.get('/:id/media/:mediaId', async (req, res) => {
+  const { id, mediaId } = req.params;
+  const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
+  if (!conversa) return res.status(404).end();
+  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId)
+    return res.status(403).end();
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  if (!tenant?.whatsappToken) return res.status(400).end();
+
+  try {
+    const metaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
+      headers: { Authorization: `Bearer ${tenant.whatsappToken}` },
+    });
+    if (!metaRes.ok) return res.status(502).end();
+    const { url, mime_type } = await metaRes.json();
+
+    const mediaRes = await fetch(url, {
+      headers: { Authorization: `Bearer ${tenant.whatsappToken}` },
+    });
+    if (!mediaRes.ok) return res.status(502).end();
+
+    res.setHeader('Content-Type', mime_type || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const buffer = Buffer.from(await mediaRes.arrayBuffer());
+    res.send(buffer);
+  } catch {
+    res.status(502).end();
+  }
 });
 
 // Nota interna (só visível para a equipe, não vai para o WhatsApp)

@@ -11,14 +11,36 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
 
-function MidiaBolao({ conteudo, isCliente }) {
+function MidiaBolao({ msg, isCliente }) {
+  const { conteudo, midiaUrl, conversaId } = msg;
   const isImagem = conteudo.startsWith('[Imagem]');
   const isAudio = conteudo.startsWith('[Áudio]');
   const nome = conteudo.replace(/^\[(Imagem|Arquivo|Áudio)\] /, '');
-  const Icon = isImagem ? ImageIcon : isAudio ? Mic : FileText;
   const cor = isCliente
     ? 'bg-white border border-gray-200 text-gray-700'
     : 'bg-blue-50 border border-blue-100 text-blue-800';
+
+  if (isImagem && midiaUrl) {
+    return (
+      <div className="rounded-2xl overflow-hidden max-w-[280px]">
+        <img
+          src={`/api/conversations/${conversaId}/media/${midiaUrl}`}
+          alt="Imagem"
+          className="w-full object-cover rounded-2xl"
+          onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+        />
+        <div style={{ display: 'none' }} className={`items-start gap-2 rounded-2xl px-3 py-2.5 text-sm ${cor}`}>
+          <ImageIcon className="w-5 h-5 shrink-0 opacity-60 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-xs opacity-60 mb-0.5 font-medium">Imagem</p>
+            <p className="text-xs leading-relaxed">{nome}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const Icon = isImagem ? ImageIcon : isAudio ? Mic : FileText;
   const label = isImagem ? 'Imagem enviada' : isAudio ? (isCliente ? 'Áudio transcrito' : 'Áudio enviado') : 'Documento enviado';
   return (
     <div className={`flex items-start gap-2 rounded-2xl px-3 py-2.5 text-sm max-w-[280px] ${cor}`}>
@@ -77,7 +99,7 @@ function BolaoMsg({ msg, agenteNome }) {
           </p>
         )}
         {isMidia ? (
-          <MidiaBolao conteudo={msg.conteudo} isCliente={isCliente} />
+          <MidiaBolao msg={{ ...msg, conversaId: msg.conversaId }} isCliente={isCliente} />
         ) : (
           <div className={clsx('rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap', {
             'bg-white border border-gray-200 text-gray-800 rounded-tl-sm': isCliente,
@@ -185,10 +207,12 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const [gravando, setGravando] = useState(false);
   const [tempoGravacao, setTempoGravacao] = useState(0);
+  const [audioPreview, setAudioPreview] = useState(null);
   const [acao, setAcao] = useState(false);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const tempoRef = useRef(null);
+  const audioBlobRef = useRef(null);
   const [aba, setAba] = useState('resposta');
   const [atalhosList, setAtalhosList] = useState([]);
   const [buscaAtalho, setBuscaAtalho] = useState('');
@@ -312,22 +336,11 @@ export default function ChatWindow({ conversa, onAtualizar }) {
       const recorder = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
         stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(chunksRef.current, { type: 'audio/ogg' });
-        setEnviandoArquivo(true);
-        try {
-          const form = new FormData();
-          form.append('arquivo', blob, 'audio.ogg');
-          await api.post(`/conversations/${conversa.id}/send-media`, form, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          });
-          carregarMsgs();
-        } catch (err) {
-          alert(err.response?.data?.erro || 'Erro ao enviar áudio');
-        } finally {
-          setEnviandoArquivo(false);
-        }
+        audioBlobRef.current = blob;
+        setAudioPreview(URL.createObjectURL(blob));
       };
       recorder.start();
       mediaRecorderRef.current = recorder;
@@ -344,6 +357,30 @@ export default function ChatWindow({ conversa, onAtualizar }) {
     mediaRecorderRef.current?.stop();
     setGravando(false);
     setTempoGravacao(0);
+  };
+
+  const descartarAudio = () => {
+    if (audioPreview) URL.revokeObjectURL(audioPreview);
+    setAudioPreview(null);
+    audioBlobRef.current = null;
+  };
+
+  const confirmarAudio = async () => {
+    if (!audioBlobRef.current) return;
+    setEnviandoArquivo(true);
+    try {
+      const form = new FormData();
+      form.append('arquivo', audioBlobRef.current, 'audio.ogg');
+      await api.post(`/conversations/${conversa.id}/send-media`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      descartarAudio();
+      carregarMsgs();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao enviar áudio');
+    } finally {
+      setEnviandoArquivo(false);
+    }
   };
 
   const selecionarAtalho = (atalho) => {
@@ -493,8 +530,24 @@ export default function ChatWindow({ conversa, onAtualizar }) {
               </>
             )}
 
-            {/* Gravação de áudio */}
-            {!isNota && gravando ? (
+            {/* Preview de áudio gravado */}
+            {!isNota && audioPreview ? (
+              <>
+                <div className="flex-1 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
+                  <Mic className="w-4 h-4 text-blue-500 shrink-0" />
+                  <audio src={audioPreview} controls className="h-8 flex-1 min-w-0" style={{ colorScheme: 'light' }} />
+                </div>
+                <button type="button" onClick={descartarAudio}
+                  title="Descartar"
+                  className="text-gray-400 hover:text-red-500 p-1.5 transition-colors shrink-0">
+                  <X className="w-5 h-5" />
+                </button>
+                <button type="button" onClick={confirmarAudio} disabled={enviandoArquivo}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
+                  {enviandoArquivo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </>
+            ) : !isNota && gravando ? (
               <>
                 <div className="flex-1 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
                   <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />

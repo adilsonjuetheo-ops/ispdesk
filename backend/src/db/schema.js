@@ -100,6 +100,7 @@ export const mensagens = pgTable('mensagens', {
   origem:     text('origem').notNull(),
   conteudo:   text('conteudo').notNull(),
   wamid:      text('wamid').unique(),
+  midiaUrl:   text('midia_url'),
   enviadaEm:  timestamp('enviada_em').defaultNow(),
 });
 

@@ -60,6 +60,7 @@ export async function runMigrations() {
         PRIMARY KEY (tenant_id, mes)
       )
     `;
+    await sql`ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS midia_url text`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

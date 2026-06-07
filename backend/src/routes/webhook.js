@@ -70,8 +70,17 @@ router.post('/', async (req, res) => {
               try { await enviarMensagem(tenant, remetente, 'Recebi seu áudio, mas não consegui processá-lo. Por favor, tente enviar uma mensagem de texto.'); } catch {}
               continue;
             }
+          } else if (msg.type === 'image') {
+            const mediaId = msg.image?.id;
+            if (!mediaId) continue;
+            texto = '[Imagem] imagem';
+            isAudio = false;
+            // guarda media_id para exibir inline no painel
+            await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
+            await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId);
+            continue;
           } else {
-            // Ignora outros tipos silenciosamente (imagem, vídeo, sticker, etc.)
+            // Ignora outros tipos silenciosamente (vídeo, sticker, etc.)
             continue;
           }
 
@@ -81,7 +90,7 @@ router.post('/', async (req, res) => {
             continue;
           }
 
-          await processarWebhookMsg(tenant, remetente, texto, wamid, isAudio);
+          await processarWebhookMsg(tenant, remetente, texto, wamid, isAudio, null);
         }
       }
     }
@@ -104,7 +113,7 @@ async function atualizarUltMsg(conversaId, conteudo, origem, nome = null) {
   }).where(eq(conversas.id, conversaId));
 }
 
-async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false) {
+async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false, midiaUrl = null) {
   let [cliente] = await db.select().from(clientes)
     .where(and(eq(clientes.tenantId, tenant.id), eq(clientes.whatsapp, remetente)))
     .limit(1);
@@ -141,6 +150,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     origem: 'cliente',
     conteudo: conteudoCliente,
     wamid,
+    midiaUrl: midiaUrl || null,
   });
   await atualizarUltMsg(conversa.id, conteudoCliente, 'cliente');
 
