@@ -407,8 +407,34 @@ export default function TenantDetail() {
           <QrCode className="w-4 h-4 text-indigo-400" /> Cobrança
         </h2>
 
+        {/* WhatsApp destino */}
+        <div className="mb-4">
+          <label className="block text-xs text-gray-400 mb-1">WhatsApp do responsável (destino da cobrança)</label>
+          <div className="flex gap-2">
+            <input
+              type="tel"
+              value={tenant.whatsappContato || ''}
+              onChange={e => setTenant(t => ({ ...t, whatsappContato: e.target.value }))}
+              placeholder="Ex: 5531987654321"
+              className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              type="button"
+              onClick={async () => {
+                await api.put(`/tenants/${id}`, { ...tenant });
+                setSucesso('Número salvo!');
+                setTimeout(() => setSucesso(''), 2000);
+              }}
+              className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-2 rounded-lg shrink-0"
+            >
+              Salvar
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Número com DDI (ex: 5531987654321). O PIX será enviado para este WhatsApp.</p>
+        </div>
+
         {/* Status atual */}
-        <div className="flex items-center gap-3 mb-5">
+        <div className="flex items-center gap-3 mb-4">
           {(!tenant.statusPagamento || tenant.statusPagamento === 'ativo') && (
             <span className="flex items-center gap-1.5 text-xs bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full">
               <CheckCircle className="w-3.5 h-3.5" />
@@ -439,8 +465,9 @@ export default function TenantDetail() {
         {tenant.statusPagamento !== 'pendente' && (
           <button
             onClick={handleGerarCobranca}
-            disabled={gerandoPIX}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium mb-4"
+            disabled={gerandoPIX || !tenant.whatsappContato}
+            title={!tenant.whatsappContato ? 'Informe o WhatsApp do responsável antes de gerar' : ''}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium mb-4"
           >
             {gerandoPIX ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
             {tenant.statusPagamento === 'suspenso' ? 'Gerar novo PIX (reativar)' : 'Gerar cobrança PIX'}
