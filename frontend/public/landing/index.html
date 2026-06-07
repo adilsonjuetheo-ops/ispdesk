@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ISPDesk — Atendimento inteligente para provedores de internet</title>
+  <meta name="description" content="Plataforma de atendimento ao cliente via WhatsApp com inteligência artificial para provedores de internet. Integração com SGP, multi-atendentes e automação de cobranças." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; background: #fff; line-height: 1.6; }
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; background: #fff; z-index: 100; }
+    .nav-logo { font-size: 1.25rem; font-weight: 700; color: #2563eb; text-decoration: none; }
+    .nav-links { display: flex; gap: 1rem; align-items: center; }
+    .nav-links a { text-decoration: none; color: #64748b; font-size: 0.9rem; }
+    .btn { display: inline-block; padding: 0.5rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; text-decoration: none; cursor: pointer; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-outline { border: 1.5px solid #2563eb; color: #2563eb; background: transparent; }
+    .btn-outline:hover { background: #eff6ff; }
+    .hero { padding: 5rem 2rem 4rem; text-align: center; max-width: 800px; margin: 0 auto; }
+    .badge { display: inline-block; background: #eff6ff; color: #2563eb; font-size: 0.8rem; font-weight: 600; padding: 0.3rem 0.9rem; border-radius: 999px; margin-bottom: 1.5rem; border: 1px solid #bfdbfe; }
+    .hero h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; line-height: 1.2; color: #0f172a; margin-bottom: 1.25rem; }
+    .hero h1 span { color: #2563eb; }
+    .hero p { font-size: 1.15rem; color: #475569; max-width: 600px; margin: 0 auto 2.5rem; }
+    .hero-ctas { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn-lg { padding: 0.75rem 2rem; font-size: 1rem; border-radius: 10px; }
+    .section { padding: 4rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .section-title { text-align: center; font-size: 1.75rem; font-weight: 700; color: #0f172a; margin-bottom: 0.75rem; }
+    .section-sub { text-align: center; color: #64748b; margin-bottom: 3rem; font-size: 1rem; }
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+    .feature-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; transition: box-shadow .2s; }
+    .feature-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.08); }
+    .feature-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; font-size: 1.3rem; }
+    .feature-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; color: #0f172a; }
+    .feature-card p { font-size: 0.9rem; color: #64748b; }
+    .how { background: #f8fafc; padding: 4rem 2rem; }
+    .how-inner { max-width: 900px; margin: 0 auto; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem; margin-top: 2.5rem; }
+    .step { text-align: center; }
+    .step-num { width: 44px; height: 44px; background: #2563eb; color: #fff; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem; margin: 0 auto 1rem; }
+    .step h4 { font-weight: 700; margin-bottom: 0.4rem; color: #0f172a; }
+    .step p { font-size: 0.875rem; color: #64748b; }
+    .sgp { padding: 4rem 2rem; max-width: 900px; margin: 0 auto; text-align: center; }
+    .sgp-logos { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; margin-top: 2rem; }
+    .sgp-chip { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 1.25rem; font-size: 0.9rem; font-weight: 600; color: #334155; }
+    .cta-section { background: #2563eb; padding: 4rem 2rem; text-align: center; }
+    .cta-section h2 { font-size: 1.75rem; font-weight: 800; color: #fff; margin-bottom: 1rem; }
+    .cta-section p { color: #bfdbfe; margin-bottom: 2rem; font-size: 1rem; }
+    .btn-white { background: #fff; color: #2563eb; padding: 0.75rem 2rem; font-size: 1rem; border-radius: 10px; font-weight: 700; text-decoration: none; display: inline-block; }
+    .btn-white:hover { background: #eff6ff; }
+    footer { background: #0f172a; color: #94a3b8; padding: 2.5rem 2rem; text-align: center; }
+    .footer-links { display: flex; gap: 1.5rem; justify-content: center; margin-bottom: 1rem; flex-wrap: wrap; }
+    .footer-links a { color: #94a3b8; text-decoration: none; font-size: 0.875rem; }
+    .footer-links a:hover { color: #fff; }
+    footer p { font-size: 0.8rem; }
+    @media (max-width: 600px) { nav { padding: 1rem; } .hero { padding: 3rem 1rem 2rem; } }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="nav-logo">ISPDesk</a>
+    <div class="nav-links">
+      <a href="#funcionalidades">Funcionalidades</a>
+      <a href="#como-funciona">Como funciona</a>
+      <a href="https://ispdesk.adilsondev.com.br/login" class="btn btn-primary">Entrar</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <span class="badge">Plataforma para provedores de internet</span>
+    <h1>Atendimento via WhatsApp com <span>inteligência artificial</span></h1>
+    <p>O ISPDesk conecta seu provedor de internet ao WhatsApp Business com IA integrada ao seu sistema de gestão. Automatize cobranças, suporte técnico e muito mais.</p>
+    <div class="hero-ctas">
+      <a href="https://ispdesk.adilsondev.com.br/login" class="btn btn-primary btn-lg">Acessar plataforma</a>
+      <a href="#funcionalidades" class="btn btn-outline btn-lg">Ver funcionalidades</a>
+    </div>
+  </section>
+
+  <section class="section" id="funcionalidades">
+    <h2 class="section-title">Tudo que seu provedor precisa</h2>
+    <p class="section-sub">Do primeiro contato ao encerramento do atendimento, tudo em um só lugar.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#dcfce7;">💬</div>
+        <h3>WhatsApp Business API</h3>
+        <p>Integração oficial com a API do WhatsApp Cloud da Meta. Múltiplos atendentes usando o mesmo número simultaneamente.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#dbeafe;">🤖</div>
+        <h3>Atendente Virtual com IA</h3>
+        <p>Assistente inteligente que identifica o cliente no SGP, envia 2ª via de boleto/PIX, desbloqueia internet e abre chamados automaticamente.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#fef9c3;">⚡</div>
+        <h3>Integração com SGP</h3>
+        <p>Acessa dados reais do cliente em tempo real: contratos, faturas, status de pagamento e filial — direto do seu sistema de gestão.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#fce7f3;">👥</div>
+        <h3>Multi-atendentes</h3>
+        <p>Distribua conversas por filial, equipe ou atendente individual. Painel em tempo real com fila de espera e transferências.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#ede9fe;">🏷️</div>
+        <h3>Tags e categorização</h3>
+        <p>A IA classifica automaticamente cada atendimento: Cobrança, Suporte Técnico, Instalação, Cancelamento e mais.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#ffedd5;">📊</div>
+        <h3>Histórico completo</h3>
+        <p>Todas as conversas registradas com timeline, operador responsável, motivo do encerramento e dados do cliente.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="how" id="como-funciona">
+    <div class="how-inner">
+      <h2 class="section-title">Como funciona</h2>
+      <p class="section-sub">Simples para o provedor, eficiente para o cliente final.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h4>Cliente envia mensagem</h4>
+          <p>O cliente entra em contato pelo WhatsApp normalmente.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h4>IA identifica e age</h4>
+          <p>O assistente localiza o cliente no SGP e resolve boleto, bloqueio ou chamado automaticamente.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h4>Transferência se necessário</h4>
+          <p>Casos complexos são transferidos para um atendente humano com todo o contexto já carregado.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <h4>Encerramento e registro</h4>
+          <p>O atendimento é encerrado, categorizado e salvo no histórico do cliente.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="sgp">
+    <h2 class="section-title">Compatível com os principais SGPs</h2>
+    <p class="section-sub">Integração nativa com os sistemas de gestão mais usados pelos provedores brasileiros.</p>
+    <div class="sgp-logos">
+      <span class="sgp-chip">Atlaz</span>
+      <span class="sgp-chip">IXC Soft</span>
+      <span class="sgp-chip">MK-Auth</span>
+      <span class="sgp-chip">SGP Genérico (API própria)</span>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <h2>Pronto para modernizar seu atendimento?</h2>
+    <p>Acesse a plataforma e configure seu provedor em minutos.</p>
+    <a href="https://ispdesk.adilsondev.com.br/login" class="btn-white">Acessar o ISPDesk</a>
+  </section>
+
+  <footer>
+    <div class="footer-links">
+      <a href="/privacidade">Política de Privacidade</a>
+      <a href="/termos">Termos de Uso</a>
+      <a href="mailto:contato@adilsondev.com.br">Contato</a>
+    </div>
+    <p>&copy; 2025 ISPDesk. Todos os direitos reservados.</p>
+  </footer>
+
+</body>
+</html>
