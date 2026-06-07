@@ -17,6 +17,17 @@ function criarSgp(tenant) {
   return new Adaptador(tenant);
 }
 
+export async function buscarDadosCliente(tenant, whatsapp) {
+  const sgp = criarSgp(tenant);
+  if (!sgp) return null;
+  try {
+    return await sgp.buscarDados(whatsapp);
+  } catch (err) {
+    console.error(`[SGP:${tenant.sgpTipo}] Erro buscarDados:`, err.message);
+    return null;
+  }
+}
+
 export async function buscarContextoSgp(tenant, whatsapp) {
   const sgp = criarSgp(tenant);
   if (!sgp) return '(Integração com SGP não configurada para este provedor)';

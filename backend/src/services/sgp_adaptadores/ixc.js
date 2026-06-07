@@ -74,7 +74,9 @@ export class IxcAdaptador extends SgpAdaptador {
     }).catch(() => ({ registros: [] }));
 
     const faturas = fatData.registros || [];
-    const vencidas = faturas.filter(f => new Date(f.data_vencimento) < new Date());
+    const hoje = new Date();
+    const vencidas = faturas.filter(f => new Date(f.data_vencimento) < hoje);
+    const aVencer  = faturas.filter(f => new Date(f.data_vencimento) >= hoje);
 
     const linhas = [
       '=== DADOS DO CLIENTE (IXC Soft) ===',
@@ -89,8 +91,27 @@ export class IxcAdaptador extends SgpAdaptador {
     if (vencidas.length > 0) {
       linhas.push(`FATURAS VENCIDAS (${vencidas.length}):`);
       vencidas.forEach(f => {
-        linhas.push(`  Vencto ${this.formatarData(f.data_vencimento)} | ${this.formatarMoeda(f.valor)}`);
+        const temPix = f.pix_copia_cola || f.pix_qrcode || f.pix;
+        linhas.push(
+          `  Vencto ${this.formatarData(f.data_vencimento)} | ${this.formatarMoeda(f.valor)}` +
+          (f.linha_digitavel ? ' | Boleto disponível' : '') +
+          (temPix            ? ' | PIX disponível'   : '')
+        );
       });
+      linhas.push('');
+    }
+
+    if (aVencer.length > 0) {
+      const prox = aVencer[0];
+      const temPix = prox.pix_copia_cola || prox.pix_qrcode || prox.pix;
+      linhas.push(`PRÓXIMA FATURA: ${this.formatarData(prox.data_vencimento)} | ${this.formatarMoeda(prox.valor)}` +
+        (prox.linha_digitavel ? ' | Boleto disponível' : '') +
+        (temPix               ? ' | PIX disponível'   : ''));
+      linhas.push('');
+    }
+
+    if (faturas.length === 0) {
+      linhas.push('FINANCEIRO: Sem faturas em aberto.');
       linhas.push('');
     }
 
@@ -108,6 +129,41 @@ export class IxcAdaptador extends SgpAdaptador {
     linhas.push('=== FIM ===');
 
     return linhas.join('\n');
+  }
+
+  async buscarDados(whatsapp) {
+    const tel = this.normalizarTelefone(whatsapp);
+    const data = await this.#get('cliente', {
+      qtype: 'cliente.celular',
+      query: tel,
+      oper: '=',
+      page: 1,
+      rp: 1,
+    }).catch(() => null);
+
+    if (!data?.registros?.length) return null;
+    const c = data.registros[0];
+
+    const contData = await this.#get('cliente_contrato', {
+      qtype: 'cliente_contrato.id_cliente',
+      query: c.id,
+      oper: '=',
+      page: 1,
+      rp: 5,
+    }).catch(() => ({ registros: [] }));
+
+    const contratoAtivo =
+      (contData.registros || []).find(ct => ct.status === 'A') ||
+      contData.registros?.[0];
+
+    const statusMap = { A: 'ativo', S: 'suspenso', CA: 'cancelado', CM: 'cancelado' };
+
+    return {
+      nome: c.razao || null,
+      contratoId: String(contratoAtivo?.id || c.id || ''),
+      statusContrato: statusMap[contratoAtivo?.status] || (contratoAtivo?.status || 'inativo').toLowerCase(),
+      filialNome: c.cidade || null,
+    };
   }
 
   async executarTool(toolName, toolInput) {
@@ -132,13 +188,21 @@ export class IxcAdaptador extends SgpAdaptador {
         });
         const faturas = data.registros || [];
         if (!faturas.length) return 'Nenhuma fatura em aberto.';
-        const f = faturas[0];
-        return [
+
+        const f = faturas.sort(
+          (a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento)
+        )[0];
+
+        const pix = f.pix_copia_cola || f.pix_qrcode || f.pix || null;
+        const partes = [
           'Mensalidade',
           `Vencimento: ${this.formatarData(f.data_vencimento)}`,
           `Valor: ${this.formatarMoeda(f.valor)}`,
-          f.linha_digitavel ? `\nLinha digitável:\n${f.linha_digitavel}` : '',
-        ].filter(Boolean).join('\n');
+        ];
+        if (pix)                  partes.push(`\nPIX copia e cola:\n${pix}`);
+        else if (f.linha_digitavel) partes.push(`\nLinha digitável:\n${f.linha_digitavel}`);
+        else if (f.url_boleto)    partes.push(`\nLink do boleto: ${f.url_boleto}`);
+        return partes.join('\n');
       }
 
       case 'abrir_chamado_tecnico': {

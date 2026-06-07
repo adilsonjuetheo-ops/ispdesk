@@ -106,6 +106,28 @@ export class AtlazAdaptador extends SgpAdaptador {
     return linhas.join('\n');
   }
 
+  async buscarDados(whatsapp) {
+    const tel = this.normalizarTelefone(whatsapp);
+    const clienteData = await this.#get('/consultacliente', {
+      telefone: tel,
+      testar_com_e_sem_nono_digito: 'true',
+      ocultar_contratos_desativados: 1,
+    }).catch(() => null);
+
+    if (clienteData?.success !== 'true') return null;
+
+    const a = clienteData.assinante;
+    const pontos = clienteData.pontos_de_acesso || [];
+    const pontoAtivo = pontos.find(p => p.status === 'Ativo') || pontos[0];
+
+    return {
+      nome: a.nome || null,
+      contratoId: String(pontoAtivo?.id_ponto || a.id_assinante || ''),
+      statusContrato: (pontoAtivo?.status || 'inativo').toLowerCase(),
+      filialNome: pontoAtivo?.cidade || null,
+    };
+  }
+
   async executarTool(toolName, toolInput) {
     switch (toolName) {
 

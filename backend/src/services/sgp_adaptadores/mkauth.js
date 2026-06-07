@@ -76,6 +76,19 @@ export class MkAuthAdaptador extends SgpAdaptador {
     return linhas.join('\n');
   }
 
+  async buscarDados(whatsapp) {
+    const tel = this.normalizarTelefone(whatsapp);
+    const data = await this.#get('/api/cliente/buscar', { celular: tel }).catch(() => null);
+    if (!data?.id) return null;
+
+    return {
+      nome: data.nome || null,
+      contratoId: String(data.id_contrato || data.id || ''),
+      statusContrato: (data.status || 'inativo').toLowerCase(),
+      filialNome: data.cidade || null,
+    };
+  }
+
   async executarTool(toolName, toolInput) {
     switch (toolName) {
 

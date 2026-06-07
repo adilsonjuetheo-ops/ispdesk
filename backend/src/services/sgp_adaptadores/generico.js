@@ -46,6 +46,19 @@ export class GenericoAdaptador extends SgpAdaptador {
     ].join('\n');
   }
 
+  async buscarDados(whatsapp) {
+    const data = await this.#chamar('consultar', { whatsapp }).catch(() => null);
+    if (!data?.sucesso) return null;
+    const d = data.dados;
+
+    return {
+      nome: d.nome || null,
+      contratoId: String(d.id_contrato || d.id_cliente || ''),
+      statusContrato: (d.status || 'inativo').toLowerCase(),
+      filialNome: d.cidade || d.filial || null,
+    };
+  }
+
   async executarTool(toolName, toolInput) {
     const acoes = {
       desbloquear_cliente:   'desbloquear',

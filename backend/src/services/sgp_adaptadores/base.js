@@ -10,6 +10,11 @@ export class SgpAdaptador {
     throw new Error(`${this.constructor.name}: buscarContexto não implementado`);
   }
 
+  // Retorna { nome, contratoId, statusContrato, filialNome } ou null se não encontrado
+  async buscarDados(whatsapp) {
+    return null;
+  }
+
   tools() {
     return TOOLS_PADRAO;
   }

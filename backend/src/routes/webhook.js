@@ -3,6 +3,7 @@ import { db } from '../db/index.js';
 import { tenants, clientes, conversas, mensagens, webhookLog, filiais } from '../db/schema.js';
 import { eq, and, ne } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
+import { buscarDadosCliente } from '../services/sgp.js';
 import { enviarMensagem, transcreverAudioMeta } from '../services/whatsapp.js';
 import { realizarHandoff } from '../services/handoff.js';
 import { enviarPushParaTenant } from '../services/pushNotification.js';
@@ -126,6 +127,24 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     }).returning();
   } else {
     await db.update(clientes).set({ ultimoContato: new Date() }).where(eq(clientes.id, cliente.id));
+  }
+
+  // Enriquece dados do cliente com informações do SGP do provedor
+  try {
+    const dadosSgp = await buscarDadosCliente(tenant, remetente);
+    if (dadosSgp) {
+      const update = {};
+      if (dadosSgp.nome && !/^\d+$/.test(dadosSgp.nome)) update.nome = dadosSgp.nome;
+      if (dadosSgp.contratoId) update.contratoId = dadosSgp.contratoId;
+      if (dadosSgp.statusContrato) update.statusContrato = dadosSgp.statusContrato;
+      if (dadosSgp.filialNome) update.filialNome = dadosSgp.filialNome;
+      if (Object.keys(update).length > 0) {
+        await db.update(clientes).set(update).where(eq(clientes.id, cliente.id));
+        cliente = { ...cliente, ...update };
+      }
+    }
+  } catch (err) {
+    console.error('[SGP] Erro ao enriquecer cliente:', err.message);
   }
 
   let [conversa] = await db.select().from(conversas)
