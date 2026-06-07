@@ -12,8 +12,10 @@ import relatorioRouter from './routes/relatorio.js';
 import atalhoRouter from './routes/atalhos.js';
 import pushRouter from './routes/push.js';
 import presenceRouter from './routes/presence.js';
+import cobrancaRouter from './routes/cobranca.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
+import { agendarCobrancaRecorrente } from './jobs/cobrancaRecorrente.js';
 import { runMigrations } from './db/migrations.js';
 
 const app = express();
@@ -37,6 +39,7 @@ app.use('/api/webhook', webhookRouter);
 app.use('/api/relatorio', relatorioRouter);
 app.use('/api/push', pushRouter);
 app.use('/api/presence', presenceRouter);
+app.use('/api', cobrancaRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
@@ -51,4 +54,5 @@ app.listen(PORT, async () => {
   await runMigrations();
   agendarLimpeza();
   agendarEncerramentoInativo();
+  agendarCobrancaRecorrente();
 });

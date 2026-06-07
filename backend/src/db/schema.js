@@ -25,6 +25,9 @@ export const tenants = pgTable('tenants', {
   sgpApiUrl:          text('sgp_api_url'),
   sgpApiKey:          text('sgp_api_key'),
   plano:              text('plano').default('basic'),
+  mpPaymentId:        text('mp_payment_id'),
+  statusPagamento:    text('status_pagamento'), // null | 'pendente' | 'ativo' | 'suspenso'
+  proximoVencimento:  timestamp('proximo_vencimento'),
   ativo:              boolean('ativo').default(true),
   horarios:           jsonb('horarios'),
   criadoEm:           timestamp('criado_em').defaultNow(),

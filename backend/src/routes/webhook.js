@@ -202,6 +202,13 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     }
   }
 
+  // Bloqueia bot se conta suspensa por inadimplência
+  if (tenant.statusPagamento === 'suspenso') {
+    const msg = 'Nosso atendimento automático está temporariamente suspenso. Por favor, entre em contato diretamente com o provedor.';
+    try { await enviarMensagem(tenant, remetente, msg); } catch {}
+    return;
+  }
+
   // Verifica limite mensal de IA
   const contagemAtual = await getUso(tenant.id);
   const limiteAtual = getLimite(tenant.plano);

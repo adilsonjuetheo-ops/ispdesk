@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
-import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2, MapPin, AlertTriangle, ToggleLeft, ToggleRight, KeyRound } from 'lucide-react';
+import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2, MapPin, AlertTriangle, ToggleLeft, ToggleRight, KeyRound, QrCode, CheckCircle, Clock, Ban } from 'lucide-react';
 
 const PLANOS = [
   { value: 'basic',      label: 'Basic',      preco: 'R$149,90/mês', cor: 'text-gray-300'  },
-  { value: 'pro',        label: 'Pro',         preco: 'R$299,90/mês', cor: 'text-blue-400'  },
+  { value: 'pro',        label: 'Pro',         preco: 'R$249,90/mês', cor: 'text-blue-400'  },
   { value: 'enterprise', label: 'Enterprise',  preco: 'R$549,90/mês', cor: 'text-amber-400' },
 ];
 
@@ -34,11 +34,15 @@ export default function TenantDetail() {
   const [confirmaExcluir, setConfirmaExcluir] = useState('');
   const [excluindo, setExcluindo] = useState(false);
 
-  const [modalResetSenha, setModalResetSenha] = useState(null); // agente selecionado
+  const [modalResetSenha, setModalResetSenha] = useState(null);
   const [novaSenhaReset, setNovaSenhaReset] = useState('');
   const [savingReset, setSavingReset] = useState(false);
   const [erroReset, setErroReset] = useState('');
   const fileRef = useRef(null);
+
+  const [gerandoPIX, setGerandoPIX] = useState(false);
+  const [pixGerado, setPixGerado] = useState(null); // { pixCopiaECola, ticketUrl }
+  const [erroCobranca, setErroCobranca] = useState('');
 
   const handleLogoUpload = e => {
     const file = e.target.files?.[0];
@@ -145,6 +149,21 @@ export default function TenantDetail() {
       setErroReset(err.response?.data?.erro || 'Erro ao redefinir senha');
     } finally {
       setSavingReset(false);
+    }
+  };
+
+  const handleGerarCobranca = async () => {
+    setGerandoPIX(true);
+    setErroCobranca('');
+    setPixGerado(null);
+    try {
+      const { data } = await api.post(`/tenants/${id}/gerar-cobranca`);
+      setPixGerado(data);
+      setTenant(t => ({ ...t, statusPagamento: 'pendente' }));
+    } catch (err) {
+      setErroCobranca(err.response?.data?.erro || 'Erro ao gerar cobrança');
+    } finally {
+      setGerandoPIX(false);
     }
   };
 
@@ -380,6 +399,82 @@ export default function TenantDetail() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Cobrança */}
+      <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6">
+        <h2 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <QrCode className="w-4 h-4 text-indigo-400" /> Cobrança
+        </h2>
+
+        {/* Status atual */}
+        <div className="flex items-center gap-3 mb-5">
+          {(!tenant.statusPagamento || tenant.statusPagamento === 'ativo') && (
+            <span className="flex items-center gap-1.5 text-xs bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full">
+              <CheckCircle className="w-3.5 h-3.5" />
+              {tenant.statusPagamento === 'ativo' ? 'Ativo — pago' : 'Aguardando primeira cobrança'}
+            </span>
+          )}
+          {tenant.statusPagamento === 'pendente' && (
+            <span className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full">
+              <Clock className="w-3.5 h-3.5" /> PIX pendente
+            </span>
+          )}
+          {tenant.statusPagamento === 'suspenso' && (
+            <span className="flex items-center gap-1.5 text-xs bg-red-500/20 text-red-300 px-3 py-1 rounded-full">
+              <Ban className="w-3.5 h-3.5" /> Suspenso — inadimplente
+            </span>
+          )}
+          {tenant.proximoVencimento && (
+            <span className="text-xs text-gray-400">
+              {tenant.statusPagamento === 'pendente' ? 'PIX expira em: ' : 'Próximo vencimento: '}
+              <strong className="text-gray-300">
+                {new Date(tenant.proximoVencimento).toLocaleDateString('pt-BR')}
+              </strong>
+            </span>
+          )}
+        </div>
+
+        {/* Botão gerar cobrança */}
+        {tenant.statusPagamento !== 'pendente' && (
+          <button
+            onClick={handleGerarCobranca}
+            disabled={gerandoPIX}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium mb-4"
+          >
+            {gerandoPIX ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+            {tenant.statusPagamento === 'suspenso' ? 'Gerar novo PIX (reativar)' : 'Gerar cobrança PIX'}
+          </button>
+        )}
+
+        {erroCobranca && <p className="text-red-400 text-sm mb-3">{erroCobranca}</p>}
+
+        {/* PIX gerado */}
+        {pixGerado && (
+          <div className="bg-gray-900 rounded-lg p-4 border border-indigo-700/50">
+            <p className="text-xs text-gray-400 mb-2">PIX enviado ao WhatsApp do provedor ✅</p>
+            <p className="text-xs text-gray-400 mb-1">Copia e Cola:</p>
+            <div className="flex gap-2 items-start">
+              <code className="text-xs text-indigo-300 break-all flex-1 bg-gray-800 p-2 rounded">{pixGerado.pixCopiaECola}</code>
+              <button
+                onClick={() => navigator.clipboard.writeText(pixGerado.pixCopiaECola)}
+                className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-2 py-1 rounded shrink-0"
+              >Copiar</button>
+            </div>
+            {pixGerado.ticketUrl && (
+              <a href={pixGerado.ticketUrl} target="_blank" rel="noreferrer"
+                className="text-xs text-indigo-400 hover:text-indigo-300 mt-2 inline-block">
+                Abrir link de pagamento →
+              </a>
+            )}
+          </div>
+        )}
+
+        {tenant.statusPagamento === 'pendente' && !pixGerado && (
+          <p className="text-xs text-amber-400">
+            Há um PIX pendente. Aguarde o vencimento (3 dias) para gerar um novo.
+          </p>
+        )}
       </div>
 
       {/* Zona de perigo */}

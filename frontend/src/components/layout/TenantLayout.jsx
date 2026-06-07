@@ -31,6 +31,11 @@ export default function TenantLayout() {
 
   useEffect(() => {
     api.get('/tenants/me').then(r => setTenant(r.data)).catch(() => {});
+    // Recarrega tenant periodicamente para detectar suspensão
+    const id = setInterval(() =>
+      api.get('/tenants/me').then(r => setTenant(r.data)).catch(() => {}),
+    300000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -247,8 +252,26 @@ export default function TenantLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-hidden">
-        <Outlet context={{ online, currentUser: user }} />
+      <main className="flex-1 overflow-hidden flex flex-col">
+        {tenant?.statusPagamento === 'suspenso' && user?.role === 'admin' && (
+          <div className="bg-red-900/80 border-b border-red-700 px-4 py-2.5 flex items-center gap-2 shrink-0">
+            <AlertTriangle className="w-4 h-4 text-red-300 shrink-0" />
+            <p className="text-red-200 text-sm">
+              <strong>Conta suspensa por inadimplência.</strong> O bot de atendimento está pausado. Entre em contato com o suporte ISPDesk para regularizar.
+            </p>
+          </div>
+        )}
+        {tenant?.statusPagamento === 'pendente' && user?.role === 'admin' && (
+          <div className="bg-amber-900/60 border-b border-amber-700 px-4 py-2 flex items-center gap-2 shrink-0">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+            <p className="text-amber-200 text-xs">
+              Pagamento PIX pendente — vencimento em {tenant.proximoVencimento ? new Date(tenant.proximoVencimento).toLocaleDateString('pt-BR') : '—'}. Verifique seu WhatsApp.
+            </p>
+          </div>
+        )}
+        <div className="flex-1 overflow-hidden">
+          <Outlet context={{ online, currentUser: user }} />
+        </div>
       </main>
     </div>
   );

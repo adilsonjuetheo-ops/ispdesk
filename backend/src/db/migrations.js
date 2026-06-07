@@ -48,6 +48,9 @@ export async function runMigrations() {
         criado_em timestamp DEFAULT now()
       )
     `;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS mp_payment_id text`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS status_pagamento text`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS proximo_vencimento timestamp`;
     await sql`
       CREATE TABLE IF NOT EXISTS uso_ia (
         tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
