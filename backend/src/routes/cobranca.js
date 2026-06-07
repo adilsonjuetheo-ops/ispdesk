@@ -14,11 +14,6 @@ router.post('/tenants/:id/gerar-cobranca', autenticar, apenasSuper, async (req, 
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id)).limit(1);
   if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
 
-  // Impede duplicata: bloqueia se já tem PIX pendente com menos de 3 dias
-  if (tenant.statusPagamento === 'pendente' && tenant.proximoVencimento > new Date()) {
-    return res.status(409).json({ erro: 'Já existe uma cobrança PIX pendente para este provedor.' });
-  }
-
   try {
     const pagamento = await criarPIX(tenant);
     const pixData      = pagamento.point_of_interaction?.transaction_data;

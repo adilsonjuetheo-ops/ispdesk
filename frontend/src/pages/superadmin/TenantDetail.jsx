@@ -462,17 +462,15 @@ export default function TenantDetail() {
         </div>
 
         {/* Botão gerar cobrança */}
-        {tenant.statusPagamento !== 'pendente' && (
-          <button
-            onClick={handleGerarCobranca}
-            disabled={gerandoPIX || !tenant.whatsappContato}
-            title={!tenant.whatsappContato ? 'Informe o WhatsApp do responsável antes de gerar' : ''}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium mb-4"
-          >
-            {gerandoPIX ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
-            {tenant.statusPagamento === 'suspenso' ? 'Gerar novo PIX (reativar)' : 'Gerar cobrança PIX'}
-          </button>
-        )}
+        <button
+          onClick={handleGerarCobranca}
+          disabled={gerandoPIX || !tenant.whatsappContato}
+          title={!tenant.whatsappContato ? 'Informe o WhatsApp do responsável antes de gerar' : ''}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium mb-4"
+        >
+          {gerandoPIX ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+          {tenant.statusPagamento === 'suspenso' ? 'Gerar novo PIX (reativar)' : tenant.statusPagamento === 'pendente' ? 'Gerar novo PIX' : 'Gerar cobrança PIX'}
+        </button>
 
         {erroCobranca && <p className="text-red-400 text-sm mb-3">{erroCobranca}</p>}
 
@@ -497,11 +495,6 @@ export default function TenantDetail() {
           </div>
         )}
 
-        {tenant.statusPagamento === 'pendente' && !pixGerado && (
-          <p className="text-xs text-amber-400">
-            Há um PIX pendente. Aguarde o vencimento (3 dias) para gerar um novo.
-          </p>
-        )}
       </div>
 
       {/* Zona de perigo */}
