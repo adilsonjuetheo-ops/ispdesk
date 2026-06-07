@@ -1,6 +1,6 @@
 const MP_BASE = 'https://api.mercadopago.com';
 
-const VALORES_PLANO = { basic: 0.01, pro: 0.01, enterprise: 0.01 };
+const VALORES_PLANO = { basic: 149.90, pro: 249.90, enterprise: 549.90 };
 const LABELS_PLANO  = { basic: 'Basic', pro: 'Pro', enterprise: 'Enterprise' };
 
 export function getValorPlano(plano) {
