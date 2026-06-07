@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { usePushNotifications } from '../../hooks/usePushNotifications.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
-  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap,
+  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap, AlertTriangle,
 } from 'lucide-react';
 import api from '../../lib/api.js';
 
@@ -27,10 +27,20 @@ export default function TenantLayout() {
   const [filiais, setFiliais] = useState([]);
   const [counts, setCounts] = useState({ todos: 0, mine: 0, fila: 0, porFilial: {} });
   const [online, setOnline] = useState([]);
+  const [usoIa, setUsoIa] = useState(null);
 
   useEffect(() => {
     api.get('/tenants/me').then(r => setTenant(r.data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (user?.role !== 'admin') return;
+    api.get('/tenants/me/uso-ia').then(r => setUsoIa(r.data)).catch(() => {});
+    const id = setInterval(() => {
+      api.get('/tenants/me/uso-ia').then(r => setUsoIa(r.data)).catch(() => {});
+    }, 60000);
+    return () => clearInterval(id);
+  }, [user?.role]);
 
   useEffect(() => {
     if (!user?.tenantId) return;
@@ -187,6 +197,38 @@ export default function TenantLayout() {
             </div>
           )}
         </nav>
+
+        {usoIa && usoIa.percentual >= 80 && (
+          <div className={`mx-2 mb-2 p-2.5 rounded-lg border text-xs ${
+            usoIa.percentual >= 100
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : usoIa.percentual >= 90
+                ? 'bg-orange-50 border-orange-200 text-orange-800'
+                : 'bg-yellow-50 border-yellow-200 text-yellow-800'
+          }`}>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span className="font-semibold">
+                {usoIa.percentual >= 100 ? 'Limite de IA atingido' : `IA: ${usoIa.percentual}% utilizada`}
+              </span>
+            </div>
+            <div className="w-full bg-white/60 rounded-full h-1.5 mb-1.5">
+              <div
+                className={`h-1.5 rounded-full transition-all ${
+                  usoIa.percentual >= 100 ? 'bg-red-500' : usoIa.percentual >= 90 ? 'bg-orange-500' : 'bg-yellow-500'
+                }`}
+                style={{ width: `${Math.min(usoIa.percentual, 100)}%` }}
+              />
+            </div>
+            <p className="leading-tight mb-1.5">
+              {usoIa.contagem.toLocaleString('pt-BR')}/{usoIa.limite.toLocaleString('pt-BR')} atendimentos
+              {usoIa.percentual >= 100 && ' — bot pausado'}
+            </p>
+            <p className="leading-tight font-medium">
+              Upgrade: Plano Pro 10.000 atend. R$249,90/mês ou R$0,03/excedente
+            </p>
+          </div>
+        )}
 
         <div className="p-3 border-t border-gray-200">
           {user?.role === 'admin' && (

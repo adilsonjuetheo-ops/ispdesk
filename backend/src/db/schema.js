@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, boolean, timestamp, jsonb, integer } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, boolean, timestamp, jsonb, integer, primaryKey } from 'drizzle-orm/pg-core';
 
 export const tenants = pgTable('tenants', {
   id:                 uuid('id').primaryKey().defaultRandom(),
@@ -124,3 +124,12 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
   keys:       jsonb('keys').notNull(),
   criadoEm:  timestamp('criado_em').defaultNow(),
 });
+
+export const usoIa = pgTable('uso_ia', {
+  tenantId:        uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  mes:             text('mes').notNull(), // YYYY-MM
+  contagem:        integer('contagem').default(0),
+  alertasEnviados: jsonb('alertas_enviados').default('[]'),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.tenantId, t.mes] }),
+}));

@@ -4,6 +4,7 @@ import { tenants, tenantUsers, conversas } from '../db/schema.js';
 import { eq, count, and } from 'drizzle-orm';
 import { autenticar, apenasSuper } from '../middleware/auth.js';
 import crypto from 'crypto';
+import { getLimite, getUso, getMes } from '../services/limites.js';
 
 const router = Router();
 
@@ -30,6 +31,16 @@ router.put('/me/horarios', autenticar, async (req, res) => {
   await db.update(tenants).set({ horarios: JSON.stringify(horarios), atualizadoEm: new Date() })
     .where(eq(tenants.id, req.user.tenantId));
   res.json({ horarios });
+});
+
+router.get('/me/uso-ia', autenticar, async (req, res) => {
+  if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+  const [tenant] = await db.select({ plano: tenants.plano }).from(tenants)
+    .where(eq(tenants.id, req.user.tenantId)).limit(1);
+  const contagem = await getUso(req.user.tenantId);
+  const limite = getLimite(tenant?.plano);
+  const percentual = Math.floor((contagem / limite) * 100);
+  res.json({ contagem, limite, percentual, mes: getMes() });
 });
 
 // rota de edição própria: admin pode editar seu tenant

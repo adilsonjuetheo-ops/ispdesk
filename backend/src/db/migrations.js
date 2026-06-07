@@ -48,6 +48,15 @@ export async function runMigrations() {
         criado_em timestamp DEFAULT now()
       )
     `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS uso_ia (
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        mes text NOT NULL,
+        contagem integer DEFAULT 0,
+        alertas_enviados jsonb DEFAULT '[]',
+        PRIMARY KEY (tenant_id, mes)
+      )
+    `;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

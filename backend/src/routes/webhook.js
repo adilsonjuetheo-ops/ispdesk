@@ -7,6 +7,7 @@ import { enviarMensagem, transcreverAudioMeta } from '../services/whatsapp.js';
 import { realizarHandoff } from '../services/handoff.js';
 import { enviarPushParaTenant } from '../services/pushNotification.js';
 import { dentroDoHorario } from '../services/horarios.js';
+import { getLimite, getUso, incrementarUso } from '../services/limites.js';
 
 const router = Router();
 
@@ -201,6 +202,16 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     }
   }
 
+  // Verifica limite mensal de IA
+  const contagemAtual = await getUso(tenant.id);
+  const limiteAtual = getLimite(tenant.plano);
+  if (contagemAtual >= limiteAtual) {
+    const msgBloqueio = '⛔ Nosso assistente virtual está temporariamente indisponível. Por favor, aguarde ou entre em contato pelo telefone do provedor.';
+    await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msgBloqueio });
+    try { await enviarMensagem(tenant, remetente, msgBloqueio); } catch {}
+    return;
+  }
+
   // Chama IA
   const historico = await db.select().from(mensagens)
     .where(eq(mensagens.conversaId, conversa.id))
@@ -216,6 +227,9 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
         .where(eq(conversas.id, conversa.id));
     }
   }
+
+  // Incrementa contador de uso IA (fire-and-forget em caso de erro)
+  incrementarUso(tenant).catch(err => console.error('[limites] Erro ao incrementar uso:', err.message));
 
   if (resultado.resposta) {
     await db.insert(mensagens).values({
@@ -254,6 +268,8 @@ async function processarSelecaoFilial(tenant, conversa, cliente, texto, remetent
 
     const conversaAtualizada = { ...conversa, filialId: escolhida.id, status: 'bot' };
     const resultado = await processarMensagem(tenant, conversaAtualizada, historico, texto, remetente);
+
+    incrementarUso(tenant).catch(err => console.error('[limites] Erro ao incrementar uso:', err.message));
 
     if (resultado.resposta) {
       await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: resultado.resposta });
