@@ -60,6 +60,12 @@ export async function runMigrations() {
         PRIMARY KEY (tenant_id, mes)
       )
     `;
+    // Limpa PIX de teste — remove status pendente/suspenso e dados de cobrança gerados em testes
+    await sql`
+      UPDATE tenants
+      SET status_pagamento = NULL, mp_payment_id = NULL, proximo_vencimento = NULL
+      WHERE status_pagamento IN ('pendente', 'suspenso')
+    `;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);
