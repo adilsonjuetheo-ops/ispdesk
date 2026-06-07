@@ -9,6 +9,12 @@ const AVATAR_COLORS = [
   '#10b981', '#3b82f6', '#ef4444', '#14b8a6',
 ];
 
+function presenceColor(nome) {
+  let hash = 0;
+  for (const c of (nome || '?')) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
 function avatarColor(nome) {
   let hash = 0;
   for (const c of (nome || '?')) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
@@ -124,7 +130,7 @@ function PreviewMsg({ c }) {
   return <span className="truncate">{ultimaMensagem}</span>;
 }
 
-export default function ConversationList({ conversas, selecionada, onSelecionar, view = 'todos', filialId }) {
+export default function ConversationList({ conversas, selecionada, onSelecionar, view = 'todos', filialId, online = [], currentUser }) {
   const { user } = useAuth();
   const [busca, setBusca] = useState('');
   const filtrados = filtrar(conversas, view, filialId, user?.id, busca);
@@ -233,6 +239,31 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
           );
         })}
       </div>
+
+      {/* Presença: Online agora */}
+      {online.length > 0 && (
+        <div className="px-3 py-2 border-t border-gray-100 bg-white">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Online agora</p>
+          <div className="flex flex-wrap gap-1.5">
+            {online.map(u => (
+              <div key={u.id} className="relative group">
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                    u.id === (currentUser?.id || user?.id) ? 'ring-2 ring-offset-1 ring-blue-400' : ''
+                  }`}
+                  style={{ backgroundColor: presenceColor(u.nome) }}
+                >
+                  {u.nome[0].toUpperCase()}
+                </div>
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+                <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded-lg px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
+                  {u.nome}{u.id === (currentUser?.id || user?.id) ? ' (você)' : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

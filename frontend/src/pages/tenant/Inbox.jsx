@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useOutletContext } from 'react-router-dom';
 import api from '../../lib/api.js';
 import { usePolling } from '../../hooks/usePolling.js';
 import { useNotificationSound } from '../../hooks/useNotificationSound.js';
@@ -9,6 +9,7 @@ import ClientInfoPanel from '../../components/ClientInfoPanel.jsx';
 import { MessageSquare } from 'lucide-react';
 
 export default function Inbox() {
+  const { online = [], currentUser } = useOutletContext() || {};
   const [conversas, setConversas] = useState([]);
   const [selecionada, setSelecionada] = useState(null);
   const [searchParams] = useSearchParams();
@@ -44,6 +45,8 @@ export default function Inbox() {
         onSelecionar={setSelecionada}
         view={filialId ? 'filial' : view}
         filialId={filialId}
+        online={online}
+        currentUser={currentUser}
       />
 
       <div className="flex-1 flex overflow-hidden">

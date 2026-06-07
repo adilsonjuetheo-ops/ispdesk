@@ -188,31 +188,6 @@ export default function TenantLayout() {
           )}
         </nav>
 
-        {/* Online agora */}
-        {online.length > 0 && (
-          <div className="px-3 pt-2 pb-1 border-t border-gray-100">
-            <p className="text-xs text-gray-400 mb-2">Online agora</p>
-            <div className="flex flex-wrap gap-1.5">
-              {online.map(u => (
-                <div key={u.id} className="relative group">
-                  <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${
-                      u.id === user?.id ? 'ring-2 ring-offset-1 ring-blue-400' : ''
-                    }`}
-                    style={{ backgroundColor: avatarColor(u.nome) }}
-                  >
-                    {u.nome[0].toUpperCase()}
-                  </div>
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
-                  <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded-lg px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
-                    {u.nome}{u.id === user?.id ? ' (você)' : ''}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="p-3 border-t border-gray-200">
           {user?.role === 'admin' && (
             <NavLink to="/settings" className={navClass}>
@@ -231,7 +206,7 @@ export default function TenantLayout() {
       </aside>
 
       <main className="flex-1 overflow-hidden">
-        <Outlet />
+        <Outlet context={{ online, currentUser: user }} />
       </main>
     </div>
   );
