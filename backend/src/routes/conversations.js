@@ -223,16 +223,30 @@ router.post('/:id/send-media', upload.single('arquivo'), async (req, res) => {
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
 
-  const tipo = arquivo.mimetype.startsWith('image/') ? 'image' : 'document';
-  const { id: mediaId } = await uploadMidia(tenant, arquivo.buffer, arquivo.mimetype, arquivo.originalname);
+  const tipo = arquivo.mimetype.startsWith('image/')
+    ? 'image'
+    : arquivo.mimetype.startsWith('audio/')
+      ? 'audio'
+      : 'document';
+
+  const mimeType = tipo === 'audio' ? 'audio/ogg; codecs=opus' : arquivo.mimetype;
+  const { id: mediaId } = await uploadMidia(tenant, arquivo.buffer, mimeType, arquivo.originalname);
   await enviarMidia(tenant, cliente.whatsapp, mediaId, tipo, arquivo.originalname);
 
-  const prefixo = tipo === 'image' ? '[Imagem]' : '[Arquivo]';
+  const prefixo = tipo === 'image' ? '[Imagem]' : tipo === 'audio' ? '[Áudio]' : '[Arquivo]';
+  const conteudo = `${prefixo} ${arquivo.originalname}`;
   const [msg] = await db.insert(mensagens).values({
     conversaId: id,
     origem: 'agente',
-    conteudo: `${prefixo} ${arquivo.originalname}`,
+    conteudo,
   }).returning();
+
+  await db.update(conversas).set({
+    ultimaMensagem: '🎤 Áudio',
+    ultimaMsgEm: new Date(),
+    ultimaMsgOrigem: 'agente',
+    ultimaMsgNome: req.user.nome,
+  }).where(eq(conversas.id, id));
 
   res.json(msg);
 });

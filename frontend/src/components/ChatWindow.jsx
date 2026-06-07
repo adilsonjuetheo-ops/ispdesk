@@ -19,7 +19,7 @@ function MidiaBolao({ conteudo, isCliente }) {
   const cor = isCliente
     ? 'bg-white border border-gray-200 text-gray-700'
     : 'bg-blue-50 border border-blue-100 text-blue-800';
-  const label = isImagem ? 'Imagem enviada' : isAudio ? 'Áudio transcrito' : 'Documento enviado';
+  const label = isImagem ? 'Imagem enviada' : isAudio ? (isCliente ? 'Áudio transcrito' : 'Áudio enviado') : 'Documento enviado';
   return (
     <div className={`flex items-start gap-2 rounded-2xl px-3 py-2.5 text-sm max-w-[280px] ${cor}`}>
       <Icon className="w-5 h-5 shrink-0 opacity-60 mt-0.5" />
@@ -183,7 +183,12 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   const [texto, setTexto] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  const [gravando, setGravando] = useState(false);
+  const [tempoGravacao, setTempoGravacao] = useState(0);
   const [acao, setAcao] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const tempoRef = useRef(null);
   const [aba, setAba] = useState('resposta');
   const [atalhosList, setAtalhosList] = useState([]);
   const [buscaAtalho, setBuscaAtalho] = useState('');
@@ -296,6 +301,49 @@ export default function ChatWindow({ conversa, onAtualizar }) {
       setEnviandoArquivo(false);
       e.target.value = '';
     }
+  };
+
+  const iniciarGravacao = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+        ? 'audio/ogg;codecs=opus'
+        : 'audio/webm;codecs=opus';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunksRef.current, { type: 'audio/ogg' });
+        setEnviandoArquivo(true);
+        try {
+          const form = new FormData();
+          form.append('arquivo', blob, 'audio.ogg');
+          await api.post(`/conversations/${conversa.id}/send-media`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+          carregarMsgs();
+        } catch (err) {
+          alert(err.response?.data?.erro || 'Erro ao enviar áudio');
+        } finally {
+          setEnviandoArquivo(false);
+        }
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setGravando(true);
+      setTempoGravacao(0);
+      tempoRef.current = setInterval(() => setTempoGravacao(t => t + 1), 1000);
+    } catch {
+      alert('Não foi possível acessar o microfone. Verifique as permissões do navegador.');
+    }
+  };
+
+  const pararGravacao = () => {
+    clearInterval(tempoRef.current);
+    mediaRecorderRef.current?.stop();
+    setGravando(false);
+    setTempoGravacao(0);
   };
 
   const selecionarAtalho = (atalho) => {
@@ -435,7 +483,7 @@ export default function ChatWindow({ conversa, onAtualizar }) {
                 />
                 <button type="button"
                   onClick={() => fileRef.current?.click()}
-                  disabled={!eHumano || enviandoArquivo}
+                  disabled={!eHumano || enviandoArquivo || gravando}
                   title="Enviar arquivo"
                   className="text-gray-400 hover:text-blue-600 disabled:opacity-30 transition-colors p-1 shrink-0">
                   {enviandoArquivo
@@ -444,31 +492,58 @@ export default function ChatWindow({ conversa, onAtualizar }) {
                 </button>
               </>
             )}
-            <input
-              type="text"
-              value={texto}
-              onChange={e => setTexto(e.target.value)}
-              disabled={!eHumano && !isNota}
-              placeholder={
-                isNota
-                  ? 'Nota interna (só a equipe vê)...'
-                  : eHumano ? 'Digite sua mensagem...' : 'Assuma a conversa para responder'
-              }
-              className={clsx(
-                'flex-1 rounded-xl px-4 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 disabled:opacity-50',
-                isNota
-                  ? 'bg-yellow-50 text-yellow-900 focus:ring-yellow-300'
-                  : 'bg-gray-100 text-gray-800 focus:ring-blue-400'
-              )}
-            />
-            <button type="submit"
-              disabled={(!eHumano && !isNota) || !texto.trim() || enviando}
-              className={clsx(
-                'disabled:opacity-40 text-white rounded-xl px-4 py-2 transition-colors shrink-0',
-                isNota ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'
-              )}>
-              {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
+
+            {/* Gravação de áudio */}
+            {!isNota && gravando ? (
+              <>
+                <div className="flex-1 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                  <span className="text-sm text-red-600 font-medium">
+                    Gravando {String(Math.floor(tempoGravacao / 60)).padStart(2, '0')}:{String(tempoGravacao % 60).padStart(2, '0')}
+                  </span>
+                </div>
+                <button type="button" onClick={pararGravacao}
+                  className="bg-red-500 hover:bg-red-600 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
+                  <Send className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={texto}
+                  onChange={e => setTexto(e.target.value)}
+                  disabled={!eHumano && !isNota}
+                  placeholder={
+                    isNota
+                      ? 'Nota interna (só a equipe vê)...'
+                      : eHumano ? 'Digite sua mensagem...' : 'Assuma a conversa para responder'
+                  }
+                  className={clsx(
+                    'flex-1 rounded-xl px-4 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 disabled:opacity-50',
+                    isNota
+                      ? 'bg-yellow-50 text-yellow-900 focus:ring-yellow-300'
+                      : 'bg-gray-100 text-gray-800 focus:ring-blue-400'
+                  )}
+                />
+                {!isNota && !texto.trim() && eHumano && (
+                  <button type="button" onClick={iniciarGravacao}
+                    disabled={enviandoArquivo}
+                    title="Gravar áudio"
+                    className="text-gray-400 hover:text-red-500 disabled:opacity-30 transition-colors p-1 shrink-0">
+                    <Mic className="w-5 h-5" />
+                  </button>
+                )}
+                <button type="submit"
+                  disabled={(!eHumano && !isNota) || !texto.trim() || enviando}
+                  className={clsx(
+                    'disabled:opacity-40 text-white rounded-xl px-4 py-2 transition-colors shrink-0',
+                    isNota ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'
+                  )}>
+                  {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </>
+            )}
           </form>
         )}
       </div>

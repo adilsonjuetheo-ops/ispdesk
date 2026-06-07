@@ -55,7 +55,9 @@ export async function enviarMidia(tenant, para, mediaId, tipo, nome) {
   const url = `https://graph.facebook.com/v19.0/${tenant.whatsappNumberId}/messages`;
   const mediaObj = tipo === 'image'
     ? { image: { id: mediaId } }
-    : { document: { id: mediaId, filename: nome } };
+    : tipo === 'audio'
+      ? { audio: { id: mediaId } }
+      : { document: { id: mediaId, filename: nome } };
 
   const res = await fetch(url, {
     method: 'POST',
