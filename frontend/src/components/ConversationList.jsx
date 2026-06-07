@@ -156,7 +156,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
             value={busca}
             onChange={e => setBusca(e.target.value)}
             placeholder="Buscar cliente..."
-            className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+            className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none border-0"
           />
         </div>
       </div>
