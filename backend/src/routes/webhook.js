@@ -43,9 +43,16 @@ router.post('/', async (req, res) => {
           .limit(1);
         if (!tenant) continue;
 
+        // Mapa wa_id -> nome do perfil WhatsApp do remetente
+        const contatosWa = {};
+        for (const c of value.contacts || []) {
+          if (c.wa_id && c.profile?.name) contatosWa[c.wa_id] = c.profile.name;
+        }
+
         for (const msg of msgs) {
           const wamid = msg.id;
           const remetente = msg.from;
+          const nomeWa = contatosWa[remetente] || null;
 
           // Ligações: avisa e ignora
           if (msg.type === 'call') {
@@ -76,9 +83,8 @@ router.post('/', async (req, res) => {
             if (!mediaId) continue;
             texto = '[Imagem] imagem';
             isAudio = false;
-            // guarda media_id para exibir inline no painel
             await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
-            await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId);
+            await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa);
             continue;
           } else {
             // Ignora outros tipos silenciosamente (vídeo, sticker, etc.)
@@ -91,7 +97,7 @@ router.post('/', async (req, res) => {
             continue;
           }
 
-          await processarWebhookMsg(tenant, remetente, texto, wamid, isAudio, null);
+          await processarWebhookMsg(tenant, remetente, texto, wamid, isAudio, null, nomeWa);
         }
       }
     }
@@ -114,7 +120,7 @@ async function atualizarUltMsg(conversaId, conteudo, origem, nome = null) {
   }).where(eq(conversas.id, conversaId));
 }
 
-async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false, midiaUrl = null) {
+async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false, midiaUrl = null, nomeWa = null) {
   let [cliente] = await db.select().from(clientes)
     .where(and(eq(clientes.tenantId, tenant.id), eq(clientes.whatsapp, remetente)))
     .limit(1);
@@ -123,10 +129,16 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     [cliente] = await db.insert(clientes).values({
       tenantId: tenant.id,
       whatsapp: remetente,
-      nome: remetente,
+      nome: nomeWa || remetente,
     }).returning();
   } else {
-    await db.update(clientes).set({ ultimoContato: new Date() }).where(eq(clientes.id, cliente.id));
+    const update = { ultimoContato: new Date() };
+    // Atualiza nome com o do WhatsApp se ainda estiver sem nome real
+    if (nomeWa && /^\d+$/.test(cliente.nome || '')) {
+      update.nome = nomeWa;
+    }
+    await db.update(clientes).set(update).where(eq(clientes.id, cliente.id));
+    if (update.nome) cliente = { ...cliente, nome: update.nome };
   }
 
   // Enriquece dados do cliente com informações do SGP do provedor
