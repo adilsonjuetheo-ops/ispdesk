@@ -55,7 +55,7 @@ export default function Inbox() {
             <div className="flex-1 overflow-hidden">
               <ChatWindow conversa={selecionada} onAtualizar={carregarConversas} />
             </div>
-            <ClientInfoPanel conversa={selecionada} />
+            <ClientInfoPanel conversa={selecionada} onAtualizar={carregarConversas} />
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-400">
