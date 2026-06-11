@@ -4,6 +4,17 @@ import { and, ne, inArray, sql } from 'drizzle-orm';
 
 const INATIVIDADE_MS = 60 * 60 * 1000; // 1 hora
 
+// Controle de atividade em memória: evita varrer o banco quando não há nada
+// que possa expirar, permitindo o autosuspend do Neon em períodos ociosos.
+// Inicia como "ativo" no boot porque podem existir conversas abertas de antes
+// do restart que precisam ser varridas pelo menos uma vez.
+let ultimaAtividade = Date.now();
+let ultimaVarredura = 0;
+
+export function registrarAtividade() {
+  ultimaAtividade = Date.now();
+}
+
 export async function encerramentoInativo() {
   const corte = new Date(Date.now() - INATIVIDADE_MS);
 
@@ -41,11 +52,21 @@ export async function encerramentoInativo() {
 }
 
 export function agendarEncerramentoInativo() {
-  const INTERVALO = 5 * 60 * 1000; // verifica a cada 5 minutos
+  const INTERVALO = 30 * 60 * 1000; // verifica a cada 30 minutos
+
+  const tick = () => {
+    // Se a última varredura aconteceu depois de tudo que poderia expirar,
+    // não há conversa para encerrar — pula sem acordar o banco.
+    if (ultimaVarredura > ultimaAtividade + INATIVIDADE_MS) return;
+
+    const inicio = Date.now();
+    encerramentoInativo()
+      .then(() => { ultimaVarredura = inicio; })
+      .catch(e => console.error('[EncerramentoInativo] Erro:', e.message));
+  };
+
   setTimeout(() => {
-    encerramentoInativo().catch(e => console.error('[EncerramentoInativo] Erro:', e.message));
-    setInterval(() => {
-      encerramentoInativo().catch(e => console.error('[EncerramentoInativo] Erro:', e.message));
-    }, INTERVALO);
+    tick();
+    setInterval(tick, INTERVALO);
   }, 3 * 60 * 1000); // aguarda 3 min após o start
 }

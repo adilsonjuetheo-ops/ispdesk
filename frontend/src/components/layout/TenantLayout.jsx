@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
+import { usePolling } from '../../hooks/usePolling.js';
 import { usePushNotifications } from '../../hooks/usePushNotifications.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
@@ -29,44 +30,31 @@ export default function TenantLayout() {
   const [online, setOnline] = useState([]);
   const [usoIa, setUsoIa] = useState(null);
 
-  useEffect(() => {
+  // Recarrega tenant periodicamente para detectar suspensão
+  usePolling(() => {
     api.get('/tenants/me').then(r => setTenant(r.data)).catch(() => {});
-    // Recarrega tenant periodicamente para detectar suspensão
-    const id = setInterval(() =>
-      api.get('/tenants/me').then(r => setTenant(r.data)).catch(() => {}),
-    300000);
-    return () => clearInterval(id);
-  }, []);
+  }, 300000);
 
-  useEffect(() => {
-    if (user?.role !== 'admin') return;
+  usePolling(() => {
     api.get('/tenants/me/uso-ia').then(r => setUsoIa(r.data)).catch(() => {});
-    const id = setInterval(() => {
-      api.get('/tenants/me/uso-ia').then(r => setUsoIa(r.data)).catch(() => {});
-    }, 60000);
-    return () => clearInterval(id);
-  }, [user?.role]);
+  }, 60000, user?.role === 'admin');
+
+  const fetchFiliais = () => {
+    if (!user?.tenantId) return;
+    api.get(`/tenants/${user.tenantId}/filiais`)
+      .then(r => setFiliais(r.data))
+      .catch(() => {});
+  };
+  usePolling(fetchFiliais, 30000, !!user?.tenantId);
 
   useEffect(() => {
-    if (!user?.tenantId) return;
-    const fetchFiliais = () =>
-      api.get(`/tenants/${user.tenantId}/filiais`)
-        .then(r => setFiliais(r.data))
-        .catch(() => {});
-    fetchFiliais();
-    const id = setInterval(fetchFiliais, 30000);
     window.addEventListener('ispdesk:filiais-updated', fetchFiliais);
-    return () => { clearInterval(id); window.removeEventListener('ispdesk:filiais-updated', fetchFiliais); };
+    return () => window.removeEventListener('ispdesk:filiais-updated', fetchFiliais);
   }, [user?.tenantId]);
 
-  useEffect(() => {
-    const fetchCounts = () => {
-      api.get('/conversations/counts').then(r => setCounts(r.data)).catch(() => {});
-    };
-    fetchCounts();
-    const id = setInterval(fetchCounts, 10000);
-    return () => clearInterval(id);
-  }, []);
+  usePolling(() => {
+    api.get('/conversations/counts').then(r => setCounts(r.data)).catch(() => {});
+  }, 15000);
 
   useEffect(() => {
     if (!user?.id) return;

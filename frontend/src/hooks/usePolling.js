@@ -18,6 +18,11 @@ export function usePolling(callback, intervalMs = 5000, enabled = true) {
 
     tick(); // executa imediatamente
     const id = setInterval(tick, intervalMs);
-    return () => clearInterval(id);
+    // Atualiza na hora quando a aba volta a ficar visível
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
+    };
   }, [intervalMs, enabled]);
 }

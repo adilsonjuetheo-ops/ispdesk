@@ -5,10 +5,18 @@ import { eq, and, desc, ne, count, inArray } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.js';
+import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = Router();
 router.use(autenticar);
+
+// Escritas de agentes (enviar, assumir, devolver, transferir) contam como
+// atividade para a varredura de encerramento por inatividade
+router.use((req, res, next) => {
+  if (req.method !== 'GET') registrarAtividade();
+  next();
+});
 
 router.get('/counts', async (req, res) => {
   const tenantId = req.user.tenantId;

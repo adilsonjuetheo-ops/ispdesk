@@ -9,6 +9,7 @@ import { realizarHandoff } from '../services/handoff.js';
 import { enviarPushParaTenant } from '../services/pushNotification.js';
 import { dentroDoHorario } from '../services/horarios.js';
 import { getLimite, getUso, incrementarUso } from '../services/limites.js';
+import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 
 const router = Router();
 
@@ -121,6 +122,8 @@ async function atualizarUltMsg(conversaId, conteudo, origem, nome = null) {
 }
 
 async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false, midiaUrl = null, nomeWa = null) {
+  registrarAtividade();
+
   let [cliente] = await db.select().from(clientes)
     .where(and(eq(clientes.tenantId, tenant.id), eq(clientes.whatsapp, remetente)))
     .limit(1);
