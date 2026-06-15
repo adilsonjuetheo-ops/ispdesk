@@ -157,7 +157,7 @@ export default function Tenants() {
               </div>
               <Field label="WhatsApp Number ID" value={form.whatsappNumberId}
                 onChange={v => setForm(f => ({ ...f, whatsappNumberId: v }))} />
-              <Field label="WhatsApp Token" value={form.whatsappToken}
+              <Field label="WhatsApp Token" type="password" value={form.whatsappToken}
                 onChange={v => setForm(f => ({ ...f, whatsappToken: v }))} />
               <div>
                 <label className="block text-xs text-gray-400 mb-1">System Prompt*</label>

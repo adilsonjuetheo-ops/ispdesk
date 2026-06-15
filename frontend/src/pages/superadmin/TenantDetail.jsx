@@ -255,7 +255,7 @@ export default function TenantDetail() {
             </select>
           </div>
           <Field dark label="WhatsApp Number ID" value={tenant.whatsappNumberId || ''} onChange={v => setTenant(t => ({ ...t, whatsappNumberId: v }))} />
-          <Field dark label="WhatsApp Token" value={tenant.whatsappToken || ''} onChange={v => setTenant(t => ({ ...t, whatsappToken: v }))} />
+          <Field dark label="WhatsApp Token" type="password" value={tenant.whatsappToken || ''} onChange={v => setTenant(t => ({ ...t, whatsappToken: v }))} />
         </div>
 
         {/* SGP */}
