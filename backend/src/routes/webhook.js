@@ -195,10 +195,10 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     tag: conversa.id,
   }).catch(() => {});
 
-  // Se aguardando seleção de filial, processa a escolha
+  // Se aguardando seleção de filial (legado), reseta para bot e continua normalmente
   if (conversa.status === 'aguardando_filial') {
-    await processarSelecaoFilial(tenant, conversa, cliente, texto, remetente);
-    return;
+    await db.update(conversas).set({ status: 'bot' }).where(eq(conversas.id, conversa.id));
+    conversa = { ...conversa, status: 'bot' };
   }
 
   // Se humano está atendendo, não aciona IA
@@ -234,15 +234,8 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
       if (filialId) {
         await db.update(conversas).set({ filialId }).where(eq(conversas.id, conversa.id));
         conversa = { ...conversa, filialId };
-      } else {
-        // Pede ao cliente que selecione a filial
-        const opcoes = filiaisAtivas.map((f, i) => `${i + 1} - ${f.nome}`).join('\n');
-        const msgMenu = `Para direcionar seu atendimento, informe o número da sua cidade:\n\n${opcoes}`;
-        await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msgMenu });
-        try { await enviarMensagem(tenant, remetente, msgMenu); } catch (e) { console.error(e.message); }
-        await db.update(conversas).set({ status: 'aguardando_filial' }).where(eq(conversas.id, conversa.id));
-        return;
       }
+      // Sem match automático: prossegue sem filial — SGP fará o roteamento quando integrado
     }
   }
 
@@ -301,41 +294,5 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
   }
 }
 
-async function processarSelecaoFilial(tenant, conversa, cliente, texto, remetente) {
-  const filiaisAtivas = await db.select().from(filiais)
-    .where(and(eq(filiais.tenantId, tenant.id), eq(filiais.ativo, true)))
-    .orderBy(filiais.nome);
-
-  const num = parseInt(texto.trim());
-  if (!isNaN(num) && num >= 1 && num <= filiaisAtivas.length) {
-    const escolhida = filiaisAtivas[num - 1];
-    await db.update(conversas)
-      .set({ filialId: escolhida.id, status: 'bot' })
-      .where(eq(conversas.id, conversa.id));
-
-    const historico = await db.select().from(mensagens)
-      .where(eq(mensagens.conversaId, conversa.id))
-      .orderBy(mensagens.enviadaEm);
-
-    const conversaAtualizada = { ...conversa, filialId: escolhida.id, status: 'bot' };
-    const resultado = await processarMensagem(tenant, conversaAtualizada, historico, texto, remetente);
-
-    incrementarUso(tenant).catch(err => console.error('[limites] Erro ao incrementar uso:', err.message));
-
-    if (resultado.resposta) {
-      await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: resultado.resposta });
-      try { await enviarMensagem(tenant, remetente, resultado.resposta); } catch (e) { console.error(e.message); }
-    }
-
-    if (resultado.devePelearHumano) {
-      await realizarHandoff(tenant, conversaAtualizada, cliente, resultado.motivo);
-    }
-  } else {
-    const opcoes = filiaisAtivas.map((f, i) => `${i + 1} - ${f.nome}`).join('\n');
-    const msg = `Por favor, responda apenas com o número da sua cidade:\n\n${opcoes}`;
-    await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msg });
-    try { await enviarMensagem(tenant, remetente, msg); } catch (e) { console.error(e.message); }
-  }
-}
 
 export default router;
