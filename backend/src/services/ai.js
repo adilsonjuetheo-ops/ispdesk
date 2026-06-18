@@ -65,7 +65,7 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
 
   // 6. Loop: chama Claude → executa tools → chama novamente até parar
   let response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: systemPrompt,
     ...(tools.length > 0 && { tools }),
@@ -91,7 +91,7 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
     });
 
     response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: systemPrompt,
       ...(tools.length > 0 && { tools }),
