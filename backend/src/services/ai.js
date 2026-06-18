@@ -13,7 +13,7 @@ export async function processarMensagem(tenant, conversa, historico, novaMensage
   const contextoSgp = await buscarContextoSgp(tenant, clienteWhatsapp);
 
   // 2. System prompt com contexto SGP injetado
-  const systemPrompt = `${tenant.systemPrompt}
+  const systemPrompt = `${tenant.systemPrompt || ''}
 
 ${contextoSgp}
 
@@ -44,9 +44,23 @@ ASSISTENTE: ${tenant.nomeAssistente}`;
   // 4. Tools disponíveis para este tenant (dependem do SGP configurado)
   const tools = getTools(tenant);
 
-  // 5. Conversa acumulada para o loop de tool_use
-  // Nota: novaMensagem já está no historico (inserida antes de buscar), então não duplicamos
-  const conversaAcumulada = [...msgs];
+  // 5. Conversa acumulada — mescla mensagens consecutivas do mesmo role
+  // (Anthropic rejeita roles não alternados, o que pode ocorrer quando o bot
+  // enviou múltiplas mensagens seguidas, ex: menus repetidos)
+  const conversaAcumulada = msgs.reduce((acc, msg) => {
+    const last = acc[acc.length - 1];
+    if (last && last.role === msg.role) {
+      last.content += '\n' + msg.content;
+    } else {
+      acc.push({ ...msg });
+    }
+    return acc;
+  }, []);
+
+  // Garante que a primeira mensagem sempre seja do usuário
+  while (conversaAcumulada.length > 0 && conversaAcumulada[0].role !== 'user') {
+    conversaAcumulada.shift();
+  }
 
   // 6. Loop: chama Claude → executa tools → chama novamente até parar
   let response = await anthropic.messages.create({
