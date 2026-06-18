@@ -45,10 +45,8 @@ ASSISTENTE: ${tenant.nomeAssistente}`;
   const tools = getTools(tenant);
 
   // 5. Conversa acumulada para o loop de tool_use
-  const conversaAcumulada = [
-    ...msgs,
-    { role: 'user', content: novaMensagem },
-  ];
+  // Nota: novaMensagem já está no historico (inserida antes de buscar), então não duplicamos
+  const conversaAcumulada = [...msgs];
 
   // 6. Loop: chama Claude → executa tools → chama novamente até parar
   let response = await anthropic.messages.create({
