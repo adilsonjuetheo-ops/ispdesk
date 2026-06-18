@@ -13,24 +13,25 @@ export async function processarMensagem(tenant, conversa, historico, novaMensage
   const contextoSgp = await buscarContextoSgp(tenant, clienteWhatsapp);
 
   // 2. System prompt com contexto SGP injetado
+  const temSgp = !!(tenant.sgpTipo && tenant.sgpApiKey);
   const systemPrompt = `${tenant.systemPrompt || ''}
 
 ${contextoSgp}
 
 INSTRUÇÕES IMPORTANTES:
-- Use apenas os dados fornecidos acima. Nunca invente informações.
 - Se o cliente pedir para falar com humano: diga que vai transferir e escreva ACTION:HANDOFF:solicitado pelo cliente
-- Se não conseguir resolver após usar as ferramentas: escreva ACTION:HANDOFF:motivo detalhado
+- Se não conseguir resolver o problema: escreva ACTION:HANDOFF:motivo detalhado
+${temSgp ? `- Use apenas os dados fornecidos pelo SGP acima. Nunca invente informações.
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
 - Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem.
 - Se o cliente NÃO for encontrado pelo número de WhatsApp: peça APENAS o CPF ou CNPJ para localizá-lo no sistema.
 - Ao receber o CPF ou CNPJ: use a ferramenta buscar_por_documento imediatamente.
 - Se o cliente NÃO for encontrado mesmo com CPF/CNPJ (cliente novo): informe que vai transferir para um atendente realizar o cadastro e escreva ACTION:HANDOFF:cliente novo — encaminhar para cadastro
-- NUNCA envie formulários de cadastro — isso é responsabilidade exclusiva do atendente humano.
+- NUNCA envie formulários de cadastro — isso é responsabilidade exclusiva do atendente humano.` : ''}
 ${primeiraMsg ? `- Na PRIMEIRA mensagem do cliente, identifique o assunto principal e inclua ao final da resposta (linha separada): TAG:categoria — onde categoria é exatamente uma de: ${TAGS_VALIDAS.join(', ')}.` : ''}
 
 PROVEDOR: ${tenant.nome}
-ASSISTENTE: ${tenant.nomeAssistente}`;
+ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
 
   // 3. Histórico das últimas 10 mensagens (exclui mensagens de sistema)
   const msgs = historico
