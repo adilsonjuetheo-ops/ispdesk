@@ -193,8 +193,10 @@ router.post('/:id/send', async (req, res) => {
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
 
+  let sentWamid = null;
   try {
-    await enviarMensagem(tenant, cliente.whatsapp, texto);
+    const apiRes = await enviarMensagem(tenant, cliente.whatsapp, texto);
+    sentWamid = apiRes?.messages?.[0]?.id || null;
   } catch (err) {
     console.error('Erro enviarMensagem:', err.message);
     return res.status(502).json({ erro: err.message });
@@ -204,6 +206,8 @@ router.post('/:id/send', async (req, res) => {
     conversaId: id,
     origem: 'agente',
     conteudo: texto,
+    wamid: sentWamid,
+    status: 'enviada',
   }).returning();
 
   await db.update(conversas).set({
@@ -239,7 +243,8 @@ router.post('/:id/send-media', upload.single('arquivo'), async (req, res) => {
 
   const mimeType = tipo === 'audio' ? 'audio/ogg; codecs=opus' : arquivo.mimetype;
   const { id: mediaId } = await uploadMidia(tenant, arquivo.buffer, mimeType, arquivo.originalname);
-  await enviarMidia(tenant, cliente.whatsapp, mediaId, tipo, arquivo.originalname);
+  const mediaApiRes = await enviarMidia(tenant, cliente.whatsapp, mediaId, tipo, arquivo.originalname);
+  const mediaWamid = mediaApiRes?.messages?.[0]?.id || null;
 
   const prefixo = tipo === 'image' ? '[Imagem]' : tipo === 'audio' ? '[Áudio]' : '[Arquivo]';
   const conteudo = `${prefixo} ${arquivo.originalname}`;
@@ -248,6 +253,8 @@ router.post('/:id/send-media', upload.single('arquivo'), async (req, res) => {
     origem: 'agente',
     conteudo,
     midiaUrl: tipo === 'image' ? mediaId : null,
+    wamid: mediaWamid,
+    status: 'enviada',
   }).returning();
 
   await db.update(conversas).set({

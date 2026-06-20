@@ -6,6 +6,7 @@ import { useNotificationSound } from '../hooks/useNotificationSound.js';
 import {
   Send, UserCheck, Bot, X, Loader2, Paperclip, FileText,
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
+  Check, CheckCheck,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -51,6 +52,24 @@ function MidiaBolao({ msg, isCliente }) {
       </div>
     </div>
   );
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex justify-start mb-3">
+      <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1.5 items-center">
+        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '160ms' }} />
+        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '320ms' }} />
+      </div>
+    </div>
+  );
+}
+
+function StatusIcon({ status }) {
+  if (status === 'lida')     return <CheckCheck className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
+  if (status === 'entregue') return <CheckCheck className="w-3.5 h-3.5 text-gray-400 shrink-0" />;
+  return <Check className="w-3.5 h-3.5 text-gray-400 shrink-0" />;
 }
 
 function BolaoMsg({ msg, agenteNome }) {
@@ -109,9 +128,12 @@ function BolaoMsg({ msg, agenteNome }) {
             {msg.conteudo}
           </div>
         )}
-        <p className={clsx('text-xs text-gray-400 mt-1', isCliente ? 'text-left' : 'text-right')}>
-          {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
-        </p>
+        <div className={clsx('flex items-center gap-1 mt-1', isCliente ? 'justify-start' : 'justify-end')}>
+          <span className="text-xs text-gray-400">
+            {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
+          </span>
+          {!isCliente && !isNota && !isSistema && <StatusIcon status={msg.status} />}
+        </div>
       </div>
     </div>
   );
@@ -452,6 +474,13 @@ export default function ChatWindow({ conversa, onAtualizar }) {
       {/* mensagens */}
       <div ref={msgAreaRef} className="flex-1 overflow-y-auto p-4">
         {msgs.map(m => <BolaoMsg key={m.id} msg={m} agenteNome={user?.nome} />)}
+        {(() => {
+          const ultima = msgs[msgs.length - 1];
+          const aguardando = ultima?.origem === 'cliente'
+            && conversa.status !== 'encerrada'
+            && (Date.now() - new Date(ultima.enviadaEm).getTime()) < 30000;
+          return aguardando ? <TypingIndicator /> : null;
+        })()}
         <div ref={bottomRef} />
       </div>
 

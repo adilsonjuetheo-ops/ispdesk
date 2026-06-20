@@ -61,6 +61,7 @@ export async function runMigrations() {
       )
     `;
     await sql`ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS midia_url text`;
+    await sql`ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS status text DEFAULT 'enviada'`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

@@ -36,6 +36,16 @@ router.post('/', async (req, res) => {
         if (change.field !== 'messages') continue;
         const value = change.value;
         const phoneNumberId = value.metadata?.phone_number_id;
+
+        // Processa atualizações de status (entregue / lida)
+        for (const s of value.statuses || []) {
+          if (s.status === 'delivered') {
+            await db.update(mensagens).set({ status: 'entregue' }).where(eq(mensagens.wamid, s.id)).catch(() => {});
+          } else if (s.status === 'read') {
+            await db.update(mensagens).set({ status: 'lida' }).where(eq(mensagens.wamid, s.id)).catch(() => {});
+          }
+        }
+
         const msgs = value.messages;
         if (!msgs?.length) continue;
 
@@ -276,17 +286,21 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
   incrementarUso(tenant).catch(err => console.error('[limites] Erro ao incrementar uso:', err.message));
 
   if (resultado.resposta) {
+    let botWamid = null;
+    try {
+      const apiRes = await enviarMensagem(tenant, remetente, resultado.resposta);
+      botWamid = apiRes?.messages?.[0]?.id || null;
+    } catch (err) {
+      console.error('Erro ao enviar resposta IA:', err.message);
+    }
     await db.insert(mensagens).values({
       conversaId: conversa.id,
       origem: 'bot',
       conteudo: resultado.resposta,
+      wamid: botWamid,
+      status: 'enviada',
     });
     await atualizarUltMsg(conversa.id, resultado.resposta, 'bot');
-    try {
-      await enviarMensagem(tenant, remetente, resultado.resposta);
-    } catch (err) {
-      console.error('Erro ao enviar resposta IA:', err.message);
-    }
   }
 
   if (resultado.devePelearHumano) {
