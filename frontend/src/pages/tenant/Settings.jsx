@@ -1,7 +1,162 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp } from 'lucide-react';
+
+function carregarFbSdk() {
+  return new Promise((resolve) => {
+    if (window.FB) { resolve(); return; }
+    window.fbAsyncInit = () => {
+      window.FB.init({
+        appId: import.meta.env.VITE_META_APP_ID,
+        autoLogAppEvents: true,
+        xfbml: false,
+        version: 'v19.0',
+      });
+      resolve();
+    };
+    const script = document.createElement('script');
+    script.src = 'https://connect.facebook.net/pt_BR/sdk.js';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  });
+}
+
+function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
+  const [status, setStatus] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+  const [conectando, setConectando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [sucesso, setSucesso] = useState('');
+
+  const carregarStatus = () => {
+    setCarregando(true);
+    api.get('/whatsapp/status')
+      .then(r => setStatus(r.data))
+      .finally(() => setCarregando(false));
+  };
+
+  useEffect(() => { carregarStatus(); }, []);
+
+  const handleConectar = async () => {
+    setErro(''); setSucesso('');
+    if (!import.meta.env.VITE_META_APP_ID) {
+      setErro('VITE_META_APP_ID não configurado. Adicione essa variável de ambiente no Coolify.');
+      return;
+    }
+    setConectando(true);
+    try {
+      await carregarFbSdk();
+      window.FB.login((response) => {
+        if (response.authResponse?.code) {
+          enviarCodigo(response.authResponse.code);
+        } else {
+          setConectando(false);
+          if (response.status !== 'connected') {
+            setErro('Fluxo cancelado ou permissões negadas.');
+          }
+        }
+      }, {
+        scope: 'whatsapp_business_management,whatsapp_business_messaging',
+        response_type: 'code',
+        override_default_response_type: true,
+      });
+    } catch (e) {
+      setConectando(false);
+      setErro('Erro ao carregar o SDK do Facebook. Verifique sua conexão.');
+    }
+  };
+
+  const enviarCodigo = async (code) => {
+    try {
+      const r = await api.post('/whatsapp/embedded-signup', { code });
+      setSucesso(`WhatsApp conectado! Número: ${r.data.displayPhone}`);
+      carregarStatus();
+      onConectado?.();
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Erro ao conectar WhatsApp');
+    } finally {
+      setConectando(false);
+    }
+  };
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-5">
+      <h2 className="font-semibold text-gray-700 mb-1">WhatsApp Business</h2>
+      <p className="text-xs text-gray-400 mb-4">
+        Conecte sua conta WhatsApp Business diretamente via Meta. O processo leva menos de 2 minutos.
+      </p>
+
+      {carregando ? (
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <Loader2 className="w-4 h-4 animate-spin" /> Verificando conexão...
+        </div>
+      ) : status?.conectado ? (
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 flex items-start gap-3">
+          <Wifi className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-emerald-800">WhatsApp conectado via Embedded Signup</p>
+            <p className="text-xs text-emerald-600 mt-0.5">WABA ID: <code className="bg-emerald-100 px-1 rounded">{status.wabaId}</code></p>
+            <p className="text-xs text-emerald-600">Phone Number ID: <code className="bg-emerald-100 px-1 rounded">{status.phoneNumberId}</code></p>
+            {status.conectadoEm && (
+              <p className="text-xs text-emerald-500 mt-0.5">
+                Conectado em {new Date(status.conectadoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-3">
+          <WifiOff className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-amber-800">WhatsApp não conectado</p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              Clique em "Conectar WhatsApp" para autorizar o acesso à sua conta WhatsApp Business via Meta.
+            </p>
+            {status?.phoneNumberId && (
+              <p className="text-xs text-amber-500 mt-1">
+                Configuração manual detectada — Phone ID: <code>{status.phoneNumberId}</code>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={handleConectar}
+        disabled={conectando}
+        className="flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe5d] disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+      >
+        {conectando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wifi className="w-4 h-4" />}
+        {status?.conectado ? 'Reconectar WhatsApp' : 'Conectar WhatsApp'}
+      </button>
+
+      {sucesso && (
+        <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5 text-emerald-700 text-sm">
+          {sucesso}
+        </div>
+      )}
+      {erro && (
+        <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-red-600 text-sm">
+          {erro}
+        </div>
+      )}
+
+      <div className="mt-4 border-t border-gray-100 pt-4">
+        <button
+          type="button"
+          onClick={onToggleManual}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          {mostrarManual ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          Configuração manual (avançado)
+        </button>
+      </div>
+    </section>
+  );
+}
 
 const DIAS = [
   { key: 'dom', label: 'Domingo' },
@@ -122,6 +277,7 @@ export default function Settings() {
   const { user } = useAuth();
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [mostrarManualWpp, setMostrarManualWpp] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sucesso, setSucesso] = useState('');
   const [erro, setErro] = useState('');
@@ -140,6 +296,9 @@ export default function Settings() {
 
   const carregarFiliais = () =>
     api.get(`/tenants/${user.tenantId}/filiais`).then(r => setFiliais(r.data));
+
+  const recarregarTenant = () =>
+    api.get('/tenants/me').then(r => setTenant(r.data));
 
   useEffect(() => {
     api.get('/tenants/me')
@@ -334,14 +493,26 @@ export default function Settings() {
             </div>
           </section>
 
-          {/* whatsapp */}
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="font-semibold text-gray-700 mb-4">WhatsApp (Meta API)</h2>
-            <div className="space-y-3">
-              <Field label="WhatsApp Number ID" value={tenant.whatsappNumberId || ''} onChange={v => set('whatsappNumberId', v)} placeholder="123456789012345" />
-              <Field label="Token de Acesso" value={tenant.whatsappToken || ''} onChange={v => set('whatsappToken', v)} type="password" placeholder="EAAxxxxx..." />
-            </div>
-          </section>
+          {/* whatsapp embedded signup */}
+          <WhatsappSection
+            onConectado={recarregarTenant}
+            mostrarManual={mostrarManualWpp}
+            onToggleManual={() => setMostrarManualWpp(v => !v)}
+          />
+
+          {/* whatsapp — campos manuais (fallback avançado) */}
+          {mostrarManualWpp && (
+            <section className="bg-white rounded-xl border border-gray-200 p-5">
+              <h2 className="font-semibold text-gray-700 mb-1">WhatsApp — Configuração Manual</h2>
+              <p className="text-xs text-gray-400 mb-4">
+                Use apenas se não utilizar o fluxo de conexão automática acima.
+              </p>
+              <div className="space-y-3">
+                <Field label="WhatsApp Number ID" value={tenant.whatsappNumberId || ''} onChange={v => set('whatsappNumberId', v)} placeholder="123456789012345" />
+                <Field label="Token de Acesso" value={tenant.whatsappToken || ''} onChange={v => set('whatsappToken', v)} type="password" placeholder="EAAxxxxx..." />
+              </div>
+            </section>
+          )}
 
           {/* integração SGP */}
           <section className="bg-white rounded-xl border border-gray-200 p-5">

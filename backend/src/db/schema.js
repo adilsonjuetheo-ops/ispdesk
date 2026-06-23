@@ -28,6 +28,8 @@ export const tenants = pgTable('tenants', {
   mpPaymentId:        text('mp_payment_id'),
   statusPagamento:    text('status_pagamento'), // null | 'pendente' | 'ativo' | 'suspenso'
   proximoVencimento:  timestamp('proximo_vencimento'),
+  wabaId:             text('waba_id'),
+  whatsappConectadoEm: timestamp('whatsapp_conectado_em'),
   ativo:              boolean('ativo').default(true),
   horarios:           jsonb('horarios'),
   criadoEm:           timestamp('criado_em').defaultNow(),
