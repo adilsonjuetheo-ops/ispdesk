@@ -5,6 +5,7 @@ import { eq, count, and } from 'drizzle-orm';
 import { autenticar, apenasSuper } from '../middleware/auth.js';
 import crypto from 'crypto';
 import { getLimite, getUso, getMes } from '../services/limites.js';
+import { buscarContextoSgp } from '../services/sgp.js';
 
 const router = Router();
 
@@ -66,6 +67,28 @@ router.put('/me', autenticar, async (req, res) => {
     .where(eq(tenants.id, req.user.tenantId))
     .returning();
   res.json(tenant);
+});
+
+// Testa conexão com SGP configurado no tenant
+router.post('/me/testar-sgp', autenticar, async (req, res) => {
+  if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+  if (req.user.role !== 'admin') return res.status(403).json({ erro: 'Apenas admins' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, req.user.tenantId)).limit(1);
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+  if (!tenant.sgpTipo || !tenant.sgpApiKey) {
+    return res.status(400).json({ erro: 'SGP não configurado' });
+  }
+
+  const { telefone } = req.body;
+  if (!telefone) return res.status(400).json({ erro: 'Informe um telefone para teste' });
+
+  try {
+    const resultado = await buscarContextoSgp(tenant, telefone);
+    res.json({ ok: true, resultado });
+  } catch (err) {
+    res.status(502).json({ ok: false, erro: err.message });
+  }
 });
 
 router.use(autenticar, apenasSuper);

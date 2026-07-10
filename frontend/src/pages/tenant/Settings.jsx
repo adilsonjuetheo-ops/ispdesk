@@ -273,6 +273,59 @@ const ESTADOS_BR = [
   'SP','SE','TO',
 ];
 
+function TestarSgp() {
+  const [telefone, setTelefone] = useState('');
+  const [carregando, setCarregando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [erro, setErro] = useState('');
+
+  async function testar() {
+    if (!telefone.trim()) return;
+    setCarregando(true);
+    setResultado(null);
+    setErro('');
+    try {
+      const { data } = await api.post('/tenants/me/testar-sgp', { telefone: telefone.trim() });
+      setResultado(data.resultado);
+    } catch (err) {
+      setErro(err.response?.data?.erro || err.message || 'Erro ao testar');
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 border border-dashed border-gray-200 rounded-lg p-3 space-y-2">
+      <p className="text-xs font-medium text-gray-500">Testar conexão com SGP</p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={telefone}
+          onChange={e => setTelefone(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && testar()}
+          placeholder="Telefone do cliente (ex: 31999887766)"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button
+          type="button"
+          onClick={testar}
+          disabled={carregando || !telefone.trim()}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+        >
+          {carregando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          Testar
+        </button>
+      </div>
+      {erro && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 whitespace-pre-wrap">{erro}</div>
+      )}
+      {resultado && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap font-mono">{resultado}</div>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   const { user } = useAuth();
   const [tenant, setTenant] = useState(null);
@@ -569,6 +622,8 @@ export default function Settings() {
                   POST /chamado — body: &#123; token, id_contrato, detalhes &#125;
                 </div>
               )}
+
+              {tenant.sgpTipo && <TestarSgp />}
             </div>
           </section>
 
