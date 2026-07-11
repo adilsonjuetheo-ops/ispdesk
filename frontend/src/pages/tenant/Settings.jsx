@@ -45,6 +45,10 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
       setErro('VITE_META_APP_ID não configurado. Adicione essa variável de ambiente no Coolify.');
       return;
     }
+    if (!import.meta.env.VITE_META_CONFIG_ID) {
+      setErro('VITE_META_CONFIG_ID não configurado. Adicione essa variável de ambiente no Coolify.');
+      return;
+    }
     setConectando(true);
     try {
       await carregarFbSdk();
@@ -58,9 +62,14 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
           }
         }
       }, {
-        scope: 'whatsapp_business_management,whatsapp_business_messaging',
+        config_id: import.meta.env.VITE_META_CONFIG_ID,
         response_type: 'code',
         override_default_response_type: true,
+        extras: {
+          setup: {},
+          featureType: '',
+          sessionInfoVersion: '3',
+        },
       });
     } catch (e) {
       setConectando(false);
