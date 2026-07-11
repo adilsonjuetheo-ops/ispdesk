@@ -18,6 +18,7 @@ export const tenants = pgTable('tenants', {
   cep:                text('cep'),
   whatsappNumberId:   text('whatsapp_number_id').unique(),
   whatsappToken:      text('whatsapp_token'),
+  whatsappTokenExpiraEm: timestamp('whatsapp_token_expira_em'),
   webhookVerifyToken: text('webhook_verify_token').notNull(),
   systemPrompt:       text('system_prompt').notNull(),
   nomeAssistente:     text('nome_assistente').default('Assistente'),

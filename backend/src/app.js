@@ -17,6 +17,7 @@ import whatsappRouter from './routes/whatsapp.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
 import { agendarCobrancaRecorrente } from './jobs/cobrancaRecorrente.js';
+import { agendarRenovacaoTokenMeta } from './jobs/renovarTokenMeta.js';
 import { runMigrations } from './db/migrations.js';
 
 const app = express();
@@ -57,4 +58,5 @@ app.listen(PORT, async () => {
   agendarLimpeza();
   agendarEncerramentoInativo();
   agendarCobrancaRecorrente();
+  agendarRenovacaoTokenMeta();
 });

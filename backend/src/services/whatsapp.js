@@ -1,3 +1,14 @@
+export async function renovarTokenLongoPrazo(tenant) {
+  const url = `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&fb_exchange_token=${tenant.whatsappToken}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(`Renovar token: ${data.error.message}`);
+  return {
+    accessToken: data.access_token,
+    expiraEm: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : null,
+  };
+}
+
 export async function transcreverAudioMeta(tenant, mediaId) {
   // 1. Obtém a URL de download da Meta
   const infoRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {

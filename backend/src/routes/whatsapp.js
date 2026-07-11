@@ -33,6 +33,9 @@ router.post('/embedded-signup', autenticar, apenasAdmin, async (req, res) => {
     const longData = await longResp.json();
     if (longData.error) throw new Error(`Long-lived token: ${longData.error.message}`);
     const accessToken = longData.access_token;
+    const tokenExpiraEm = longData.expires_in
+      ? new Date(Date.now() + longData.expires_in * 1000)
+      : null;
 
     // 3. Obter user_id via debug_token
     const debugResp = await fetch(
@@ -91,6 +94,7 @@ router.post('/embedded-signup', autenticar, apenasAdmin, async (req, res) => {
       wabaId,
       whatsappNumberId: phoneNumberId,
       whatsappToken: accessToken,
+      whatsappTokenExpiraEm: tokenExpiraEm,
       whatsappConectadoEm: new Date(),
       atualizadoEm: new Date(),
     }).where(eq(tenants.id, tenantId));
