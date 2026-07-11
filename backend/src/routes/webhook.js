@@ -92,8 +92,17 @@ router.post('/', async (req, res) => {
           } else if (msg.type === 'image') {
             const mediaId = msg.image?.id;
             if (!mediaId) continue;
-            texto = '[Imagem] imagem';
+            const caption = msg.image?.caption ? ` — "${msg.image.caption}"` : '';
+            texto = `[Imagem]${caption}`;
             isAudio = false;
+            await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
+            await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa);
+            continue;
+          } else if (msg.type === 'document') {
+            const mediaId = msg.document?.id;
+            if (!mediaId) continue;
+            const nomeArquivo = msg.document?.filename || 'documento';
+            texto = `[Documento] ${nomeArquivo}`;
             await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
             await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa);
             continue;
