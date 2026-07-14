@@ -52,9 +52,15 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
     setConectando(true);
     try {
       await carregarFbSdk();
+
+      let sessionInfo = null;
+      window.FB.Event.subscribe('WhatsAppBusinessSignup:finish', (data) => {
+        sessionInfo = data;
+      });
+
       window.FB.login((response) => {
         if (response.authResponse?.code) {
-          enviarCodigo(response.authResponse.code);
+          enviarCodigo(response.authResponse.code, sessionInfo);
         } else {
           setConectando(false);
           if (response.status !== 'connected') {
@@ -77,9 +83,13 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
     }
   };
 
-  const enviarCodigo = async (code) => {
+  const enviarCodigo = async (code, sessionInfo) => {
     try {
-      const r = await api.post('/whatsapp/embedded-signup', { code });
+      const r = await api.post('/whatsapp/embedded-signup', {
+        code,
+        wabaId: sessionInfo?.waba_id || null,
+        phoneNumberId: sessionInfo?.phone_number_id || null,
+      });
       setSucesso(`WhatsApp conectado! Número: ${r.data.displayPhone}`);
       carregarStatus();
       onConectado?.();

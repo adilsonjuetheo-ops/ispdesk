@@ -37,45 +37,44 @@ router.post('/embedded-signup', autenticar, apenasAdmin, async (req, res) => {
       ? new Date(Date.now() + longData.expires_in * 1000)
       : null;
 
-    // 3. Obter user_id via debug_token
+    // 3. debug_token: extrai wabaId das granular_scopes e phoneNumberId do body (evento frontend)
     const debugResp = await fetch(
       `${GRAPH}/debug_token?input_token=${accessToken}&access_token=${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
     );
     const debugData = await debugResp.json();
-    if (debugData.error || !debugData.data?.user_id) {
-      throw new Error('Não foi possível identificar o usuário Meta');
-    }
-    const userId = debugData.data.user_id;
+    console.log('[whatsapp] debug_token granular_scopes:', JSON.stringify(debugData?.data?.granular_scopes));
+    if (debugData.error) throw new Error('Não foi possível validar o token Meta');
 
-    // 4. Listar businesses do usuário
-    const bizResp = await fetch(
-      `${GRAPH}/${userId}/businesses?fields=id,name&access_token=${accessToken}`
-    );
-    const bizData = await bizResp.json();
-    if (bizData.error || !bizData.data?.length) {
-      throw new Error('Nenhuma conta Business Meta encontrada. Verifique se o usuário tem acesso a um Business Manager.');
-    }
-    const businessId = bizData.data[0].id;
+    let wabaId = req.body.wabaId || null;
+    let phoneNumberId = req.body.phoneNumberId || null;
+    let displayPhone = null;
 
-    // 5. Listar WABAs da business
-    const wabaResp = await fetch(
-      `${GRAPH}/${businessId}/owned_whatsapp_business_accounts?access_token=${accessToken}`
-    );
-    const wabaData = await wabaResp.json();
-    if (wabaData.error || !wabaData.data?.length) {
-      throw new Error('Nenhuma conta WhatsApp Business (WABA) encontrada neste Business Manager.');
+    if (!wabaId) {
+      const wabaScope = (debugData.data?.granular_scopes || [])
+        .find(s => s.scope === 'whatsapp_business_management');
+      if (!wabaScope?.target_ids?.length) {
+        throw new Error('Nenhuma conta WhatsApp Business (WABA) encontrada no token. Certifique-se de selecionar a WABA no fluxo de autorização.');
+      }
+      wabaId = wabaScope.target_ids[0];
     }
-    const wabaId = wabaData.data[0].id;
 
-    // 6. Listar números de telefone do WABA
-    const phoneResp = await fetch(
-      `${GRAPH}/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name&access_token=${accessToken}`
-    );
-    const phoneData = await phoneResp.json();
-    if (phoneData.error || !phoneData.data?.length) {
-      throw new Error('Nenhum número de telefone encontrado no WABA. Adicione um número no Meta Business Manager.');
+    if (!phoneNumberId) {
+      // 4. Busca números de telefone da WABA
+      const phoneResp = await fetch(
+        `${GRAPH}/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name&access_token=${accessToken}`
+      );
+      const phoneData = await phoneResp.json();
+      if (phoneData.error || !phoneData.data?.length) {
+        throw new Error('Nenhum número de telefone encontrado no WABA. Adicione um número no Meta Business Manager.');
+      }
+      ({ id: phoneNumberId, display_phone_number: displayPhone } = phoneData.data[0]);
+    } else {
+      const phoneResp = await fetch(
+        `${GRAPH}/${phoneNumberId}?fields=display_phone_number&access_token=${accessToken}`
+      );
+      const phoneData = await phoneResp.json();
+      displayPhone = phoneData.display_phone_number || phoneNumberId;
     }
-    const { id: phoneNumberId, display_phone_number: displayPhone } = phoneData.data[0];
 
     // 7. Subscrever app no webhook do WABA
     try {
