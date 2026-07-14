@@ -113,6 +113,7 @@ export class AtlazAdaptador extends SgpAdaptador {
       cpf_cnpj: doc,
       ocultar_contratos_desativados: 1,
     }).catch(() => ({ success: 'false' }));
+    console.log('[Atlaz] buscarPorDocumento resposta:', JSON.stringify(clienteData).slice(0, 300));
     if (clienteData.success !== 'true') return null;
     return this.#buildContexto(clienteData);
   }
