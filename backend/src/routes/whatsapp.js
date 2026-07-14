@@ -106,8 +106,9 @@ router.post('/embedded-signup', autenticar, apenasAdmin, async (req, res) => {
 });
 
 router.post('/registrar-numero', autenticar, apenasAdmin, async (req, res) => {
-  const tenantId = req.user.tenantId;
-  if (!tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+  const isSuperAdmin = req.user.role === 'superadmin' || req.user.role === 'super_admin';
+  const tenantId = isSuperAdmin ? (req.body.tenantId || req.user.tenantId) : req.user.tenantId;
+  if (!tenantId) return res.status(403).json({ erro: 'Sem tenant. Super admin deve informar tenantId no body.' });
 
   const [tenant] = await db.select({
     whatsappNumberId: tenants.whatsappNumberId,
