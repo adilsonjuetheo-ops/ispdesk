@@ -105,6 +105,43 @@ router.post('/embedded-signup', autenticar, apenasAdmin, async (req, res) => {
   }
 });
 
+router.post('/registrar-numero', autenticar, apenasAdmin, async (req, res) => {
+  const tenantId = req.user.tenantId;
+  if (!tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+
+  const [tenant] = await db.select({
+    whatsappNumberId: tenants.whatsappNumberId,
+    whatsappToken: tenants.whatsappToken,
+  }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+
+  if (!tenant?.whatsappNumberId || !tenant?.whatsappToken) {
+    return res.status(400).json({ erro: 'WhatsApp não configurado para este tenant' });
+  }
+
+  try {
+    const regResp = await fetch(`${GRAPH}/${tenant.whatsappNumberId}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        pin: '000000',
+        access_token: tenant.whatsappToken,
+      }),
+    });
+    const regData = await regResp.json();
+    console.log('[whatsapp] register:', JSON.stringify(regData));
+
+    if (regData.error) {
+      return res.status(400).json({ erro: regData.error.message, detalhes: regData.error });
+    }
+
+    res.json({ ok: true, resultado: regData });
+  } catch (err) {
+    console.error('[whatsapp/registrar-numero]', err.message);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
 router.get('/status', autenticar, async (req, res) => {
   const tenantId = req.user.tenantId;
   if (!tenantId) return res.status(403).json({ erro: 'Sem tenant' });
