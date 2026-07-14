@@ -73,22 +73,23 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
   });
 
   while (response.stop_reason === 'tool_use') {
-    const toolBlock = response.content.find(b => b.type === 'tool_use');
-    if (!toolBlock) break;
+    const toolBlocks = response.content.filter(b => b.type === 'tool_use');
+    if (!toolBlocks.length) break;
 
-    console.log(`[IA] Tool: ${toolBlock.name}`, toolBlock.input);
-    const resultado = await executarTool(toolBlock.name, toolBlock.input, tenant);
-    console.log(`[IA] Resultado: ${resultado}`);
-
-    conversaAcumulada.push({ role: 'assistant', content: response.content });
-    conversaAcumulada.push({
-      role: 'user',
-      content: [{
+    const toolResults = [];
+    for (const toolBlock of toolBlocks) {
+      console.log(`[IA] Tool: ${toolBlock.name}`, toolBlock.input);
+      const resultado = await executarTool(toolBlock.name, toolBlock.input, tenant);
+      console.log(`[IA] Resultado: ${resultado}`);
+      toolResults.push({
         type: 'tool_result',
         tool_use_id: toolBlock.id,
         content: resultado,
-      }],
-    });
+      });
+    }
+
+    conversaAcumulada.push({ role: 'assistant', content: response.content });
+    conversaAcumulada.push({ role: 'user', content: toolResults });
 
     response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
