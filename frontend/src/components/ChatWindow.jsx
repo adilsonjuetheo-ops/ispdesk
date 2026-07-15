@@ -473,7 +473,7 @@ export default function ChatWindow({ conversa, onAtualizar }) {
 
       {/* mensagens */}
       <div ref={msgAreaRef} className="flex-1 overflow-y-auto p-4">
-        {msgs.map(m => <BolaoMsg key={m.id} msg={m} agenteNome={user?.nome} />)}
+        {msgs.map(m => <BolaoMsg key={m.id} msg={m} agenteNome={m.agenteNome || user?.nome} />)}
         {(() => {
           const ultima = msgs[msgs.length - 1];
           const aguardando = ultima?.origem === 'cliente'

@@ -63,6 +63,7 @@ export async function runMigrations() {
     await sql`ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS midia_url text`;
     await sql`ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS status text DEFAULT 'enviada'`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_token_expira_em timestamp`;
+    await sql`ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS agente_nome text`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

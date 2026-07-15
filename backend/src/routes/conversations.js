@@ -208,6 +208,7 @@ router.post('/:id/send', async (req, res) => {
     conteudo: texto,
     wamid: sentWamid,
     status: 'enviada',
+    agenteNome: req.user.nome,
   }).returning();
 
   await db.update(conversas).set({
@@ -255,6 +256,7 @@ router.post('/:id/send-media', upload.single('arquivo'), async (req, res) => {
     midiaUrl: tipo === 'image' ? mediaId : null,
     wamid: mediaWamid,
     status: 'enviada',
+    agenteNome: req.user.nome,
   }).returning();
 
   await db.update(conversas).set({

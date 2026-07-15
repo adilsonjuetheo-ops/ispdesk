@@ -105,6 +105,7 @@ export const mensagens = pgTable('mensagens', {
   wamid:      text('wamid').unique(),
   midiaUrl:   text('midia_url'),
   status:     text('status').default('enviada'), // 'enviada' | 'entregue' | 'lida'
+  agenteNome: text('agente_nome'),
   enviadaEm:  timestamp('enviada_em').defaultNow(),
 });
 
