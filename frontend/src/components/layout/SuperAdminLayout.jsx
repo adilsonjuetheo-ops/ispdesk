@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
-import { LayoutDashboard, Building2, LogOut } from 'lucide-react';
+import { LayoutDashboard, Building2, LogOut, CreditCard } from 'lucide-react';
 
 export default function SuperAdminLayout() {
   const { user, logout } = useAuth();
@@ -35,6 +35,10 @@ export default function SuperAdminLayout() {
           <NavLink to="/admin/tenants" className={navClass}>
             <Building2 className="w-4 h-4" />
             Provedores
+          </NavLink>
+          <NavLink to="/admin/cobrancas" className={navClass}>
+            <CreditCard className="w-4 h-4" />
+            Cobranças
           </NavLink>
         </nav>
 

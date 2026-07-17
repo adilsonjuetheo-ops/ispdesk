@@ -5,6 +5,7 @@ import Privacidade from './pages/Privacidade.jsx';
 import Dashboard from './pages/superadmin/Dashboard.jsx';
 import Tenants from './pages/superadmin/Tenants.jsx';
 import TenantDetail from './pages/superadmin/TenantDetail.jsx';
+import Cobrancas from './pages/superadmin/Cobrancas.jsx';
 import Inbox from './pages/tenant/Inbox.jsx';
 import Agents from './pages/tenant/Agents.jsx';
 import Settings from './pages/tenant/Settings.jsx';
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="tenants" element={<Tenants />} />
           <Route path="tenants/:id" element={<TenantDetail />} />
+          <Route path="cobrancas" element={<Cobrancas />} />
         </Route>
 
         <Route element={

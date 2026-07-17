@@ -8,6 +8,36 @@ import { enviarMensagem } from '../services/whatsapp.js';
 
 const router = Router();
 
+// Lista todos os tenants com info de cobrança
+router.get('/cobrancas', autenticar, apenasSuper, async (req, res) => {
+  const rows = await db.select({
+    id: tenants.id,
+    nome: tenants.nome,
+    plano: tenants.plano,
+    ativo: tenants.ativo,
+    statusPagamento: tenants.statusPagamento,
+    proximoVencimento: tenants.proximoVencimento,
+    mpPaymentId: tenants.mpPaymentId,
+    whatsappContato: tenants.whatsappContato,
+  }).from(tenants).orderBy(tenants.nome);
+  res.json(rows);
+});
+
+// Baixa manual — marca como pago sem consultar MP
+router.post('/tenants/:id/baixa-manual', autenticar, apenasSuper, async (req, res) => {
+  const { id } = req.params;
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id)).limit(1);
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+
+  const proxVencimento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await db.update(tenants)
+    .set({ statusPagamento: 'ativo', proximoVencimento: proxVencimento })
+    .where(eq(tenants.id, id));
+
+  console.log(`[cobrança] Baixa manual: ${tenant.nome} por superadmin`);
+  res.json({ ok: true, proximoVencimento: proxVencimento });
+});
+
 // SuperAdmin dispara a primeira (ou qualquer) cobrança PIX
 router.post('/tenants/:id/gerar-cobranca', autenticar, apenasSuper, async (req, res) => {
   const { id } = req.params;
