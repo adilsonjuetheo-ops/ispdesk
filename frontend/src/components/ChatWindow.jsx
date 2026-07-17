@@ -72,7 +72,7 @@ function StatusIcon({ status }) {
   return <Check className="w-3.5 h-3.5 text-gray-400 shrink-0" />;
 }
 
-function BolaoMsg({ msg, agenteNome }) {
+function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
   const isCliente = msg.origem === 'cliente';
   const isBot = msg.origem === 'bot';
   const isNota = msg.origem === 'nota';
@@ -112,7 +112,7 @@ function BolaoMsg({ msg, agenteNome }) {
         {!isCliente && (
           <p className="text-xs mb-1 text-right">
             {isBot
-              ? <span className="text-gray-400">Bot</span>
+              ? <span className="text-gray-400">{nomeAssistente || 'Bot'}</span>
               : <span className="font-bold text-gray-700">{agenteNome || 'Agente'}</span>
             }
           </p>
@@ -473,7 +473,7 @@ export default function ChatWindow({ conversa, onAtualizar }) {
 
       {/* mensagens */}
       <div ref={msgAreaRef} className="flex-1 overflow-y-auto p-4">
-        {msgs.map(m => <BolaoMsg key={m.id} msg={m} agenteNome={m.agenteNome || user?.nome} />)}
+        {msgs.map(m => <BolaoMsg key={m.id} msg={m} agenteNome={m.agenteNome || user?.nome} nomeAssistente={user?.nomeAssistente} />)}
         {(() => {
           const ultima = msgs[msgs.length - 1];
           const aguardando = ultima?.origem === 'cliente'
