@@ -128,15 +128,18 @@ router.post('/mp/webhook', async (req, res) => {
       .limit(1);
     if (!tenant) return;
 
+    // Se já foi dado baixa manual, não envia mensagem ao provedor
+    const jaAtivo = tenant.statusPagamento === 'ativo';
+
     const proxVencimento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await db.update(tenants)
       .set({ statusPagamento: 'ativo', proximoVencimento: proxVencimento })
       .where(eq(tenants.id, tenant.id));
 
-    console.log(`[cobrança] ✅ Pago: ${tenant.nome} — próximo: ${proxVencimento.toLocaleDateString('pt-BR')}`);
+    console.log(`[cobrança] ✅ Pago: ${tenant.nome} — próximo: ${proxVencimento.toLocaleDateString('pt-BR')}${jaAtivo ? ' (já ativo, mensagem suprimida)' : ''}`);
 
-    // Confirmação WhatsApp
-    if (tenant.whatsappContato && tenant.whatsappNumberId && tenant.whatsappToken) {
+    // Só envia confirmação WhatsApp se o pagamento ainda não havia sido dado baixa manualmente
+    if (!jaAtivo && tenant.whatsappContato && tenant.whatsappNumberId && tenant.whatsappToken) {
       const numero = tenant.whatsappContato.replace(/\D/g, '');
       const proxStr = proxVencimento.toLocaleDateString('pt-BR');
       const msg =
