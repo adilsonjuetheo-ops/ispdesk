@@ -43,6 +43,8 @@ export default function TenantDetail() {
   const [gerandoPIX, setGerandoPIX] = useState(false);
   const [pixGerado, setPixGerado] = useState(null); // { pixCopiaECola, ticketUrl }
   const [erroCobranca, setErroCobranca] = useState('');
+  const [verificandoPIX, setVerificandoPIX] = useState(false);
+  const [resultadoVerif, setResultadoVerif] = useState(null);
 
   const handleLogoUpload = e => {
     const file = e.target.files?.[0];
@@ -149,6 +151,24 @@ export default function TenantDetail() {
       setErroReset(err.response?.data?.erro || 'Erro ao redefinir senha');
     } finally {
       setSavingReset(false);
+    }
+  };
+
+  const handleVerificarPagamento = async () => {
+    setVerificandoPIX(true);
+    setResultadoVerif(null);
+    try {
+      const { data } = await api.post(`/tenants/${id}/verificar-pagamento`);
+      if (data.pago) {
+        setTenant(t => ({ ...t, statusPagamento: 'ativo', proximoVencimento: data.proximoVencimento }));
+        setResultadoVerif({ ok: true, msg: 'Pagamento confirmado! Status atualizado para ativo.' });
+      } else {
+        setResultadoVerif({ ok: false, msg: `Pagamento ainda não aprovado no Mercado Pago (status: ${data.statusMP}).` });
+      }
+    } catch (err) {
+      setResultadoVerif({ ok: false, msg: err.response?.data?.erro || 'Erro ao verificar pagamento.' });
+    } finally {
+      setVerificandoPIX(false);
     }
   };
 
@@ -442,9 +462,19 @@ export default function TenantDetail() {
             </span>
           )}
           {tenant.statusPagamento === 'pendente' && (
-            <span className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full">
-              <Clock className="w-3.5 h-3.5" /> PIX pendente
-            </span>
+            <>
+              <span className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full">
+                <Clock className="w-3.5 h-3.5" /> PIX pendente
+              </span>
+              <button
+                onClick={handleVerificarPagamento}
+                disabled={verificandoPIX}
+                className="flex items-center gap-1.5 text-xs bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 px-3 py-1 rounded-full transition-colors"
+              >
+                {verificandoPIX ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                Verificar pagamento
+              </button>
+            </>
           )}
           {tenant.statusPagamento === 'suspenso' && (
             <span className="flex items-center gap-1.5 text-xs bg-red-500/20 text-red-300 px-3 py-1 rounded-full">
@@ -460,6 +490,12 @@ export default function TenantDetail() {
             </span>
           )}
         </div>
+
+        {resultadoVerif && (
+          <p className={`text-xs mb-3 ${resultadoVerif.ok ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {resultadoVerif.msg}
+          </p>
+        )}
 
         {/* Botão gerar cobrança */}
         <button

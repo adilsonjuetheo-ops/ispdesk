@@ -59,6 +59,29 @@ router.post('/tenants/:id/gerar-cobranca', autenticar, apenasSuper, async (req, 
   }
 });
 
+// SuperAdmin verifica manualmente se um pagamento pendente foi aprovado no MP
+router.post('/tenants/:id/verificar-pagamento', autenticar, apenasSuper, async (req, res) => {
+  const { id } = req.params;
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id)).limit(1);
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+  if (!tenant.mpPaymentId) return res.status(400).json({ erro: 'Nenhum pagamento registrado para este provedor' });
+
+  try {
+    const pag = await consultarPagamento(tenant.mpPaymentId);
+    if (pag.status === 'approved') {
+      const proxVencimento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await db.update(tenants)
+        .set({ statusPagamento: 'ativo', proximoVencimento: proxVencimento })
+        .where(eq(tenants.id, id));
+      return res.json({ ok: true, pago: true, proximoVencimento: proxVencimento });
+    }
+    res.json({ ok: true, pago: false, statusMP: pag.status });
+  } catch (err) {
+    console.error('[verificar-pagamento]', err.message);
+    res.status(500).json({ erro: err.message });
+  }
+});
+
 // Webhook do Mercado Pago — confirma pagamentos
 router.post('/mp/webhook', async (req, res) => {
   res.sendStatus(200); // responde antes de processar para não timeout
