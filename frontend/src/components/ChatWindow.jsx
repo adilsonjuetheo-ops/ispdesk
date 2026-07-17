@@ -6,7 +6,8 @@ import { useNotificationSound } from '../hooks/useNotificationSound.js';
 import {
   Send, UserCheck, Bot, X, Loader2, Paperclip, FileText,
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
-  Check, CheckCheck,
+  Check, CheckCheck, Bold, Italic, Strikethrough, Code,
+  List, ListOrdered,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -242,6 +243,7 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   const bottomRef = useRef(null);
   const msgAreaRef = useRef(null);
   const fileRef = useRef(null);
+  const textareaRef = useRef(null);
   const msgIdsRef = useRef(new Set());
   const inicialRef = useRef(false);
   const atBottomRef = useRef(true);
@@ -405,6 +407,36 @@ export default function ChatWindow({ conversa, onAtualizar }) {
     }
   };
 
+  const aplicarFormato = (prefixo, sufixo = prefixo) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const sel = texto.slice(start, end);
+    const novo = texto.slice(0, start) + prefixo + (sel || 'texto') + sufixo + texto.slice(end);
+    setTexto(novo);
+    setTimeout(() => {
+      el.focus();
+      const novoStart = start + prefixo.length;
+      const novoEnd = novoStart + (sel || 'texto').length;
+      el.setSelectionRange(novoStart, novoEnd);
+    }, 0);
+  };
+
+  const aplicarLista = (tipo) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const linhas = texto.slice(start, end || start).split('\n');
+    const prefixadas = linhas.map((l, i) =>
+      l ? `${tipo === 'ol' ? `${i + 1}. ` : '• '}${l}` : l
+    ).join('\n');
+    const novo = texto.slice(0, start) + prefixadas + texto.slice(end || start);
+    setTexto(novo);
+    setTimeout(() => el.focus(), 0);
+  };
+
   const selecionarAtalho = (atalho) => {
     setTexto(applyVars(atalho.conteudo, conversa));
     setAba('resposta');
@@ -486,11 +518,12 @@ export default function ChatWindow({ conversa, onAtualizar }) {
 
       {/* área de input com tabs */}
       <div className="bg-white border-t border-gray-200">
+        {/* Tabs */}
         {eHumano && (
           <div className="flex border-b border-gray-100 px-3">
             <button className={tabClass('resposta')} onClick={() => setAba('resposta')}>Resposta</button>
             <button className={tabClass('nota')} onClick={() => setAba('nota')}>
-              <span className="flex items-center gap-1"><StickyNote className="w-3 h-3" /> Nota</span>
+              <span className="flex items-center gap-1"><StickyNote className="w-3 h-3" /> Lembrete</span>
             </button>
             <button className={tabClass('atalhos')} onClick={() => setAba('atalhos')}>Atalhos</button>
           </div>
@@ -537,37 +570,23 @@ export default function ChatWindow({ conversa, onAtualizar }) {
           </div>
         )}
 
-        {/* input Resposta / Nota */}
+        {/* input Resposta / Lembrete */}
         {(!eHumano || aba === 'resposta' || aba === 'nota') && (
-          <form onSubmit={handleEnviar} className="p-3 flex gap-2 items-center">
-            {!isNota && (
-              <>
-                <input ref={fileRef} type="file" className="hidden"
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                  onChange={handleEnviarArquivo}
-                  disabled={!eHumano}
-                />
-                <button type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={!eHumano || enviandoArquivo || gravando}
-                  title="Enviar arquivo"
-                  className="text-gray-400 hover:text-blue-600 disabled:opacity-30 transition-colors p-1 shrink-0">
-                  {enviandoArquivo
-                    ? <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                    : <Paperclip className="w-5 h-5" />}
-                </button>
-              </>
-            )}
+          <form onSubmit={handleEnviar}>
+            <input ref={fileRef} type="file" className="hidden"
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+              onChange={handleEnviarArquivo}
+              disabled={!eHumano}
+            />
 
-            {/* Preview de áudio gravado */}
+            {/* Preview áudio gravado */}
             {!isNota && audioPreview ? (
-              <>
+              <div className="flex items-center gap-2 px-3 py-2">
                 <div className="flex-1 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
                   <Mic className="w-4 h-4 text-blue-500 shrink-0" />
                   <audio src={audioPreview} controls className="h-8 flex-1 min-w-0" style={{ colorScheme: 'light' }} />
                 </div>
-                <button type="button" onClick={descartarAudio}
-                  title="Descartar"
+                <button type="button" onClick={descartarAudio} title="Descartar"
                   className="text-gray-400 hover:text-red-500 p-1.5 transition-colors shrink-0">
                   <X className="w-5 h-5" />
                 </button>
@@ -575,9 +594,9 @@ export default function ChatWindow({ conversa, onAtualizar }) {
                   className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
                   {enviandoArquivo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
-              </>
+              </div>
             ) : !isNota && gravando ? (
-              <>
+              <div className="flex items-center gap-2 px-3 py-2">
                 <div className="flex-1 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
                   <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
                   <span className="text-sm text-red-600 font-medium">
@@ -588,42 +607,99 @@ export default function ChatWindow({ conversa, onAtualizar }) {
                   className="bg-red-500 hover:bg-red-600 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
                   <Send className="w-4 h-4" />
                 </button>
-              </>
+              </div>
             ) : (
               <>
-                <input
-                  type="text"
-                  value={texto}
-                  onChange={e => setTexto(e.target.value)}
-                  disabled={!eHumano && !isNota}
-                  placeholder={
-                    isNota
-                      ? 'Nota interna (só a equipe vê)...'
-                      : eHumano ? 'Digite sua mensagem...' : 'Assuma a conversa para responder'
-                  }
-                  className={clsx(
-                    'flex-1 rounded-xl px-4 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 disabled:opacity-50',
-                    isNota
-                      ? 'bg-yellow-50 text-yellow-900 focus:ring-yellow-300'
-                      : 'bg-gray-100 text-gray-800 focus:ring-blue-400'
-                  )}
-                />
-                {!isNota && !texto.trim() && eHumano && (
-                  <button type="button" onClick={iniciarGravacao}
-                    disabled={enviandoArquivo}
-                    title="Gravar áudio"
-                    className="text-gray-400 hover:text-red-500 disabled:opacity-30 transition-colors p-1 shrink-0">
-                    <Mic className="w-5 h-5" />
-                  </button>
-                )}
-                <button type="submit"
-                  disabled={(!eHumano && !isNota) || !texto.trim() || enviando}
-                  className={clsx(
-                    'disabled:opacity-40 text-white rounded-xl px-4 py-2 transition-colors shrink-0',
-                    isNota ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'
-                  )}>
-                  {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </button>
+                {/* Textarea */}
+                <div className={clsx('mx-3 mt-2.5 mb-1 rounded-xl border focus-within:ring-2 transition-all', isNota
+                  ? 'bg-yellow-50 border-yellow-200 focus-within:ring-yellow-300'
+                  : 'bg-white border-gray-200 focus-within:ring-blue-300 focus-within:border-blue-300'
+                )}>
+                  <textarea
+                    ref={textareaRef}
+                    rows={3}
+                    value={texto}
+                    onChange={e => setTexto(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEnviar(e); }
+                    }}
+                    disabled={!eHumano && !isNota}
+                    placeholder={
+                      isNota
+                        ? 'Lembrete interno (só a equipe vê)...'
+                        : eHumano ? 'Digite uma mensagem e pressione enter para enviar...' : 'Assuma a conversa para responder'
+                    }
+                    className={clsx(
+                      'w-full px-3 pt-2.5 pb-1 text-sm bg-transparent resize-none focus:outline-none placeholder-gray-400 rounded-t-xl',
+                      isNota ? 'text-yellow-900' : 'text-gray-800'
+                    )}
+                  />
+
+                  {/* Barra de formatação + ações */}
+                  <div className="flex items-center justify-between px-2 pb-2 pt-1">
+                    {/* Botões de formatação (só na aba Resposta) */}
+                    {!isNota ? (
+                      <div className="flex items-center gap-0.5">
+                        {[
+                          { icon: Bold,          title: 'Negrito (*)',       action: () => aplicarFormato('*') },
+                          { icon: Italic,        title: 'Itálico (_)',       action: () => aplicarFormato('_') },
+                          { icon: Strikethrough, title: 'Tachado (~)',       action: () => aplicarFormato('~') },
+                          { icon: Code,          title: 'Código (`)',        action: () => aplicarFormato('`') },
+                          { icon: ListOrdered,   title: 'Lista numerada',    action: () => aplicarLista('ol') },
+                          { icon: List,          title: 'Lista com marcador',action: () => aplicarLista('ul') },
+                        ].map(({ icon: Icon, title, action }) => (
+                          <button key={title} type="button" onClick={action}
+                            disabled={!eHumano}
+                            title={title}
+                            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-500 hover:text-gray-800 transition-colors">
+                            <Icon className="w-3.5 h-3.5" />
+                          </button>
+                        ))}
+                        {texto.length > 0 && (
+                          <span className="ml-2 text-[10px] text-gray-400 font-mono">{texto.length}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div />
+                    )}
+
+                    {/* Ações direita */}
+                    <div className="flex items-center gap-1">
+                      {!isNota && (
+                        <>
+                          <button type="button"
+                            onClick={() => fileRef.current?.click()}
+                            disabled={!eHumano || enviandoArquivo || gravando}
+                            title="Enviar arquivo"
+                            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-400 hover:text-blue-600 transition-colors">
+                            {enviandoArquivo
+                              ? <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                              : <Paperclip className="w-4 h-4" />}
+                          </button>
+                          {!texto.trim() && eHumano && (
+                            <button type="button" onClick={iniciarGravacao}
+                              disabled={enviandoArquivo}
+                              title="Gravar áudio"
+                              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-400 hover:text-red-500 transition-colors">
+                              <Mic className="w-4 h-4" />
+                            </button>
+                          )}
+                        </>
+                      )}
+                      <button type="submit"
+                        disabled={(!eHumano && !isNota) || !texto.trim() || enviando}
+                        className={clsx(
+                          'ml-1 rounded-lg px-3 py-1.5 disabled:opacity-40 text-white transition-colors shrink-0',
+                          isNota ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'
+                        )}>
+                        {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-400 px-4 pb-2">
+                  {isNota ? 'Shift+Enter para nova linha' : 'Enter para enviar · Shift+Enter para nova linha'}
+                </p>
               </>
             )}
           </form>
