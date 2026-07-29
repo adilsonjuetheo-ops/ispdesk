@@ -87,10 +87,11 @@ export const TOOLS_PADRAO = [
     input_schema: {
       type: 'object',
       properties: {
+        id_cliente:  { type: 'string', description: 'ID interno do cliente no SGP' },
         id_contrato: { type: 'string', description: 'ID do contrato do cliente' },
         detalhes:    { type: 'string', description: 'Descrição do problema relatado' },
       },
-      required: ['id_contrato', 'detalhes'],
+      required: ['id_cliente', 'id_contrato', 'detalhes'],
     },
   },
 ];
