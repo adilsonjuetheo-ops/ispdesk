@@ -54,6 +54,7 @@ router.put('/me', autenticar, async (req, res) => {
     endereco, cidade, uf, cep,
     whatsappNumberId, whatsappToken, systemPrompt, nomeAssistente,
     sgpTipo, sgpApiUrl, sgpApiKey,
+    assinaturaTipo, assinaturaToken, assinaturaExtra,
   } = req.body;
   const [tenant] = await db.update(tenants)
     .set({
@@ -62,6 +63,9 @@ router.put('/me', autenticar, async (req, res) => {
       endereco, cidade, uf, cep,
       whatsappNumberId, whatsappToken, systemPrompt, nomeAssistente,
       sgpTipo, sgpApiUrl, sgpApiKey,
+      assinaturaTipo: assinaturaTipo || null,
+      assinaturaToken: assinaturaToken || null,
+      assinaturaExtra: assinaturaExtra || null,
       atualizadoEm: new Date(),
     })
     .where(eq(tenants.id, req.user.tenantId))

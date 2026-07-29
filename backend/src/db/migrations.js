@@ -80,6 +80,12 @@ export async function runMigrations() {
     `;
     await sql`CREATE INDEX IF NOT EXISTS idx_nps_tenant ON nps_respostas(tenant_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_nps_whatsapp ON nps_respostas(cliente_whatsapp, aguardando)`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS assinatura_tipo text`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS assinatura_token text`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS assinatura_extra jsonb`;
+    await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS contrato_uuid text`;
+    await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS contrato_status text`;
+    await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS contrato_enviado_em timestamp`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

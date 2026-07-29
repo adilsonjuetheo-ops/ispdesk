@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature } from 'lucide-react';
 
 function carregarFbSdk() {
   return new Promise((resolve) => {
@@ -728,6 +728,90 @@ export default function Settings() {
               URL do webhook: <code className="bg-gray-100 px-1 rounded">https://seu-dominio.com/api/webhook</code>
             </p>
           </section>
+
+          {/* assinatura digital — apenas Pro e Enterprise */}
+          {['pro', 'enterprise'].includes(tenant.plano) && (
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+              <FileSignature className="w-4 h-4 text-blue-500" /> Assinatura Digital de Contratos
+            </h2>
+            <p className="text-xs text-gray-400 mb-4">
+              Configure a integração com ZapSign ou D4Sign para enviar contratos para assinatura diretamente pelo atendimento.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Plataforma</label>
+                <select value={tenant.assinaturaTipo || ''} onChange={e => set('assinaturaTipo', e.target.value || null)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  <option value="">Nenhuma (desativado)</option>
+                  <option value="zapsign">ZapSign</option>
+                  <option value="d4sign">D4Sign</option>
+                </select>
+              </div>
+
+              {tenant.assinaturaTipo && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    {tenant.assinaturaTipo === 'zapsign' ? 'Token da API ZapSign' : 'Token da API D4Sign (tokenAPI)'}
+                  </label>
+                  <input type="password" value={tenant.assinaturaToken || ''}
+                    onChange={e => set('assinaturaToken', e.target.value)}
+                    placeholder={tenant.assinaturaTipo === 'zapsign' ? 'Bearer token do ZapSign' : 'Token de API do D4Sign'}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                </div>
+              )}
+
+              {tenant.assinaturaTipo === 'zapsign' && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Token do Modelo de Contrato (ZapSign)</label>
+                  <input type="text" value={tenant.assinaturaExtra?.templateToken || ''}
+                    onChange={e => set('assinaturaExtra', { ...(tenant.assinaturaExtra || {}), templateToken: e.target.value })}
+                    placeholder="Token do modelo criado no ZapSign"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                  <p className="text-[11px] text-gray-400 mt-1">Encontre em ZapSign → Modelos → seu modelo → copie o token da URL.</p>
+                </div>
+              )}
+
+              {tenant.assinaturaTipo === 'd4sign' && (
+                <>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">CryptKey D4Sign</label>
+                    <input type="password" value={tenant.assinaturaExtra?.cryptKey || ''}
+                      onChange={e => set('assinaturaExtra', { ...(tenant.assinaturaExtra || {}), cryptKey: e.target.value })}
+                      placeholder="cryptKey da sua conta D4Sign"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">UUID do Cofre D4Sign</label>
+                    <input type="text" value={tenant.assinaturaExtra?.cofreUuid || ''}
+                      onChange={e => set('assinaturaExtra', { ...(tenant.assinaturaExtra || {}), cofreUuid: e.target.value })}
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">UUID do Template de Contrato D4Sign</label>
+                    <input type="text" value={tenant.assinaturaExtra?.templateUuid || ''}
+                      onChange={e => set('assinaturaExtra', { ...(tenant.assinaturaExtra || {}), templateUuid: e.target.value })}
+                      placeholder="UUID do documento modelo no D4Sign"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                    <p className="text-[11px] text-gray-400 mt-1">Suba o PDF do contrato no D4Sign e copie o UUID do documento modelo.</p>
+                  </div>
+                </>
+              )}
+
+              {tenant.assinaturaTipo && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700 leading-relaxed">
+                  <strong>Webhook de confirmação:</strong><br />
+                  Configure esta URL na plataforma para atualizar o status quando o contrato for assinado:<br />
+                  <code className="select-all break-all mt-1 block bg-blue-100 rounded px-2 py-1">
+                    https://seu-backend.com/api/contracts/webhook/{tenant.assinaturaTipo}
+                  </code>
+                  <span className="text-[10px] mt-1 block">Substitua "seu-backend.com" pelo domínio do seu servidor.</span>
+                </div>
+              )}
+            </div>
+          </section>
+          )}
 
           {sucesso && (
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-emerald-700 text-sm">

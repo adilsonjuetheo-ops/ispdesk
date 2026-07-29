@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Phone, Fingerprint, ChevronDown, User, X, Plus, MapPin } from 'lucide-react';
+import { Phone, Fingerprint, ChevronDown, User, X, Plus, MapPin, FileSignature, CheckCircle2, Clock } from 'lucide-react';
 import api from '../lib/api.js';
+import { useAuth } from '../hooks/useAuth.js';
 
 const WaIcon = () => (
   <svg className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
@@ -44,9 +45,145 @@ function Section({ title, children, defaultOpen = true }) {
   );
 }
 
+function ContratoModal({ conversa, onClose, onEnviado }) {
+  const nomeInicial = conversa.clienteNome && !/^\d+$/.test(conversa.clienteNome) ? conversa.clienteNome : '';
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [dados, setDados] = useState({
+    nome_contratante: nomeInicial,
+    cpf_cnpj: '', rg: '', email: '', endereco_contratante: '',
+    identificacao_oferta: '', tecnologia: 'Fibra Óptica',
+    velocidade_download: '', velocidade_upload: '',
+    mensalidade: '', taxa_instalacao: '0,00', dia_vencimento: '',
+    franquia: 'Ilimitada', endereco_instalacao: '',
+    tipo_ip: 'Dinâmico', equipamentos: '',
+    prazo_instalacao: '7', prazo_permanencia: 'Sem fidelidade',
+    forma_pagamento: 'PIX', modalidade_equipamento: 'comodato',
+    nome_representante: '', numero_anatel: '',
+  });
+
+  const set = (k, v) => setDados(p => ({ ...p, [k]: v }));
+  const field = (label, key, opts = {}) => (
+    <div>
+      <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}{opts.req && <span className="text-red-400 ml-0.5">*</span>}</label>
+      {opts.options ? (
+        <select value={dados[key]} onChange={e => set(key, e.target.value)}
+          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          {opts.options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : (
+        <input type={opts.type || 'text'} value={dados[key]} placeholder={opts.placeholder || ''}
+          onChange={e => set(key, e.target.value)}
+          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+      )}
+    </div>
+  );
+
+  async function enviar(e) {
+    e.preventDefault();
+    setErro(''); setEnviando(true);
+    try {
+      await api.post(`/contracts/${conversa.id}/send`, dados);
+      onEnviado?.();
+      onClose();
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Erro ao enviar contrato.');
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-end">
+      <div className="w-[420px] h-full bg-white shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <div className="flex items-center gap-2">
+            <FileSignature className="w-4 h-4 text-blue-600" />
+            <span className="font-semibold text-gray-800 text-sm">Enviar Contrato</span>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X className="w-4 h-4" /></button>
+        </div>
+
+        <form onSubmit={enviar} className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* Cliente */}
+          <div>
+            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3">Dados do Cliente</p>
+            <div className="space-y-2.5">
+              {field('Nome completo', 'nome_contratante', { req: true })}
+              {field('CPF / CNPJ', 'cpf_cnpj', { req: true, placeholder: '000.000.000-00' })}
+              {field('RG', 'rg', { placeholder: 'Opcional' })}
+              {field('E-mail', 'email', { type: 'email', placeholder: 'cliente@email.com' })}
+              {field('Endereço completo', 'endereco_contratante', { placeholder: 'Rua, nº, bairro, cidade' })}
+            </div>
+          </div>
+
+          {/* Plano */}
+          <div>
+            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3">Plano Contratado</p>
+            <div className="space-y-2.5">
+              {field('Nome / código do plano', 'identificacao_oferta', { req: true, placeholder: 'Ex: Fibra 300M' })}
+              {field('Tecnologia', 'tecnologia', { options: ['Fibra Óptica', 'Rádio', 'Cabo', 'Outra'] })}
+              <div className="grid grid-cols-2 gap-2">
+                {field('Download (Mbps)', 'velocidade_download', { req: true, placeholder: '300' })}
+                {field('Upload (Mbps)', 'velocidade_upload', { req: true, placeholder: '150' })}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {field('Mensalidade (R$)', 'mensalidade', { req: true, placeholder: '99,90' })}
+                {field('Taxa instalação (R$)', 'taxa_instalacao', { placeholder: '0,00' })}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {field('Dia de vencimento', 'dia_vencimento', { req: true, placeholder: '10' })}
+                {field('Franquia', 'franquia', { options: ['Ilimitada', '50 GB', '100 GB', '200 GB'] })}
+              </div>
+              {field('Forma de pagamento', 'forma_pagamento', { options: ['PIX', 'Boleto', 'Cartão de crédito', 'Débito automático'] })}
+            </div>
+          </div>
+
+          {/* Instalação */}
+          <div>
+            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3">Instalação</p>
+            <div className="space-y-2.5">
+              {field('Endereço de instalação', 'endereco_instalacao', { placeholder: 'Igual ao do cliente ou diferente' })}
+              {field('Equipamentos fornecidos', 'equipamentos', { placeholder: 'Ex: Roteador TP-Link AX1500' })}
+              {field('Modalidade dos equipamentos', 'modalidade_equipamento', { options: ['comodato', 'locação', 'venda'] })}
+              {field('Tipo de IP', 'tipo_ip', { options: ['Dinâmico', 'Fixo', 'CGNAT'] })}
+              {field('Prazo de instalação (dias)', 'prazo_instalacao', { placeholder: '7' })}
+              {field('Prazo de permanência', 'prazo_permanencia', { options: ['Sem fidelidade', '6 meses', '12 meses'] })}
+            </div>
+          </div>
+
+          {/* Prestadora */}
+          <div>
+            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3">Prestadora</p>
+            <div className="space-y-2.5">
+              {field('Nome do representante', 'nome_representante', { req: true, placeholder: 'Quem assina pela empresa' })}
+              {field('Nº autorização ANATEL', 'numero_anatel', { placeholder: 'Opcional' })}
+            </div>
+          </div>
+
+          {erro && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{erro}</div>
+          )}
+        </form>
+
+        <div className="px-5 py-4 border-t border-gray-100 shrink-0">
+          <button type="submit" onClick={enviar} disabled={enviando}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+            <FileSignature className="w-4 h-4" />
+            {enviando ? 'Enviando...' : 'Enviar para Assinatura'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ClientInfoPanel({ conversa, onAtualizar }) {
+  const { user } = useAuth();
   const [tagInput, setTagInput] = useState('');
   const [encerrando, setEncerrando] = useState(false);
+  const [modalContrato, setModalContrato] = useState(false);
+  const temAssinatura = ['pro', 'enterprise'].includes(user?.plano);
 
   if (!conversa) return null;
 
@@ -105,20 +242,54 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
         </div>
 
         {!isEncerrada && (
-          <button
-            onClick={encerrar}
-            disabled={encerrando}
-            className="w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 active:bg-black text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-60"
-          >
-            <User className="w-4 h-4" />
-            {encerrando ? 'Encerrando...' : 'Encerrar atendimento'}
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={encerrar}
+              disabled={encerrando}
+              className="w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 active:bg-black text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-60"
+            >
+              <User className="w-4 h-4" />
+              {encerrando ? 'Encerrando...' : 'Encerrar atendimento'}
+            </button>
+
+            {temAssinatura && conversa.status === 'humano' && !conversa.contratoStatus && (
+              <button
+                onClick={() => setModalContrato(true)}
+                className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium py-2.5 rounded-lg transition-colors border border-blue-200"
+              >
+                <FileSignature className="w-4 h-4" />
+                Enviar Contrato
+              </button>
+            )}
+
+            {conversa.contratoStatus === 'pendente' && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span className="text-xs text-amber-700">Contrato aguardando assinatura</span>
+              </div>
+            )}
+
+            {conversa.contratoStatus === 'assinado' && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span className="text-xs text-emerald-700">Contrato assinado</span>
+              </div>
+            )}
+          </div>
         )}
 
         {isEncerrada && (
-          <span className="w-full flex items-center justify-center text-xs text-gray-400 py-1.5 bg-gray-50 rounded-lg">
-            Atendimento encerrado
-          </span>
+          <div className="space-y-2">
+            <span className="w-full flex items-center justify-center text-xs text-gray-400 py-1.5 bg-gray-50 rounded-lg">
+              Atendimento encerrado
+            </span>
+            {conversa.contratoStatus === 'assinado' && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span className="text-xs text-emerald-700">Contrato assinado</span>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -222,6 +393,14 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
           )}
         </div>
       </Section>
+
+      {modalContrato && (
+        <ContratoModal
+          conversa={conversa}
+          onClose={() => setModalContrato(false)}
+          onEnviado={() => { setModalContrato(false); onAtualizar?.(); }}
+        />
+      )}
     </div>
   );
 }

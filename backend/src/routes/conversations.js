@@ -78,6 +78,8 @@ router.get('/', async (req, res) => {
     ultimaMsgNome: conversas.ultimaMsgNome,
     iniciadaEm: conversas.iniciadaEm,
     encerradaEm: conversas.encerradaEm,
+    contratoStatus: conversas.contratoStatus,
+    contratoEnviadoEm: conversas.contratoEnviadoEm,
     clienteId: clientes.id,
     clienteNome: clientes.nome,
     clienteWhatsapp: clientes.whatsapp,

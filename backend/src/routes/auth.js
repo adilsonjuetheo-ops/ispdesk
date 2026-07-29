@@ -33,12 +33,13 @@ router.post('/login', async (req, res) => {
   const ok = await bcrypt.compare(senha, tu.senhaHash);
   if (!ok) return res.status(401).json({ erro: 'Credenciais inválidas' });
 
-  const [tenant] = await db.select({ sgpTipo: tenants.sgpTipo, nomeAssistente: tenants.nomeAssistente })
+  const [tenant] = await db.select({ sgpTipo: tenants.sgpTipo, nomeAssistente: tenants.nomeAssistente, plano: tenants.plano })
     .from(tenants).where(eq(tenants.id, tu.tenantId)).limit(1);
   const sgpTipo = tenant?.sgpTipo || null;
   const nomeAssistente = tenant?.nomeAssistente || 'Assistente';
+  const plano = tenant?.plano || 'basic';
 
-  const payload = { id: tu.id, email: tu.email, nome: tu.nome, role: tu.role, tenantId: tu.tenantId, filialId: tu.filialId || null, sgpTipo, nomeAssistente };
+  const payload = { id: tu.id, email: tu.email, nome: tu.nome, role: tu.role, tenantId: tu.tenantId, filialId: tu.filialId || null, sgpTipo, nomeAssistente, plano };
   const token = gerarToken(payload);
   return res.json({ token, user: payload });
 });

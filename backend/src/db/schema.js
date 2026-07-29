@@ -33,6 +33,9 @@ export const tenants = pgTable('tenants', {
   whatsappConectadoEm: timestamp('whatsapp_conectado_em'),
   ativo:              boolean('ativo').default(true),
   horarios:           jsonb('horarios'),
+  assinaturaTipo:     text('assinatura_tipo'),   // 'zapsign' | 'd4sign' | null
+  assinaturaToken:    text('assinatura_token'),
+  assinaturaExtra:    jsonb('assinatura_extra'), // { templateToken, cofreUuid, cryptKey }
   criadoEm:           timestamp('criado_em').defaultNow(),
   atualizadoEm:       timestamp('atualizado_em').defaultNow(),
 });
@@ -95,6 +98,9 @@ export const conversas = pgTable('conversas', {
   ultimaMsgNome:   text('ultima_msg_nome'),
   iniciadaEm:      timestamp('iniciada_em').defaultNow(),
   encerradaEm:     timestamp('encerrada_em'),
+  contratoUuid:    text('contrato_uuid'),
+  contratoStatus:  text('contrato_status'), // 'pendente' | 'assinado'
+  contratoEnviadoEm: timestamp('contrato_enviado_em'),
 });
 
 export const mensagens = pgTable('mensagens', {
