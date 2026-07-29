@@ -13,6 +13,7 @@ import atalhoRouter from './routes/atalhos.js';
 import pushRouter from './routes/push.js';
 import presenceRouter from './routes/presence.js';
 import cobrancaRouter from './routes/cobranca.js';
+import npsRouter from './routes/nps.js';
 import whatsappRouter from './routes/whatsapp.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
@@ -43,6 +44,7 @@ app.use('/api/push', pushRouter);
 app.use('/api/presence', presenceRouter);
 app.use('/api/whatsapp', whatsappRouter);
 app.use('/api', cobrancaRouter);
+app.use('/api/nps', npsRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

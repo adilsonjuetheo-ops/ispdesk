@@ -10,6 +10,7 @@ import { enviarPushParaTenant } from '../services/pushNotification.js';
 import { dentroDoHorario } from '../services/horarios.js';
 import { getLimite, getUso, incrementarUso } from '../services/limites.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
+import { processarRespostaNps } from '../services/nps.js';
 
 const router = Router();
 
@@ -218,6 +219,12 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
   if (conversa.status === 'aguardando_filial') {
     await db.update(conversas).set({ status: 'bot' }).where(eq(conversas.id, conversa.id));
     conversa = { ...conversa, status: 'bot' };
+  }
+
+  // Verifica se é resposta de NPS pendente — intercepta antes de acionar IA
+  if (conversa.status !== 'humano') {
+    const foiNps = await processarRespostaNps(tenant, remetente, texto);
+    if (foiNps) return;
   }
 
   // Se humano está atendendo, não aciona IA

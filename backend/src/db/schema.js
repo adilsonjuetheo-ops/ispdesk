@@ -134,6 +134,19 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
   criadoEm:  timestamp('criado_em').defaultNow(),
 });
 
+export const npsRespostas = pgTable('nps_respostas', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  tenantId:        uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  conversaId:      uuid('conversa_id').references(() => conversas.id),
+  clienteId:       uuid('cliente_id').notNull().references(() => clientes.id),
+  clienteWhatsapp: text('cliente_whatsapp').notNull(),
+  aguardando:      boolean('aguardando').default(true),
+  nota:            integer('nota'),
+  categoria:       text('categoria'), // 'promotor' | 'neutro' | 'detrator'
+  enviadoEm:       timestamp('enviado_em').defaultNow(),
+  respondidoEm:    timestamp('respondido_em'),
+});
+
 export const usoIa = pgTable('uso_ia', {
   tenantId:        uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   mes:             text('mes').notNull(), // YYYY-MM

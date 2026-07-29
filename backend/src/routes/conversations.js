@@ -6,6 +6,7 @@ import { autenticar } from '../middleware/auth.js';
 import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
+import { enviarNps } from '../services/nps.js';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = Router();
@@ -173,6 +174,17 @@ router.post('/:id/close', async (req, res) => {
   await db.update(conversas)
     .set({ status: 'encerrada', encerradaEm: new Date() })
     .where(eq(conversas.id, id));
+
+  // Dispara NPS apenas quando um agente humano participou da conversa
+  if (conversa.agenteId) {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+    const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+    if (tenant && cliente) {
+      enviarNps(tenant, conversa, cliente.id, cliente.whatsapp).catch(err =>
+        console.error('[NPS] Erro:', err.message)
+      );
+    }
+  }
 
   res.json({ mensagem: 'Conversa encerrada' });
 });

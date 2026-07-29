@@ -64,6 +64,22 @@ export async function runMigrations() {
     await sql`ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS status text DEFAULT 'enviada'`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_token_expira_em timestamp`;
     await sql`ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS agente_nome text`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS nps_respostas (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        conversa_id uuid REFERENCES conversas(id),
+        cliente_id uuid NOT NULL REFERENCES clientes(id),
+        cliente_whatsapp text NOT NULL,
+        aguardando boolean DEFAULT true,
+        nota integer,
+        categoria text,
+        enviado_em timestamp DEFAULT now(),
+        respondido_em timestamp
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_nps_tenant ON nps_respostas(tenant_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_nps_whatsapp ON nps_respostas(cliente_whatsapp, aguardando)`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

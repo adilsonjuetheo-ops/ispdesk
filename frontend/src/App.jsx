@@ -11,6 +11,7 @@ import Agents from './pages/tenant/Agents.jsx';
 import Settings from './pages/tenant/Settings.jsx';
 import Relatorio from './pages/tenant/Relatorio.jsx';
 import Atalhos from './pages/tenant/Atalhos.jsx';
+import Nps from './pages/tenant/Nps.jsx';
 import SuperAdminLayout from './components/layout/SuperAdminLayout.jsx';
 import TenantLayout from './components/layout/TenantLayout.jsx';
 
@@ -71,6 +72,11 @@ export default function App() {
           <Route path="/atalhos" element={
             <ProtectedRoute roles={['admin']}>
               <Atalhos />
+            </ProtectedRoute>
+          } />
+          <Route path="/nps" element={
+            <ProtectedRoute roles={['admin']}>
+              <Nps />
             </ProtectedRoute>
           } />
         </Route>

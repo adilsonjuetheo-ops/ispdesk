@@ -5,7 +5,7 @@ import { usePolling } from '../../hooks/usePolling.js';
 import { usePushNotifications } from '../../hooks/usePushNotifications.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
-  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap, AlertTriangle,
+  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap, AlertTriangle, Star,
 } from 'lucide-react';
 import api from '../../lib/api.js';
 
@@ -180,6 +180,9 @@ export default function TenantLayout() {
             <div className="pt-2 mt-1 border-t border-gray-100 space-y-0.5">
               <NavLink to="/relatorio" className={navClass}>
                 <BarChart2 className="w-4 h-4" /> Relatório
+              </NavLink>
+              <NavLink to="/nps" className={navClass}>
+                <Star className="w-4 h-4" /> NPS
               </NavLink>
               <NavLink to="/agents" className={navClass}>
                 <Users className="w-4 h-4" /> Equipe
