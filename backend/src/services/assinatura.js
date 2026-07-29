@@ -1,3 +1,11 @@
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import PizZip from 'pizzip';
+import FormData from 'form-data';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 function buildVariables(tenant, clienteWhatsapp, dados) {
@@ -18,8 +26,9 @@ function buildVariables(tenant, clienteWhatsapp, dados) {
     horario_atendimento:   dados.horario_atendimento || '',
     canal_lgpd:            dados.canal_lgpd || tenant.email || '',
     url_privacidade:       dados.url_privacidade || tenant.website || '',
-    cidade_foro:           tenant.cidade || '',
-    cidade_assinatura:     tenant.cidade || '',
+    cidade_foro:           dados.cidade_foro || tenant.cidade || '',
+    uf:                    dados.uf || tenant.uf || '',
+    cidade_assinatura:     dados.cidade_foro || tenant.cidade || '',
     dia_assinatura:        String(hoje.getDate()).padStart(2, '0'),
     mes_assinatura:        MESES[hoje.getMonth()],
     ano_assinatura:        String(hoje.getFullYear()),
@@ -110,52 +119,73 @@ async function enviarZapSign(tenant, clienteWhatsapp, dados) {
   };
 }
 
-async function enviarD4Sign(tenant, clienteWhatsapp, dados) {
-  const token    = tenant.assinaturaToken;
-  const extra    = tenant.assinaturaExtra || {};
-  const cofreUuid   = extra.cofreUuid;
-  const templateUuid = extra.templateUuid;
-  const cryptKey = extra.cryptKey;
+function fillDocxTemplate(templateBuffer, variables) {
+  const zip = new PizZip(templateBuffer);
+  const xmlParts = ['word/document.xml', 'word/header1.xml', 'word/header2.xml', 'word/footer1.xml', 'word/footer2.xml'];
 
-  if (!token)      throw new Error('Token D4Sign não configurado.');
-  if (!cofreUuid)  throw new Error('UUID do cofre D4Sign não configurado.');
-
-  const variables = buildVariables(tenant, clienteWhatsapp, dados);
-  const qs = `tokenAPI=${token}${cryptKey ? `&cryptKey=${cryptKey}` : ''}`;
-
-  // Se há template configurado usa CLM; senão lança erro claro
-  if (!templateUuid) {
-    throw new Error('UUID do template D4Sign não configurado. Suba o PDF do contrato no D4Sign e configure o UUID do documento em Configurações → Assinatura Digital.');
+  for (const part of xmlParts) {
+    if (!zip.files[part]) continue;
+    let content = zip.files[part].asText();
+    for (const [key, value] of Object.entries(variables)) {
+      content = content.replaceAll(`{{${key}}}`, String(value));
+    }
+    zip.file(part, content);
   }
 
-  // Cria documento a partir do template CLM com variáveis
-  const varArray = Object.entries(variables).map(([chave, valor]) => ({
-    key: `{{${chave}}}`,
-    value: String(valor),
-  }));
+  return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
 
-  const res = await fetch(
-    `https://secure.d4sign.com.br/api/v1/documents/${templateUuid}/makedocumentbysafe?${qs}`,
+async function enviarD4Sign(tenant, clienteWhatsapp, dados) {
+  const token     = tenant.assinaturaToken;
+  const extra     = tenant.assinaturaExtra || {};
+  const cofreUuid = extra.cofreUuid;
+  const cryptKey  = extra.cryptKey;
+
+  if (!token)     throw new Error('Token D4Sign não configurado.');
+  if (!cofreUuid) throw new Error('UUID do cofre D4Sign não configurado.');
+
+  const qs = `tokenAPI=${token}${cryptKey ? `&cryptKey=${cryptKey}` : ''}`;
+  const nomeContratante = dados.nome_contratante || clienteWhatsapp;
+
+  // 1. Preencher variáveis no template DOCX via substituição direta no XML
+  const variables = buildVariables(tenant, clienteWhatsapp, dados);
+  const templatePath = join(__dirname, '../templates/contrato_scm.docx');
+  const templateBuffer = readFileSync(templatePath);
+  const filledBuffer = fillDocxTemplate(templateBuffer, variables);
+
+  // 2. Upload do DOCX preenchido para o D4Sign
+  const form = new FormData();
+  form.append('file-upload', filledBuffer, {
+    filename: `Contrato - ${nomeContratante}.docx`,
+    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+  form.append('name_document', `Contrato - ${nomeContratante}`);
+
+  const uploadRes = await fetch(
+    `https://secure.d4sign.com.br/api/v1/documents/${cofreUuid}/upload?${qs}`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name_document: `Contrato - ${dados.nome_contratante || clienteWhatsapp}`,
-        uuid_safe: cofreUuid,
-        templates: varArray,
-      }),
+      body: form,
+      headers: form.getHeaders(),
     }
   );
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`D4Sign erro ${res.status}: ${err}`);
+  const uploadText = await uploadRes.text();
+  if (!uploadRes.ok) {
+    throw new Error(`D4Sign upload erro ${uploadRes.status}: ${uploadText}`);
   }
 
-  const data = await res.json();
-  const docUuid = data.uuid;
+  let uploadData;
+  try { uploadData = JSON.parse(uploadText); } catch {
+    throw new Error(`D4Sign upload resposta inválida: ${uploadText}`);
+  }
 
-  // Adiciona signatário
+  const docUuid = uploadData?.uuid;
+  if (!docUuid) {
+    throw new Error(`D4Sign não retornou UUID do documento. Resposta: ${uploadText}`);
+  }
+
+  // 3. Adiciona signatário
   await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/createlist?${qs}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -173,7 +203,7 @@ async function enviarD4Sign(tenant, clienteWhatsapp, dados) {
     }),
   });
 
-  // Envia para assinatura
+  // 4. Envia para assinatura
   await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/sendtosigner?${qs}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
