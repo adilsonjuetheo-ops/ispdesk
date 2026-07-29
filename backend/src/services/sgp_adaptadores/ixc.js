@@ -186,10 +186,11 @@ export class IxcAdaptador extends SgpAdaptador {
     switch (toolName) {
 
       case 'desbloquear_cliente': {
-        const data = await this.#post(`cliente_contrato/${toolInput.id_contrato}`, {
-          status: 'A',
+        const data = await this.#post('desbloqueio_confianca', {
+          id_cliente: toolInput.id_cliente,
+          id_contrato: toolInput.id_contrato,
         });
-        if (data.type === 'success') return 'Desbloqueio realizado com sucesso!';
+        if (data.type === 'success') return 'Desbloqueio em confiança realizado com sucesso!';
         return `Não foi possível desbloquear: ${data.message || 'erro desconhecido'}`;
       }
 
