@@ -13,7 +13,7 @@ router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {
   const { conversaId } = req.params;
   const dados = req.body;
 
-  if (!['pro', 'enterprise'].includes(req.user.plano)) {
+  if (req.user.role !== 'superadmin' && !['pro', 'enterprise'].includes(req.user.plano)) {
     return res.status(403).json({ erro: 'O módulo de assinatura digital está disponível apenas nos planos Pro e Enterprise.' });
   }
 
@@ -23,7 +23,7 @@ router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {
 
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, conversaId)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
-  if (conversa.tenantId !== req.user.tenantId) return res.status(403).json({ erro: 'Acesso negado' });
+  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) return res.status(403).json({ erro: 'Acesso negado' });
 
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
