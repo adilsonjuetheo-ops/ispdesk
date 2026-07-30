@@ -137,12 +137,12 @@ export default function Login() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center bg-white px-8">
-        <div className="w-full max-w-sm">
+      <div className="flex-1 flex items-center justify-center bg-white px-12 rounded-l-[48px] shadow-[-12px_0_40px_rgba(0,0,0,0.10)]">
+        <div className="w-full max-w-md">
 
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <img src="/logoisp.png" alt="Logo" className="h-16 rounded-2xl" />
+            <img src="/logoisp.png" alt="Logo" className="h-24 rounded-2xl" />
           </div>
 
           {/* Heading */}
