@@ -210,6 +210,13 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     console.error('[SGP] Erro ao enriquecer cliente:', err.message);
   }
 
+  // Verifica se é resposta de NPS pendente ANTES de criar/abrir conversa
+  // Isso evita abrir uma nova conversa só para a resposta do NPS
+  if (!isAudio) {
+    const foiNps = await processarRespostaNps(tenant, remetente, texto, wamid);
+    if (foiNps) return;
+  }
+
   let [conversa] = await db.select().from(conversas)
     .where(and(
       eq(conversas.tenantId, tenant.id),
@@ -247,12 +254,6 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
   if (conversa.status === 'aguardando_filial') {
     await db.update(conversas).set({ status: 'bot' }).where(eq(conversas.id, conversa.id));
     conversa = { ...conversa, status: 'bot' };
-  }
-
-  // Verifica se é resposta de NPS pendente — intercepta antes de acionar IA
-  if (conversa.status !== 'humano') {
-    const foiNps = await processarRespostaNps(tenant, remetente, texto);
-    if (foiNps) return;
   }
 
   // Se humano está atendendo, não aciona IA

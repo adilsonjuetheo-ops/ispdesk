@@ -53,7 +53,7 @@ export async function enviarNps(tenant, conversa, clienteId, clienteWhatsapp) {
   console.log(`[NPS] Enviado para ${clienteWhatsapp}`);
 }
 
-export async function processarRespostaNps(tenant, remetente, texto) {
+export async function processarRespostaNps(tenant, remetente, texto, wamid = null) {
   const nota = parseInt(texto.trim(), 10);
   if (isNaN(nota) || nota < 0 || nota > 10) return false;
 
@@ -67,6 +67,14 @@ export async function processarRespostaNps(tenant, remetente, texto) {
     .limit(1);
 
   if (!pendente) return false;
+
+  // Salva a resposta do cliente na conversa original (encerrada)
+  await db.insert(mensagens).values({
+    conversaId: pendente.conversaId,
+    origem: 'cliente',
+    conteudo: texto,
+    wamid: wamid || null,
+  }).catch(() => {});
 
   const categoria = categorizar(nota);
 
@@ -82,7 +90,6 @@ export async function processarRespostaNps(tenant, remetente, texto) {
 
   try {
     await enviarMensagem(tenant, remetente, agradecimentos[categoria]);
-    // Registra o agradecimento no histórico da conversa
     await db.insert(mensagens).values({
       conversaId: pendente.conversaId,
       origem: 'bot',
