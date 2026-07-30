@@ -96,7 +96,7 @@ router.post('/', async (req, res) => {
 
           // Ligações: avisa e ignora
           if (msg.type === 'call') {
-            try { await enviarMensagem(tenant, remetente, 'Este número não atende ligações. Por favor, envie uma mensagem de texto ou áudio. 😊'); } catch {}
+            try { await enviarMensagem(tenant, remetente, 'Este *whatsapp* é automatizado, não permite ligações por aqui.\n\nMande um *áudio* ou *mensagem* dizendo o que deseja.'); } catch {}
             continue;
           }
 
