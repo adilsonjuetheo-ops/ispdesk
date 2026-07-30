@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSearchParams, useOutletContext } from 'react-router-dom';
 import api from '../../lib/api.js';
 import { usePolling } from '../../hooks/usePolling.js';
@@ -18,6 +18,10 @@ export default function Inbox() {
 
   const view = searchParams.get('view') || 'todos';
   const filialId = searchParams.get('filial') || null;
+
+  useEffect(() => {
+    setSelecionada(null);
+  }, [view, filialId]);
 
   const carregarConversas = useCallback(async () => {
     const { data } = await api.get('/conversations');
