@@ -9,9 +9,39 @@ import {
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
   List, ListOrdered,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
+
+function groupMsgsByDate(msgs) {
+  const result = [];
+  let lastDate = null;
+  for (const msg of msgs) {
+    const d = new Date(msg.enviadaEm);
+    const dateStr = format(d, 'yyyy-MM-dd');
+    if (dateStr !== lastDate) {
+      lastDate = dateStr;
+      result.push({ type: 'separator', date: d, key: `sep-${dateStr}` });
+    }
+    result.push({ type: 'msg', msg, key: msg.id });
+  }
+  return result;
+}
+
+function DateSeparator({ date }) {
+  const label = isToday(date) ? 'Hoje'
+    : isYesterday(date) ? 'Ontem'
+    : format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+  return (
+    <div className="flex items-center gap-3 my-4 px-2">
+      <div className="flex-1 h-px bg-gray-200" />
+      <span className="text-[11px] text-gray-400 bg-gray-100 px-3 py-1 rounded-full whitespace-nowrap">
+        {label}
+      </span>
+      <div className="flex-1 h-px bg-gray-200" />
+    </div>
+  );
+}
 
 function MidiaBolao({ msg, isCliente }) {
   const { conteudo, midiaUrl, conversaId } = msg;
@@ -503,9 +533,32 @@ export default function ChatWindow({ conversa, onAtualizar }) {
         )}
       </div>
 
+      {/* Status banner */}
+      {conversa.status === 'aguardando' || conversa.status === 'aguardando_filial' ? (
+        <div className="bg-amber-500 text-white text-xs font-semibold text-center py-1.5 px-4 shrink-0">
+          Aguardando atendimento
+        </div>
+      ) : conversa.status === 'humano' ? (
+        <div className="bg-emerald-500 text-white text-xs font-semibold text-center py-1.5 px-4 shrink-0">
+          Em atendimento{conversa.agenteNome ? ` · ${conversa.agenteNome}` : ''}
+        </div>
+      ) : conversa.status === 'bot' ? (
+        <div className="bg-blue-500 text-white text-xs font-semibold text-center py-1.5 px-4 shrink-0">
+          Bot está respondendo
+        </div>
+      ) : conversa.status === 'encerrada' ? (
+        <div className="bg-gray-300 text-gray-600 text-xs font-semibold text-center py-1.5 px-4 shrink-0">
+          Atendimento encerrado
+        </div>
+      ) : null}
+
       {/* mensagens */}
       <div ref={msgAreaRef} className="flex-1 overflow-y-auto p-4">
-        {msgs.map(m => <BolaoMsg key={m.id} msg={m} agenteNome={m.agenteNome || user?.nome} nomeAssistente={user?.nomeAssistente} />)}
+        {groupMsgsByDate(msgs).map(item =>
+          item.type === 'separator'
+            ? <DateSeparator key={item.key} date={item.date} />
+            : <BolaoMsg key={item.key} msg={item.msg} agenteNome={item.msg.agenteNome || user?.nome} nomeAssistente={user?.nomeAssistente} />
+        )}
         {(() => {
           const ultima = msgs[msgs.length - 1];
           const aguardando = ultima?.origem === 'cliente'

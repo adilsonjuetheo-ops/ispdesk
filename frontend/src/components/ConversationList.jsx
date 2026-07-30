@@ -234,6 +234,13 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
 
                 {/* Tempo de espera para fila */}
                 <WaitTime iniciadaEm={c.iniciadaEm} status={c.status} />
+
+                {/* Agente + filial */}
+                {(c.agenteNome || c.filialNome) && (
+                  <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+                    {[c.agenteNome, c.filialNome].filter(Boolean).join(' › ')}
+                  </p>
+                )}
               </div>
             </button>
           );
