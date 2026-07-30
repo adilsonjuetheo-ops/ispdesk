@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle } from 'lucide-react';
 
 function carregarFbSdk() {
   return new Promise((resolve) => {
@@ -203,12 +203,14 @@ function HorariosSection() {
   const [saving, setSaving] = useState(false);
   const [sucesso, setSucesso] = useState(false);
   const [msgForaHorario, setMsgForaHorario] = useState('');
+  const [slaMinutos, setSlaMinutos] = useState(15);
 
   useEffect(() => {
     api.get('/tenants/me/horarios').then(r => {
       if (r.data) {
         setHorarios(r.data.dias || HORARIO_DEFAULT);
         setMsgForaHorario(r.data.msgForaHorario || '');
+        setSlaMinutos(r.data.slaMinutos ?? 15);
       } else {
         setHorarios(HORARIO_DEFAULT);
       }
@@ -221,7 +223,10 @@ function HorariosSection() {
   const salvar = async () => {
     setSaving(true);
     try {
-      await api.put('/tenants/me/horarios', { horarios: { dias: horarios, msgForaHorario } });
+      const { data: atual } = await api.get('/tenants/me/horarios');
+      await api.put('/tenants/me/horarios', {
+        horarios: { ...(atual || {}), dias: horarios, msgForaHorario, slaMinutos: Number(slaMinutos) || 0 },
+      });
       setSucesso(true);
       setTimeout(() => setSucesso(false), 3000);
     } finally { setSaving(false); }
@@ -269,6 +274,17 @@ function HorariosSection() {
         <textarea value={msgForaHorario} onChange={e => setMsgForaHorario(e.target.value)} rows={3}
           placeholder="Ex: Olá! Nosso atendimento funciona de segunda a sexta das 8h às 18h. Deixe sua mensagem e retornaremos em breve!"
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
+      </div>
+
+      <div className="mb-4 flex items-center gap-3">
+        <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-600 font-medium whitespace-nowrap">SLA da fila:</label>
+          <input type="number" min="0" max="1440" value={slaMinutos}
+            onChange={e => setSlaMinutos(e.target.value)}
+            className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          <span className="text-xs text-gray-400">minutos — conversas aguardando além desse tempo ficam com alerta vermelho</span>
+        </div>
       </div>
 
       {sucesso && (
@@ -342,6 +358,82 @@ function TestarSgp() {
         <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap font-mono">{resultado}</div>
       )}
     </div>
+  );
+}
+
+const CORES_TAGS = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6'];
+
+function TagsSection() {
+  const [catalogo, setCatalogo] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [novoNome, setNovoNome] = useState('');
+  const [novaCor, setNovaCor] = useState('#6366f1');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get('/tenants/me/horarios').then(r => {
+      setCatalogo(r.data?.tagsCatalog || []);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const salvarCatalogo = async (novo) => {
+    setSaving(true);
+    try {
+      const { data: atual } = await api.get('/tenants/me/horarios');
+      await api.put('/tenants/me/horarios', { horarios: { ...(atual || {}), tagsCatalog: novo } });
+      setCatalogo(novo);
+    } finally { setSaving(false); }
+  };
+
+  const adicionar = async () => {
+    const nome = novoNome.trim();
+    if (!nome || catalogo.find(t => t.nome.toLowerCase() === nome.toLowerCase())) return;
+    await salvarCatalogo([...catalogo, { nome, cor: novaCor }]);
+    setNovoNome('');
+    setNovaCor(CORES_TAGS[(catalogo.length + 1) % CORES_TAGS.length]);
+  };
+
+  const remover = (idx) => salvarCatalogo(catalogo.filter((_, i) => i !== idx));
+
+  if (loading) return null;
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-5 mt-5">
+      <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+        <Tag className="w-4 h-4 text-indigo-500" /> Tags de Atendimento
+      </h2>
+      <p className="text-xs text-gray-400 mb-4">
+        Crie etiquetas para categorizar atendimentos. Os agentes poderão aplicá-las nas conversas abertas.
+      </p>
+
+      {catalogo.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {catalogo.map((t, i) => (
+            <div key={i} className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
+              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.cor }} />
+              <span className="text-sm font-medium text-gray-700">{t.nome}</span>
+              <button type="button" onClick={() => remover(i)} className="ml-0.5 text-gray-400 hover:text-red-500 transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <input type="color" value={novaCor} onChange={e => setNovaCor(e.target.value)}
+          className="h-9 w-10 rounded-lg border border-gray-200 cursor-pointer p-0.5 shrink-0" />
+        <input type="text" value={novoNome} onChange={e => setNovoNome(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && adicionar()}
+          placeholder="Nome da tag (ex: Suporte técnico)"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        <button type="button" onClick={adicionar} disabled={saving || !novoNome.trim()}
+          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+          Adicionar
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -822,8 +914,9 @@ export default function Settings() {
           </button>
         </form>
 
-        {/* Alterar senha — fora do form principal */}
+        {/* Fora do form principal */}
         <HorariosSection />
+        <TagsSection />
 
         <form onSubmit={handleAlterarSenha} className="mt-5">
           <section className="bg-white rounded-xl border border-gray-200 p-5">

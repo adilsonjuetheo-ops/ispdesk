@@ -119,9 +119,16 @@ export default function Inbox() {
   const { online = [], currentUser } = useOutletContext() || {};
   const [conversas, setConversas] = useState([]);
   const [selecionada, setSelecionada] = useState(null);
+  const [slaMinutos, setSlaMinutos] = useState(0);
   const [searchParams] = useSearchParams();
   const convIdsRef = useRef(null);
   const tocarNotificacao = useNotificationSound();
+
+  useEffect(() => {
+    api.get('/tenants/me/horarios').then(r => {
+      if (r.data?.slaMinutos) setSlaMinutos(Number(r.data.slaMinutos));
+    }).catch(() => {});
+  }, []);
 
   const view = searchParams.get('view') || 'todos';
   const filialId = searchParams.get('filial') || null;
@@ -158,6 +165,7 @@ export default function Inbox() {
         filialId={filialId}
         online={online}
         currentUser={currentUser}
+        slaMinutos={slaMinutos}
       />
 
       <div className="flex-1 flex overflow-hidden">

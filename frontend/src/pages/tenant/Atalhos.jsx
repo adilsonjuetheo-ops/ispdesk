@@ -136,6 +136,15 @@ export default function Atalhos() {
                   onChange={e => setForm(f => ({ ...f, conteudo: e.target.value }))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
                 />
+                <div className="mt-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                  <p className="text-xs font-medium text-blue-700 mb-1.5">Variáveis disponíveis:</p>
+                  <div className="flex flex-wrap gap-1.5 mb-1">
+                    {['{nome}', '{empresa}', '{filial}', '{contrato}'].map(v => (
+                      <code key={v} className="text-xs bg-white border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded font-mono cursor-pointer select-all">{v}</code>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-blue-500">Substituídas automaticamente ao usar o atalho no atendimento.</p>
+                </div>
               </div>
               {erro && <p className="text-xs text-red-600">{erro}</p>}
             </div>

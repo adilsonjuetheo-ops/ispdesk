@@ -7,7 +7,7 @@ import {
   Send, UserCheck, Bot, X, Loader2, Paperclip, FileText,
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
-  List, ListOrdered,
+  List, ListOrdered, Plus,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -170,15 +170,17 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
   );
 }
 
-function applyVars(texto, conversa) {
+function applyVars(texto, conversa, empresa = '') {
   return texto
-    .replace(/\{\{nome\}\}/gi, conversa.clienteNome || '')
-    .replace(/\{\{contrato\}\}/gi, conversa.clienteContratoId || '')
-    .replace(/\{\{filial\}\}/gi, conversa.clienteFilial || conversa.filialNome || '');
+    .replace(/\{\{nome\}\}|\{nome\}/gi, conversa.clienteNome || '')
+    .replace(/\{\{empresa\}\}|\{empresa\}/gi, empresa)
+    .replace(/\{\{contrato\}\}|\{contrato\}/gi, conversa.clienteContratoId || '')
+    .replace(/\{\{filial\}\}|\{filial\}/gi, conversa.clienteFilial || conversa.filialNome || '');
 }
 
-function TagsBar({ conversa, onUpdate }) {
+function TagsBar({ conversa, onUpdate, catalog = [], podeEditar = false }) {
   const tags = Array.isArray(conversa.tags) ? conversa.tags : [];
+  const [aberto, setAberto] = useState(false);
 
   const removerTag = async (tag) => {
     const novo = tags.filter(t => t !== tag);
@@ -186,19 +188,59 @@ function TagsBar({ conversa, onUpdate }) {
     onUpdate();
   };
 
-  if (tags.length === 0) return null;
+  const adicionarTag = async (nome) => {
+    if (tags.includes(nome)) { setAberto(false); return; }
+    await api.patch(`/conversations/${conversa.id}/tags`, { tags: [...tags, nome] });
+    setAberto(false);
+    onUpdate();
+  };
+
+  const disponiveis = catalog.filter(t => !tags.includes(t.nome));
 
   return (
     <div className="flex items-center gap-1 flex-wrap">
-      {tags.map(t => (
-        <span key={t}
-          className="inline-flex items-center gap-1 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
-          {t}
-          <button onClick={() => removerTag(t)} className="hover:text-indigo-900 transition-colors">
-            <X className="w-2.5 h-2.5" />
+      {tags.map(t => {
+        const catalogTag = catalog.find(c => c.nome === t);
+        return (
+          <span key={t}
+            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border"
+            style={catalogTag ? {
+              backgroundColor: catalogTag.cor + '20',
+              color: catalogTag.cor,
+              borderColor: catalogTag.cor + '50',
+            } : { backgroundColor: '#e0e7ff', color: '#4338ca', borderColor: '#c7d2fe' }}>
+            {t}
+            {podeEditar && (
+              <button onClick={() => removerTag(t)} className="opacity-60 hover:opacity-100 transition-opacity">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            )}
+          </span>
+        );
+      })}
+
+      {podeEditar && disponiveis.length > 0 && (
+        <div className="relative">
+          <button onClick={() => setAberto(v => !v)}
+            className="inline-flex items-center gap-0.5 text-xs text-gray-400 hover:text-blue-600 px-1.5 py-0.5 rounded-full hover:bg-blue-50 transition-colors">
+            <Plus className="w-3 h-3" /> Tag
           </button>
-        </span>
-      ))}
+          {aberto && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setAberto(false)} />
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 min-w-44 py-1">
+                {disponiveis.map(t => (
+                  <button key={t.nome} onClick={() => adicionarTag(t.nome)}
+                    className="w-full text-left flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 text-sm text-gray-700">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.cor }} />
+                    {t.nome}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -270,6 +312,8 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   const [atalhosList, setAtalhosList] = useState([]);
   const [buscaAtalho, setBuscaAtalho] = useState('');
   const [showTransfer, setShowTransfer] = useState(false);
+  const [tagsCatalog, setTagsCatalog] = useState([]);
+  const [tenantNome, setTenantNome] = useState('');
   const bottomRef = useRef(null);
   const msgAreaRef = useRef(null);
   const fileRef = useRef(null);
@@ -322,6 +366,8 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   useEffect(() => {
     if (!user?.tenantId) return;
     api.get(`/tenants/${user.tenantId}/atalhos`).then(r => setAtalhosList(r.data)).catch(() => {});
+    api.get('/tenants/me').then(r => setTenantNome(r.data?.nomeFantasia || r.data?.nome || '')).catch(() => {});
+    api.get('/tenants/me/horarios').then(r => setTagsCatalog(r.data?.tagsCatalog || [])).catch(() => {});
   }, [user?.tenantId]);
 
   const podeAtuar = conversa.status !== 'encerrada';
@@ -468,7 +514,7 @@ export default function ChatWindow({ conversa, onAtualizar }) {
   };
 
   const selecionarAtalho = (atalho) => {
-    setTexto(applyVars(atalho.conteudo, conversa));
+    setTexto(applyVars(atalho.conteudo, conversa, tenantNome));
     setAba('resposta');
     setBuscaAtalho('');
   };
@@ -524,11 +570,16 @@ export default function ChatWindow({ conversa, onAtualizar }) {
           </div>
         </div>
 
-        {/* Tags (só exibe se houver tags) */}
-        {Array.isArray(conversa.tags) && conversa.tags.length > 0 && (
+        {/* Tags */}
+        {((Array.isArray(conversa.tags) && conversa.tags.length > 0) || (eHumano && tagsCatalog.length > 0)) && (
           <div className="flex items-center gap-1.5">
             <Tag className="w-3 h-3 text-gray-300 shrink-0" />
-            <TagsBar conversa={conversa} onUpdate={onAtualizar} />
+            <TagsBar
+              conversa={conversa}
+              onUpdate={onAtualizar}
+              catalog={tagsCatalog}
+              podeEditar={eHumano}
+            />
           </div>
         )}
       </div>
