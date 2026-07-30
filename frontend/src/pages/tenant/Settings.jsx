@@ -788,14 +788,6 @@ export default function Settings() {
                       placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">UUID do Template de Contrato D4Sign</label>
-                    <input type="text" value={tenant.assinaturaExtra?.templateUuid || ''}
-                      onChange={e => set('assinaturaExtra', { ...(tenant.assinaturaExtra || {}), templateUuid: e.target.value })}
-                      placeholder="UUID do documento modelo no D4Sign"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                    <p className="text-[11px] text-gray-400 mt-1">Suba o PDF do contrato no D4Sign e copie o UUID do documento modelo.</p>
-                  </div>
                 </>
               )}
 
@@ -804,9 +796,8 @@ export default function Settings() {
                   <strong>Webhook de confirmação:</strong><br />
                   Configure esta URL na plataforma para atualizar o status quando o contrato for assinado:<br />
                   <code className="select-all break-all mt-1 block bg-blue-100 rounded px-2 py-1">
-                    https://seu-backend.com/api/contracts/webhook/{tenant.assinaturaTipo}
+                    {`${import.meta.env.VITE_API_URL || window.location.origin}/api/contracts/webhook/${tenant.assinaturaTipo}`}
                   </code>
-                  <span className="text-[10px] mt-1 block">Substitua "seu-backend.com" pelo domínio do seu servidor.</span>
                 </div>
               )}
             </div>
