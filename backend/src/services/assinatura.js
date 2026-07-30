@@ -325,7 +325,7 @@ async function enviarD4Sign(tenant, clienteWhatsapp, dados) {
   if (!docUuid) throw new Error(`D4Sign não retornou UUID. Resposta: ${uploadText}`);
 
   // 3. Adiciona signatário
-  await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/createlist?${qs}`, {
+  const createRes = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/createlist?${qs}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -341,13 +341,30 @@ async function enviarD4Sign(tenant, clienteWhatsapp, dados) {
       }],
     }),
   });
+  const createText = await createRes.text();
+  if (!createRes.ok) throw new Error(`D4Sign createlist erro ${createRes.status}: ${createText}`);
 
   // 4. Envia para assinatura
-  await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/sendtosigner?${qs}`, {
+  const sendRes = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/sendtosigner?${qs}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: 'Por favor, assine seu contrato de prestação de serviços de internet.' }),
+    body: JSON.stringify({ message: `Olá! Seu contrato de internet (${dados.identificacao_oferta || 'plano contratado'}) está pronto para assinatura digital. Por favor, assine para confirmar sua adesão.` }),
   });
+  const sendText = await sendRes.text();
+  if (!sendRes.ok) throw new Error(`D4Sign sendtosigner erro ${sendRes.status}: ${sendText}`);
 
-  return { uuid: docUuid, linkAssinatura: null };
+  // 5. Busca o link de assinatura do signatário
+  let linkAssinatura = null;
+  try {
+    const listRes = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/list?${qs}`);
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      const signers = Object.values(listData);
+      linkAssinatura = signers[0]?.link_shortner || null;
+    }
+  } catch {
+    // link não crítico — contrato já foi enviado por e-mail
+  }
+
+  return { uuid: docUuid, linkAssinatura };
 }

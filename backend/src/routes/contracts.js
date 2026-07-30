@@ -49,9 +49,10 @@ router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {
     });
 
     // Avisa o cliente via WhatsApp
+    const primeiroNome = (dados.nome_contratante || '').split(' ')[0];
     const msg = resultado.linkAssinatura
-      ? `Olá, ${dados.nome_contratante}! Seu contrato de internet está pronto para assinatura. Acesse o link: ${resultado.linkAssinatura}`
-      : `Olá, ${dados.nome_contratante}! Seu contrato foi enviado para assinatura. Verifique seu e-mail ou WhatsApp para assinar.`;
+      ? `Olá, ${primeiroNome}! Seu contrato de internet está pronto para assinatura digital.\n\nPlano: ${dados.identificacao_oferta}\nMensalidade: R$ ${dados.mensalidade}\n\nClique no link abaixo para assinar pelo celular, sem precisar imprimir nada:\n${resultado.linkAssinatura}\n\nQualquer dúvida, é só chamar aqui!`
+      : `Olá, ${primeiroNome}! Seu contrato de internet (${dados.identificacao_oferta} — R$ ${dados.mensalidade}/mês) foi enviado para assinatura digital. Verifique seu e-mail para assinar. Qualquer dúvida, é só chamar!`;
 
     await enviarMensagem(tenant, cliente.whatsapp, msg).catch(err =>
       console.error('[Contrato] Erro ao avisar cliente:', err.message)
