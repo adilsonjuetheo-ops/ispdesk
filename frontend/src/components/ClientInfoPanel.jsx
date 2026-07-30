@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Phone, Fingerprint, ChevronDown, User, X, Plus, MapPin, FileSignature, CheckCircle2, Clock } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Fingerprint, ChevronDown, User, X, Plus, MapPin, FileSignature, CheckCircle2, Clock, Copy, RefreshCw, Check } from 'lucide-react';
 import api from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
 
@@ -45,6 +45,25 @@ function Section({ title, children, defaultOpen = true }) {
   );
 }
 
+function CopyButton({ texto }) {
+  const [copiado, setCopiado] = useState(false);
+  function copiar() {
+    navigator.clipboard.writeText(texto).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    }).catch(() => {});
+  }
+  return (
+    <button
+      onClick={copiar}
+      title="Copiar"
+      className="ml-1 p-0.5 rounded text-gray-300 hover:text-gray-500 transition-colors shrink-0"
+    >
+      {copiado ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
 function ContratoModal({ conversa, onClose, onEnviado }) {
   const nomeInicial = conversa.clienteNome && !/^\d+$/.test(conversa.clienteNome) ? conversa.clienteNome : '';
   const [enviando, setEnviando] = useState(false);
@@ -68,7 +87,6 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
       .then(r => {
         setDados(prev => {
           const next = { ...prev };
-          // Só sobrescreve campos vazios com dados do prefill
           for (const [k, v] of Object.entries(r.data)) {
             if (v && !next[k]) next[k] = v;
           }
@@ -123,7 +141,6 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
         </div>
 
         <form onSubmit={enviar} className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-          {/* Cliente */}
           <div>
             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3">Dados do Cliente</p>
             <div className="space-y-2.5">
@@ -135,7 +152,6 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
             </div>
           </div>
 
-          {/* Plano */}
           <div>
             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3">Plano Contratado</p>
             <div className="space-y-2.5">
@@ -157,7 +173,6 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
             </div>
           </div>
 
-          {/* Instalação */}
           <div>
             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3">Instalação</p>
             <div className="space-y-2.5">
@@ -170,7 +185,6 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
             </div>
           </div>
 
-          {/* Prestadora */}
           <div>
             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3">Prestadora</p>
             <div className="space-y-2.5">
@@ -201,7 +215,47 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
   const [tagInput, setTagInput] = useState('');
   const [encerrando, setEncerrando] = useState(false);
   const [modalContrato, setModalContrato] = useState(false);
+  const [agentes, setAgentes] = useState([]);
+  const [editandoAgente, setEditandoAgente] = useState(false);
+  const [transferindo, setTransferindo] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+  const [erroReenvio, setErroReenvio] = useState('');
   const temAssinatura = ['pro', 'enterprise'].includes(user?.plano);
+
+  useEffect(() => {
+    const tid = user?.tenantId;
+    if (!tid) return;
+    api.get(`/tenants/${tid}/agents`)
+      .then(r => setAgentes(r.data.filter(a => a.ativo !== false)))
+      .catch(() => {});
+  }, [user?.tenantId]);
+
+  const transferir = useCallback(async (agenteId) => {
+    if (!agenteId || transferindo) return;
+    setTransferindo(true);
+    setEditandoAgente(false);
+    try {
+      await api.post(`/conversations/${conversa.id}/transfer`, { agenteId });
+      onAtualizar?.();
+    } catch {
+      // silently fail — UI refresh will show current state
+    } finally {
+      setTransferindo(false);
+    }
+  }, [conversa?.id, transferindo, onAtualizar]);
+
+  const reenviarLink = useCallback(async () => {
+    if (reenviando) return;
+    setReenviando(true);
+    setErroReenvio('');
+    try {
+      await api.post(`/contracts/${conversa.id}/resend-link`);
+    } catch (err) {
+      setErroReenvio(err.response?.data?.erro || 'Erro ao reenviar link.');
+    } finally {
+      setReenviando(false);
+    }
+  }, [conversa?.id, reenviando]);
 
   if (!conversa) return null;
 
@@ -281,9 +335,20 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
             )}
 
             {conversa.contratoStatus === 'pendente' && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="text-xs text-amber-700">Contrato aguardando assinatura</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                  <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span className="text-xs text-amber-700">Contrato aguardando assinatura</span>
+                </div>
+                <button
+                  onClick={reenviarLink}
+                  disabled={reenviando}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs text-amber-700 hover:text-amber-900 py-1.5 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${reenviando ? 'animate-spin' : ''}`} />
+                  {reenviando ? 'Reenviando...' : 'Reenviar link ao cliente'}
+                </button>
+                {erroReenvio && <p className="text-[10px] text-red-600 text-center">{erroReenvio}</p>}
               </div>
             )}
 
@@ -311,17 +376,9 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
         )}
       </div>
 
-      {/* Identificar cliente */}
-      <div className="px-4 py-3 border-b border-gray-100">
-        <button className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-400 text-sm py-2 rounded-lg cursor-default">
-          <User className="w-4 h-4" />
-          Identificar Cliente
-        </button>
-      </div>
-
       {/* Operador Responsável */}
       <Section title="Operador Responsável">
-        <div className="flex items-center justify-between">
+        {isEncerrada || agentes.length === 0 ? (
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
               <User className="w-3 h-3 text-blue-600" />
@@ -330,7 +387,40 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
               {conversa.agenteNome || 'Não atribuído'}
             </span>
           </div>
-        </div>
+        ) : editandoAgente ? (
+          <select
+            defaultValue={conversa.agenteId || ''}
+            onChange={e => transferir(e.target.value)}
+            onBlur={() => setEditandoAgente(false)}
+            autoFocus
+            disabled={transferindo}
+            className="w-full text-sm border border-blue-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-60"
+          >
+            <option value="" disabled>Selecionar agente...</option>
+            {agentes.map(a => (
+              <option key={a.id} value={a.id}>{a.nome}</option>
+            ))}
+          </select>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                <User className="w-3 h-3 text-blue-600" />
+              </div>
+              <span className="text-sm text-gray-700 truncate">
+                {conversa.agenteNome || 'Não atribuído'}
+              </span>
+            </div>
+            {!isEncerrada && (
+              <button
+                onClick={() => setEditandoAgente(true)}
+                className="text-[11px] text-blue-500 hover:text-blue-700 shrink-0 ml-1"
+              >
+                Alterar
+              </button>
+            )}
+          </div>
+        )}
       </Section>
 
       {/* Caixa de entrada */}
@@ -349,6 +439,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
             <div className="flex items-center gap-2.5">
               <Fingerprint className="w-4 h-4 text-gray-400 shrink-0" />
               <span className="text-sm text-gray-600 font-mono truncate">{conversa.clienteContratoId}</span>
+              <CopyButton texto={conversa.clienteContratoId} />
             </div>
           )}
           <div className="flex items-center gap-2.5">
@@ -356,6 +447,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
             <span className="text-sm text-gray-600 truncate">
               {conversa.clienteWhatsapp}
             </span>
+            <CopyButton texto={conversa.clienteWhatsapp} />
           </div>
           {conversa.clienteFilial && (
             <div className="flex items-center gap-2.5">

@@ -368,3 +368,27 @@ async function enviarD4Sign(tenant, clienteWhatsapp, dados) {
 
   return { uuid: docUuid, linkAssinatura };
 }
+
+export async function buscarLinkAssinatura(tenant, uuid) {
+  if (tenant.assinaturaTipo === 'd4sign') {
+    const extra = tenant.assinaturaExtra || {};
+    const qs = `tokenAPI=${tenant.assinaturaToken}${extra.cryptKey ? `&cryptKey=${extra.cryptKey}` : ''}`;
+    try {
+      const res = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${uuid}/list?${qs}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return Object.values(data)[0]?.link_shortner || null;
+    } catch { return null; }
+  }
+  if (tenant.assinaturaTipo === 'zapsign') {
+    try {
+      const res = await fetch(`https://api.zapsign.com.br/api/v1/docs/${uuid}/`, {
+        headers: { Authorization: `Bearer ${tenant.assinaturaToken}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.signers?.[0]?.sign_url || null;
+    } catch { return null; }
+  }
+  return null;
+}

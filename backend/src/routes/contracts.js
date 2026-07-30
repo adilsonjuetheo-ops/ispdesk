@@ -3,7 +3,7 @@ import { db } from '../db/index.js';
 import { conversas, clientes, tenants, mensagens } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
-import { enviarContrato } from '../services/assinatura.js';
+import { enviarContrato, buscarLinkAssinatura } from '../services/assinatura.js';
 import { enviarMensagem } from '../services/whatsapp.js';
 import { enviarPushParaUsuario, enviarPushParaTenant } from '../services/pushNotification.js';
 import { buscarDadosCliente } from '../services/sgp.js';
@@ -176,6 +176,30 @@ router.post('/webhook/d4sign', async (req, res) => {
   } catch (err) {
     console.error('[Webhook D4Sign]', err.message);
   }
+});
+
+// Reenviar link do contrato pendente via WhatsApp
+router.post('/:conversaId/resend-link', autenticar, apenasAdmin, async (req, res) => {
+  const { conversaId } = req.params;
+
+  const [conversa] = await db.select().from(conversas).where(eq(conversas.id, conversaId)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) return res.status(403).json({ erro: 'Acesso negado' });
+  if (conversa.contratoStatus !== 'pendente') return res.status(400).json({ erro: 'Não há contrato pendente para esta conversa.' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+
+  const linkAssinatura = await buscarLinkAssinatura(tenant, conversa.contratoUuid);
+  if (!linkAssinatura) return res.status(502).json({ erro: 'Não foi possível obter o link de assinatura. Tente novamente.' });
+
+  const primeiroNome = (cliente?.nome || '').split(' ')[0] || 'Cliente';
+  const msg = `Olá, ${primeiroNome}! Seu contrato ainda está aguardando assinatura.\n\nClique no link abaixo para assinar pelo celular:\n${linkAssinatura}\n\nQualquer dúvida, é só chamar!`;
+  await enviarMensagem(tenant, cliente.whatsapp, msg).catch(err =>
+    console.error('[Contrato] Erro ao reenviar link:', err.message)
+  );
+
+  res.json({ linkAssinatura });
 });
 
 // Prefill: retorna dados disponíveis do cliente para pré-preencher o modal de contrato
