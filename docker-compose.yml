@@ -15,6 +15,8 @@ services:
       VAPID_EMAIL:         ${VAPID_EMAIL:-admin@ispdesk.com.br}
       VAPID_PUBLIC_KEY:    ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY:   ${VAPID_PRIVATE_KEY:-}
+      SGP_ALLOWED_PRIVATE_HOSTS: ${SGP_ALLOWED_PRIVATE_HOSTS:-}
+      SGP_ALLOW_HTTP:      ${SGP_ALLOW_HTTP:-false}
     expose:
       - "3001"
     healthcheck:

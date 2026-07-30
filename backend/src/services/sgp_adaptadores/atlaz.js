@@ -112,7 +112,6 @@ export class AtlazAdaptador extends SgpAdaptador {
     const clienteData = await this.#get('/consultacliente', {
       cpf_cnpj: doc,
     }).catch(() => ({ success: 'false' }));
-    console.log('[Atlaz] buscarPorDocumento resposta:', JSON.stringify(clienteData).slice(0, 300));
     if (clienteData.success !== 'true') return null;
     return this.#buildContexto(clienteData);
   }

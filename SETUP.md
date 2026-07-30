@@ -21,7 +21,7 @@ npm run dev        # inicia em http://localhost:3001
 ```bash
 curl -X POST http://localhost:3001/api/auth/setup \
   -H "Content-Type: application/json" \
-  -d '{"nome":"Admin","email":"admin@ispdesk.com","senha":"senha123"}'
+  -d '{"nome":"Admin","email":"admin@ispdesk.com","senha":"use-uma-senha-forte-aqui"}'
 ```
 Esta rota só funciona uma vez (enquanto não houver nenhum super admin).
 

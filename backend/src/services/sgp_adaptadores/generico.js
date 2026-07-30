@@ -12,7 +12,8 @@ import { SgpAdaptador } from './base.js';
 export class GenericoAdaptador extends SgpAdaptador {
 
   async #chamar(acao, body = {}) {
-    const url = `${this.apiUrl.replace(/\/$/, '')}/${acao}`;
+    const base = await this.validarApiUrl();
+    const url = new URL(acao, `${base.toString().replace(/\/$/, '')}/`).toString();
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

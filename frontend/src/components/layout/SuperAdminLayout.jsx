@@ -1,12 +1,14 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 import { LayoutDashboard, Building2, LogOut, CreditCard } from 'lucide-react';
+import api from '../../lib/api.js';
 
 export default function SuperAdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await api.post('/auth/logout').catch(() => {});
     logout();
     navigate('/login');
   };

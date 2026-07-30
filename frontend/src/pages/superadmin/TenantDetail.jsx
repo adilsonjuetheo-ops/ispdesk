@@ -135,7 +135,7 @@ export default function TenantDetail() {
   };
 
   const handleResetSenha = async () => {
-    if (!novaSenhaReset || novaSenhaReset.length < 6) return setErroReset('Mínimo 6 caracteres');
+    if (!novaSenhaReset || novaSenhaReset.length < 10) return setErroReset('Mínimo 10 caracteres');
     setSavingReset(true);
     setErroReset('');
     try {
@@ -614,7 +614,7 @@ export default function TenantDetail() {
               <p className="text-gray-400 text-sm mb-4">
                 Nova senha para <strong className="text-white">{modalResetSenha.nome}</strong>
               </p>
-              <Field dark label="Nova senha (mín. 6 caracteres)" type="password"
+              <Field dark label="Nova senha (mín. 10 caracteres)" type="password"
                 value={novaSenhaReset} onChange={setNovaSenhaReset} placeholder="••••••••" />
               {erroReset && <p className="text-red-400 text-sm mt-2">{erroReset}</p>}
               <div className="flex gap-3 mt-4">

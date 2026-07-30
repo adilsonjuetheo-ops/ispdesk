@@ -9,10 +9,25 @@ import { buscarContextoSgp } from '../services/sgp.js';
 
 const router = Router();
 
+const CAMPOS_TENANT_SEGUROS = {
+  id: tenants.id,
+  slug: tenants.slug,
+  nome: tenants.nome,
+  nomeFantasia: tenants.nomeFantasia,
+  logoUrl: tenants.logoUrl,
+  corPrimaria: tenants.corPrimaria,
+  nomeAssistente: tenants.nomeAssistente,
+  plano: tenants.plano,
+  ativo: tenants.ativo,
+};
+
 // rota de auto-consulta: admin/agente pode ver seu próprio tenant
 router.get('/me', autenticar, async (req, res) => {
   if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, req.user.tenantId)).limit(1);
+  const consulta = req.user.role === 'admin'
+    ? db.select().from(tenants)
+    : db.select(CAMPOS_TENANT_SEGUROS).from(tenants);
+  const [tenant] = await consulta.where(eq(tenants.id, req.user.tenantId)).limit(1);
   if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
   res.json(tenant);
 });
@@ -98,7 +113,7 @@ router.post('/me/testar-sgp', autenticar, async (req, res) => {
 router.use(autenticar, apenasSuper);
 
 router.get('/', async (req, res) => {
-  const rows = await db.select().from(tenants).orderBy(tenants.criadoEm);
+  const rows = await db.select(CAMPOS_TENANT_SEGUROS).from(tenants).orderBy(tenants.criadoEm);
   res.json(rows);
 });
 

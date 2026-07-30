@@ -41,7 +41,7 @@ export default function Agents() {
   const handleSalvar = async e => {
     e.preventDefault();
     setErro('');
-    if (!editando && form.senha.length < 6) return setErro('Senha mínimo 6 caracteres');
+    if ((!editando || form.senha) && form.senha.length < 10) return setErro('Senha mínimo 10 caracteres');
     if (form.senha && form.senha !== form.confirmar) return setErro('Senhas não conferem');
 
     setSaving(true);

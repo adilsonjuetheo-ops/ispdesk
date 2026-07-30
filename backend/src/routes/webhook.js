@@ -11,8 +11,33 @@ import { dentroDoHorario } from '../services/horarios.js';
 import { getLimite, getUso, incrementarUso } from '../services/limites.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { processarRespostaNps } from '../services/nps.js';
+import crypto from 'crypto';
 
 const router = Router();
+let avisoAppSecretAusenteExibido = false;
+
+function assinaturaMetaValida(req) {
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appSecret) {
+    if (!avisoAppSecretAusenteExibido) {
+      console.warn('[Webhook] META_APP_SECRET ausente; validação de assinatura da Meta não está ativa.');
+      avisoAppSecretAusenteExibido = true;
+    }
+    return true;
+  }
+
+  const recebida = req.get('x-hub-signature-256');
+  if (!recebida?.startsWith('sha256=') || !req.rawBody) return false;
+
+  const esperada = `sha256=${crypto
+    .createHmac('sha256', appSecret)
+    .update(req.rawBody)
+    .digest('hex')}`;
+  const recebidaBuffer = Buffer.from(recebida);
+  const esperadaBuffer = Buffer.from(esperada);
+  return recebidaBuffer.length === esperadaBuffer.length
+    && crypto.timingSafeEqual(recebidaBuffer, esperadaBuffer);
+}
 
 router.get('/', (req, res) => {
   const mode = req.query['hub.mode'];
@@ -26,6 +51,9 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', async (req, res) => {
+  if (!assinaturaMetaValida(req)) {
+    return res.status(401).json({ erro: 'Assinatura de webhook inválida' });
+  }
   res.sendStatus(200);
 
   try {

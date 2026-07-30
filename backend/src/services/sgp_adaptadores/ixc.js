@@ -12,8 +12,8 @@ export class IxcAdaptador extends SgpAdaptador {
   }
 
   async #get(recurso, params = {}) {
-    const base = this.apiUrl.replace(/\/$/, '');
-    const url = new URL(`${base}/webservice/v1/${recurso}`);
+    const base = await this.validarApiUrl();
+    const url = new URL(`webservice/v1/${recurso}`, `${base.toString().replace(/\/$/, '')}/`);
     for (const [k, v] of Object.entries(params)) {
       if (v != null) url.searchParams.set(k, String(v));
     }
@@ -23,10 +23,11 @@ export class IxcAdaptador extends SgpAdaptador {
   }
 
   async #post(recurso, body = {}) {
-    const base = this.apiUrl.replace(/\/$/, '');
+    const base = await this.validarApiUrl();
     const headers = this.#headers();
     delete headers.ixcsoft;
-    const res = await fetch(`${base}/webservice/v1/${recurso}`, {
+    const url = new URL(`webservice/v1/${recurso}`, `${base.toString().replace(/\/$/, '')}/`);
+    const res = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),

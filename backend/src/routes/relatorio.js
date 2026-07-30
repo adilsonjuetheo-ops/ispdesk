@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { db } from '../db/index.js';
 import { conversas, mensagens, clientes } from '../db/schema.js';
 import { eq, and, gte, lt, isNotNull, count, desc, sql } from 'drizzle-orm';
-import { autenticar } from '../middleware/auth.js';
+import { autenticar, apenasAdmin } from '../middleware/auth.js';
 
 const router = Router();
-router.use(autenticar);
+router.use(autenticar, apenasAdmin);
 
 router.get('/', async (req, res) => {
   const mes = req.query.mes || new Date().toISOString().slice(0, 7);

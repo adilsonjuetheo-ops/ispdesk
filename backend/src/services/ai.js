@@ -6,6 +6,25 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // clienteWhatsapp: número do remetente vindo direto do payload do webhook
 const TAGS_VALIDAS = ['Suporte Técnico','Cobrança','Cancelamento','Instalação','Velocidade','Sem Sinal','Mudança de Plano','Outros'];
 
+function extrairIdsAutorizados(contexto) {
+  const idsCliente = new Set();
+  const idsContrato = new Set();
+  const regex = /ID_INTERNO:\s*id_cliente=([^|\s]+)\s*\|\s*id_contrato=([^\s]*)/g;
+  let match;
+  while ((match = regex.exec(contexto || '')) !== null) {
+    if (match[1]) idsCliente.add(String(match[1]));
+    if (match[2]) idsContrato.add(String(match[2]));
+  }
+  return { idsCliente, idsContrato };
+}
+
+function toolAutorizada(toolName, input, ids) {
+  if (toolName === 'buscar_por_documento') return true;
+  if (!input?.id_cliente || !ids.idsCliente.has(String(input.id_cliente))) return false;
+  if (input.id_contrato && !ids.idsContrato.has(String(input.id_contrato))) return false;
+  return true;
+}
+
 export async function processarMensagem(tenant, conversa, historico, novaMensagem, clienteWhatsapp) {
   const primeiraMsg = historico.filter(m => m.origem === 'cliente').length <= 1;
 
@@ -51,6 +70,7 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
 
   // 4. Tools disponíveis para este tenant (dependem do SGP configurado)
   const tools = getTools(tenant);
+  const idsAutorizados = extrairIdsAutorizados(contextoSgp);
 
   // 5. Conversa acumulada — mescla mensagens consecutivas do mesmo role
   // (Anthropic rejeita roles não alternados, o que pode ocorrer quando o bot
@@ -85,9 +105,19 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
 
     const toolResults = [];
     for (const toolBlock of toolBlocks) {
-      console.log(`[IA] Tool: ${toolBlock.name}`, toolBlock.input);
-      const resultado = await executarTool(toolBlock.name, toolBlock.input, tenant);
-      console.log(`[IA] Resultado: ${resultado}`);
+      let resultado;
+      if (!toolAutorizada(toolBlock.name, toolBlock.input, idsAutorizados)) {
+        console.warn(`[IA] Tool bloqueada por vínculo inválido: ${toolBlock.name}`);
+        resultado = 'Ação bloqueada: os identificadores informados não pertencem ao cliente validado nesta conversa.';
+      } else {
+        console.log(`[IA] Executando tool autorizada: ${toolBlock.name}`);
+        resultado = await executarTool(toolBlock.name, toolBlock.input, tenant);
+        if (toolBlock.name === 'buscar_por_documento') {
+          const novosIds = extrairIdsAutorizados(resultado);
+          novosIds.idsCliente.forEach(id => idsAutorizados.idsCliente.add(id));
+          novosIds.idsContrato.forEach(id => idsAutorizados.idsContrato.add(id));
+        }
+      }
       toolResults.push({
         type: 'tool_result',
         tool_use_id: toolBlock.id,

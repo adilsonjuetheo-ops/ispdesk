@@ -1,12 +1,18 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { tenants } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, and, ne, or, isNull } from 'drizzle-orm';
 import { autenticar, apenasSuper } from '../middleware/auth.js';
 import { criarPIX, consultarPagamento, getValorPlano } from '../services/mercadopago.js';
 import { enviarMensagem } from '../services/whatsapp.js';
+import { criarRateLimit } from '../middleware/security.js';
 
 const router = Router();
+const limitarWebhookPagamento = criarRateLimit({
+  janelaMs: 60_000,
+  limite: 120,
+  prefixo: 'webhook-pagamento',
+});
 
 // Lista todos os tenants com info de cobrança
 router.get('/cobrancas', autenticar, apenasSuper, async (req, res) => {
@@ -113,7 +119,7 @@ router.post('/tenants/:id/verificar-pagamento', autenticar, apenasSuper, async (
 });
 
 // Webhook do Mercado Pago — confirma pagamentos
-router.post('/mp/webhook', async (req, res) => {
+router.post('/mp/webhook', limitarWebhookPagamento, async (req, res) => {
   res.sendStatus(200); // responde antes de processar para não timeout
 
   try {
@@ -127,19 +133,21 @@ router.post('/mp/webhook', async (req, res) => {
       .where(eq(tenants.mpPaymentId, String(data.id)))
       .limit(1);
     if (!tenant) return;
-
-    // Se já foi dado baixa manual, não envia mensagem ao provedor
-    const jaAtivo = tenant.statusPagamento === 'ativo';
+    if (tenant.statusPagamento === 'ativo') return;
 
     const proxVencimento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    await db.update(tenants)
+    const [ativado] = await db.update(tenants)
       .set({ statusPagamento: 'ativo', proximoVencimento: proxVencimento })
-      .where(eq(tenants.id, tenant.id));
+      .where(and(
+        eq(tenants.id, tenant.id),
+        or(isNull(tenants.statusPagamento), ne(tenants.statusPagamento, 'ativo')),
+      ))
+      .returning({ id: tenants.id });
+    if (!ativado) return;
 
-    console.log(`[cobrança] ✅ Pago: ${tenant.nome} — próximo: ${proxVencimento.toLocaleDateString('pt-BR')}${jaAtivo ? ' (já ativo, mensagem suprimida)' : ''}`);
+    console.log(`[cobrança] Pagamento confirmado para tenant ${tenant.id}`);
 
-    // Só envia confirmação WhatsApp se o pagamento ainda não havia sido dado baixa manualmente
-    if (!jaAtivo && tenant.whatsappContato && tenant.whatsappNumberId && tenant.whatsappToken) {
+    if (tenant.whatsappContato && tenant.whatsappNumberId && tenant.whatsappToken) {
       const numero = tenant.whatsappContato.replace(/\D/g, '');
       const proxStr = proxVencimento.toLocaleDateString('pt-BR');
       const msg =

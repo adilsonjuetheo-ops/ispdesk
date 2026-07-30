@@ -73,7 +73,11 @@ export default function TenantLayout() {
   }, [user?.id]);
 
   usePushNotifications(!!user?.tenantId);
-  const handleLogout = () => { logout(); navigate('/login'); };
+  const handleLogout = async () => {
+    await api.post('/auth/logout').catch(() => {});
+    logout();
+    navigate('/login');
+  };
 
   const params = new URLSearchParams(location.search);
   const currentView = params.get('view');

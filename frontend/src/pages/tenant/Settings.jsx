@@ -451,7 +451,7 @@ export default function Settings() {
   const handleAlterarSenha = async e => {
     e.preventDefault();
     setErroSenha(''); setSucessoSenha('');
-    if (formSenha.novaSenha.length < 6) return setErroSenha('Nova senha: mínimo 6 caracteres');
+    if (formSenha.novaSenha.length < 10) return setErroSenha('Nova senha: mínimo 10 caracteres');
     if (formSenha.novaSenha !== formSenha.confirmar) return setErroSenha('As senhas não conferem');
     setSavingSenha(true);
     try {
@@ -838,7 +838,7 @@ export default function Settings() {
                 onChange={v => setFormSenha(f => ({ ...f, senhaAtual: v }))} />
               <Field label="Nova senha" type="password" value={formSenha.novaSenha}
                 onChange={v => setFormSenha(f => ({ ...f, novaSenha: v }))}
-                placeholder="Mínimo 6 caracteres" />
+                placeholder="Mínimo 10 caracteres" />
               <Field label="Confirmar nova senha" type="password" value={formSenha.confirmar}
                 onChange={v => setFormSenha(f => ({ ...f, confirmar: v }))} />
             </div>

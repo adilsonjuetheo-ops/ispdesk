@@ -86,6 +86,8 @@ export async function runMigrations() {
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS contrato_uuid text`;
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS contrato_status text`;
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS contrato_enviado_em timestamp`;
+    await sql`ALTER TABLE super_admins ADD COLUMN IF NOT EXISTS singleton boolean NOT NULL DEFAULT true`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_super_admin_singleton ON super_admins(singleton)`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

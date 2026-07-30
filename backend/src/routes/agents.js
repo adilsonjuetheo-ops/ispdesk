@@ -1,12 +1,22 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import { db } from '../db/index.js';
-import { tenantUsers } from '../db/schema.js';
+import { tenantUsers, filiais } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { autenticar, apenasAdmin, mesmotenant } from '../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
 router.use(autenticar, apenasAdmin, mesmotenant);
+
+async function filialValida(tenantId, filialId) {
+  if (!filialId) return true;
+  const [filial] = await db.select({ id: filiais.id }).from(filiais).where(and(
+    eq(filiais.id, filialId),
+    eq(filiais.tenantId, tenantId),
+    eq(filiais.ativo, true),
+  )).limit(1);
+  return !!filial;
+}
 
 router.get('/', async (req, res) => {
   const agentes = await db.select({
@@ -25,10 +35,13 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { nome, email, senha, role, filialId } = req.body;
   if (!nome || !email || !senha) return res.status(400).json({ erro: 'nome, email e senha obrigatórios' });
-  if (senha.length < 6) return res.status(400).json({ erro: 'Senha mínimo 6 caracteres' });
+  if (senha.length < 10) return res.status(400).json({ erro: 'Senha mínimo 10 caracteres' });
+  if (!await filialValida(req.params.tenantId, filialId)) {
+    return res.status(400).json({ erro: 'Filial inválida para este provedor' });
+  }
 
   const roleValido = ['agente', 'admin'].includes(role) ? role : 'agente';
-  const senhaHash = await bcrypt.hash(senha, 10);
+  const senhaHash = await bcrypt.hash(senha, 12);
 
   try {
     const [agente] = await db.insert(tenantUsers).values({
@@ -58,11 +71,14 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const { nome, email, senha, role, ativo, filialId } = req.body;
+  if (filialId !== undefined && !await filialValida(req.params.tenantId, filialId)) {
+    return res.status(400).json({ erro: 'Filial inválida para este provedor' });
+  }
   const updates = { nome, email, role, ativo, filialId: filialId || null };
 
   if (senha) {
-    if (senha.length < 6) return res.status(400).json({ erro: 'Senha mínimo 6 caracteres' });
-    updates.senhaHash = await bcrypt.hash(senha, 10);
+    if (senha.length < 10) return res.status(400).json({ erro: 'Senha mínimo 10 caracteres' });
+    updates.senhaHash = await bcrypt.hash(senha, 12);
   }
 
   Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);

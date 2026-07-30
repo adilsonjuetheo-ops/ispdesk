@@ -9,6 +9,9 @@ router.use(autenticar);
 
 router.get('/', async (req, res) => {
   const tenantId = req.params.tenantId;
+  if (req.user.role !== 'superadmin' && req.user.tenantId !== tenantId) {
+    return res.status(403).json({ erro: 'Acesso negado a este provedor' });
+  }
   try {
     const rows = await db.select().from(filiais)
       .where(eq(filiais.tenantId, tenantId))

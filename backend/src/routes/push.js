@@ -2,7 +2,7 @@ import { Router } from 'express';
 import webpush from 'web-push';
 import { db } from '../db/index.js';
 import { pushSubscriptions } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 
 const router = Router();
@@ -34,7 +34,10 @@ router.post('/subscribe', autenticar, async (req, res) => {
 router.delete('/subscribe', autenticar, async (req, res) => {
   const { endpoint } = req.body;
   if (endpoint) {
-    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+    await db.delete(pushSubscriptions).where(and(
+      eq(pushSubscriptions.endpoint, endpoint),
+      eq(pushSubscriptions.userId, req.user.id),
+    ));
   }
   res.json({ ok: true });
 });

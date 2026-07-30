@@ -7,7 +7,40 @@ import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { enviarNps } from '../services/nps.js';
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+import { criarRateLimit } from '../middleware/security.js';
+
+const MIME_TYPES_PERMITIDOS = new Set([
+  'image/jpeg', 'image/png', 'image/webp',
+  'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/webm',
+  'application/pdf', 'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (req, arquivo, callback) => {
+    if (!MIME_TYPES_PERMITIDOS.has(arquivo.mimetype)) {
+      return callback(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'arquivo'));
+    }
+    callback(null, true);
+  },
+});
+
+const limitarUpload = criarRateLimit({
+  janelaMs: 60_000,
+  limite: 60,
+  prefixo: 'upload-midia',
+  mensagem: 'Muitos uploads em pouco tempo. Aguarde antes de tentar novamente.',
+});
+
+function podeAcessarConversa(req, conversa) {
+  if (req.user.role === 'superadmin') return true;
+  if (conversa.tenantId !== req.user.tenantId) return false;
+  if (req.user.filialId && conversa.filialId !== req.user.filialId) return false;
+  return true;
+}
 
 const router = Router();
 router.use(autenticar);
@@ -22,18 +55,20 @@ router.use((req, res, next) => {
 router.get('/counts', async (req, res) => {
   const tenantId = req.user.tenantId;
   if (!tenantId) return res.json({ todos: 0, mine: 0, fila: 0, porFilial: {} });
+  const escopo = [eq(conversas.tenantId, tenantId), ne(conversas.status, 'encerrada')];
+  if (req.user.filialId) escopo.push(eq(conversas.filialId, req.user.filialId));
 
   const [r1] = await db.select({ total: count() }).from(conversas)
-    .where(and(eq(conversas.tenantId, tenantId), ne(conversas.status, 'encerrada')));
+    .where(and(...escopo));
 
   const [r2] = await db.select({ total: count() }).from(conversas)
-    .where(and(eq(conversas.tenantId, tenantId), eq(conversas.agenteId, req.user.id), eq(conversas.status, 'humano')));
+    .where(and(...escopo, eq(conversas.agenteId, req.user.id), eq(conversas.status, 'humano')));
 
   const [r3] = await db.select({ total: count() }).from(conversas)
-    .where(and(eq(conversas.tenantId, tenantId), inArray(conversas.status, ['aguardando', 'aguardando_filial'])));
+    .where(and(...escopo, inArray(conversas.status, ['aguardando', 'aguardando_filial'])));
 
   const filialRows = await db.select({ filialId: conversas.filialId, total: count() }).from(conversas)
-    .where(and(eq(conversas.tenantId, tenantId), ne(conversas.status, 'encerrada')))
+    .where(and(...escopo))
     .groupBy(conversas.filialId);
 
   const porFilial = {};
@@ -102,7 +137,7 @@ router.get('/:id/messages', async (req, res) => {
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
 
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) {
+  if (!podeAcessarConversa(req, conversa)) {
     return res.status(403).json({ erro: 'Acesso negado' });
   }
 
@@ -118,7 +153,7 @@ router.post('/:id/assume', async (req, res) => {
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
 
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) {
+  if (!podeAcessarConversa(req, conversa)) {
     return res.status(403).json({ erro: 'Acesso negado' });
   }
 
@@ -147,7 +182,7 @@ router.post('/:id/release', async (req, res) => {
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
 
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) {
+  if (!podeAcessarConversa(req, conversa)) {
     return res.status(403).json({ erro: 'Acesso negado' });
   }
 
@@ -169,7 +204,7 @@ router.post('/:id/close', async (req, res) => {
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
 
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) {
+  if (!podeAcessarConversa(req, conversa)) {
     return res.status(403).json({ erro: 'Acesso negado' });
   }
 
@@ -199,7 +234,7 @@ router.post('/:id/send', async (req, res) => {
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
 
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) {
+  if (!podeAcessarConversa(req, conversa)) {
     return res.status(403).json({ erro: 'Acesso negado' });
   }
   if (conversa.status !== 'humano') return res.status(400).json({ erro: 'Só agentes podem enviar mensagens em conversas humanas' });
@@ -235,14 +270,14 @@ router.post('/:id/send', async (req, res) => {
   res.json(msg);
 });
 
-router.post('/:id/send-media', upload.single('arquivo'), async (req, res) => {
+router.post('/:id/send-media', limitarUpload, upload.single('arquivo'), async (req, res) => {
   const { id } = req.params;
   const arquivo = req.file;
   if (!arquivo) return res.status(400).json({ erro: 'Arquivo obrigatório' });
 
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId)
+  if (!podeAcessarConversa(req, conversa))
     return res.status(403).json({ erro: 'Acesso negado' });
   if (conversa.status !== 'humano')
     return res.status(400).json({ erro: 'Só agentes podem enviar em conversas humanas' });
@@ -288,8 +323,13 @@ router.get('/:id/media/:mediaId', async (req, res) => {
   const { id, mediaId } = req.params;
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
   if (!conversa) return res.status(404).end();
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId)
+  if (!podeAcessarConversa(req, conversa))
     return res.status(403).end();
+
+  const [midiaVinculada] = await db.select({ id: mensagens.id }).from(mensagens)
+    .where(and(eq(mensagens.conversaId, id), eq(mensagens.midiaUrl, mediaId)))
+    .limit(1);
+  if (!midiaVinculada) return res.status(404).end();
 
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
   if (!tenant?.whatsappToken) return res.status(400).end();
@@ -307,7 +347,7 @@ router.get('/:id/media/:mediaId', async (req, res) => {
     if (!mediaRes.ok) return res.status(502).end();
 
     res.setHeader('Content-Type', mime_type || 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'private, no-store');
     const buffer = Buffer.from(await mediaRes.arrayBuffer());
     res.send(buffer);
   } catch {
@@ -323,7 +363,7 @@ router.post('/:id/note', async (req, res) => {
 
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId)
+  if (!podeAcessarConversa(req, conversa))
     return res.status(403).json({ erro: 'Acesso negado' });
 
   const [msg] = await db.insert(mensagens).values({
@@ -343,11 +383,18 @@ router.post('/:id/transfer', async (req, res) => {
 
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId)
+  if (!podeAcessarConversa(req, conversa))
     return res.status(403).json({ erro: 'Acesso negado' });
 
-  const [agente] = await db.select().from(tenantUsers).where(eq(tenantUsers.id, agenteId)).limit(1);
+  const [agente] = await db.select().from(tenantUsers).where(and(
+    eq(tenantUsers.id, agenteId),
+    eq(tenantUsers.tenantId, conversa.tenantId),
+    eq(tenantUsers.ativo, true),
+  )).limit(1);
   if (!agente) return res.status(404).json({ erro: 'Agente não encontrado' });
+  if (conversa.filialId && agente.filialId && agente.filialId !== conversa.filialId) {
+    return res.status(403).json({ erro: 'Agente não pertence à filial desta conversa' });
+  }
 
   await db.update(conversas)
     .set({ status: 'humano', agenteId })
@@ -370,7 +417,7 @@ router.patch('/:id/tags', async (req, res) => {
 
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId)
+  if (!podeAcessarConversa(req, conversa))
     return res.status(403).json({ erro: 'Acesso negado' });
 
   await db.update(conversas).set({ tags: JSON.stringify(tags) }).where(eq(conversas.id, id));

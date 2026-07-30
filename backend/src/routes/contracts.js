@@ -1,14 +1,27 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { conversas, clientes, tenants, mensagens } from '../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, ne, or, isNull } from 'drizzle-orm';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
 import { enviarContrato, buscarLinkAssinatura } from '../services/assinatura.js';
 import { enviarMensagem } from '../services/whatsapp.js';
 import { enviarPushParaUsuario, enviarPushParaTenant } from '../services/pushNotification.js';
 import { buscarDadosCliente } from '../services/sgp.js';
+import { criarRateLimit } from '../middleware/security.js';
 
 const router = Router();
+const limitarWebhookContrato = criarRateLimit({
+  janelaMs: 60_000,
+  limite: 120,
+  prefixo: 'webhook-contrato',
+});
+
+function podeAcessarContrato(req, conversa) {
+  if (req.user.role === 'superadmin') return true;
+  if (conversa.tenantId !== req.user.tenantId) return false;
+  if (req.user.filialId && conversa.filialId !== req.user.filialId) return false;
+  return true;
+}
 
 // Envia contrato para assinatura digital
 router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {
@@ -25,7 +38,7 @@ router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {
 
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, conversaId)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) return res.status(403).json({ erro: 'Acesso negado' });
+  if (!podeAcessarContrato(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
 
   if (conversa.contratoStatus === 'pendente') {
     return res.status(409).json({ erro: 'Já existe um contrato pendente de assinatura para esta conversa. Aguarde a assinatura do cliente.' });
@@ -72,7 +85,7 @@ router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {
 });
 
 // Webhook ZapSign — chamado quando documento é assinado
-router.post('/webhook/zapsign', async (req, res) => {
+router.post('/webhook/zapsign', limitarWebhookContrato, async (req, res) => {
   res.sendStatus(200); // responde rápido
 
   const payload = req.body;
@@ -85,11 +98,17 @@ router.post('/webhook/zapsign', async (req, res) => {
     const [conversa] = await db.select().from(conversas)
       .where(eq(conversas.contratoUuid, docToken)).limit(1);
     if (!conversa) return;
+    if (conversa.contratoStatus === 'assinado') return;
 
     if (status === 'signed' || payload?.event_action === 'all_signed') {
-      await db.update(conversas)
+      const [atualizada] = await db.update(conversas)
         .set({ contratoStatus: 'assinado' })
-        .where(eq(conversas.id, conversa.id));
+        .where(and(
+          eq(conversas.id, conversa.id),
+          or(isNull(conversas.contratoStatus), ne(conversas.contratoStatus, 'assinado')),
+        ))
+        .returning({ id: conversas.id });
+      if (!atualizada) return;
 
       const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
       const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
@@ -125,7 +144,7 @@ router.post('/webhook/zapsign', async (req, res) => {
 });
 
 // Webhook D4Sign — chamado quando documento é assinado
-router.post('/webhook/d4sign', async (req, res) => {
+router.post('/webhook/d4sign', limitarWebhookContrato, async (req, res) => {
   res.sendStatus(200);
 
   const payload = req.body;
@@ -138,11 +157,17 @@ router.post('/webhook/d4sign', async (req, res) => {
     const [conversa] = await db.select().from(conversas)
       .where(eq(conversas.contratoUuid, docUuid)).limit(1);
     if (!conversa) return;
+    if (conversa.contratoStatus === 'assinado') return;
 
     if (type === '1' || payload?.type === '1') {
-      await db.update(conversas)
+      const [atualizada] = await db.update(conversas)
         .set({ contratoStatus: 'assinado' })
-        .where(eq(conversas.id, conversa.id));
+        .where(and(
+          eq(conversas.id, conversa.id),
+          or(isNull(conversas.contratoStatus), ne(conversas.contratoStatus, 'assinado')),
+        ))
+        .returning({ id: conversas.id });
+      if (!atualizada) return;
 
       const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
       const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
@@ -184,7 +209,7 @@ router.post('/:conversaId/resend-link', autenticar, apenasAdmin, async (req, res
 
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, conversaId)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) return res.status(403).json({ erro: 'Acesso negado' });
+  if (!podeAcessarContrato(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
   if (conversa.contratoStatus !== 'pendente') return res.status(400).json({ erro: 'Não há contrato pendente para esta conversa.' });
 
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
@@ -208,7 +233,7 @@ router.get('/:conversaId/prefill', autenticar, apenasAdmin, async (req, res) => 
 
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, conversaId)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
-  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) return res.status(403).json({ erro: 'Acesso negado' });
+  if (!podeAcessarContrato(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
 
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
   const [tenant]  = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);

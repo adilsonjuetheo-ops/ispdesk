@@ -1,3 +1,5 @@
+import { validarUrlSgp } from '../urlSegura.js';
+
 export class SgpAdaptador {
   constructor(tenant) {
     this.tenant = tenant;
@@ -26,6 +28,10 @@ export class SgpAdaptador {
 
   async executarTool(toolName, toolInput) {
     throw new Error(`${this.constructor.name}: executarTool não implementado`);
+  }
+
+  async validarApiUrl() {
+    return validarUrlSgp(this.apiUrl);
   }
 
   normalizarTelefone(tel) {

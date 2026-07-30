@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { db } from '../db/index.js';
 import { npsRespostas, clientes } from '../db/schema.js';
 import { eq, and, desc, isNotNull } from 'drizzle-orm';
-import { autenticar } from '../middleware/auth.js';
+import { autenticar, apenasAdmin } from '../middleware/auth.js';
 
 const router = Router();
-router.use(autenticar);
+router.use(autenticar, apenasAdmin);
 
 router.get('/', async (req, res) => {
   const tenantId = req.user.tenantId;

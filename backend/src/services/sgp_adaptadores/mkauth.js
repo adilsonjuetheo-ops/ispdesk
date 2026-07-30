@@ -3,7 +3,8 @@ import { SgpAdaptador } from './base.js';
 export class MkAuthAdaptador extends SgpAdaptador {
 
   async #get(endpoint, params = {}) {
-    const url = new URL(`${this.apiUrl.replace(/\/$/, '')}${endpoint}`);
+    const base = await this.validarApiUrl();
+    const url = new URL(endpoint.replace(/^\//, ''), `${base.toString().replace(/\/$/, '')}/`);
     url.searchParams.set('authtoken', this.apiKey);
     for (const [k, v] of Object.entries(params)) {
       if (v != null) url.searchParams.set(k, String(v));
@@ -14,7 +15,9 @@ export class MkAuthAdaptador extends SgpAdaptador {
   }
 
   async #post(endpoint, body = {}) {
-    const res = await fetch(`${this.apiUrl.replace(/\/$/, '')}${endpoint}`, {
+    const base = await this.validarApiUrl();
+    const url = new URL(endpoint.replace(/^\//, ''), `${base.toString().replace(/\/$/, '')}/`);
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
