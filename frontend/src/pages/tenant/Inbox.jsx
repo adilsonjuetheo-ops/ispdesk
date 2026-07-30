@@ -116,7 +116,7 @@ function WelcomePanel({ currentUser }) {
 }
 
 export default function Inbox() {
-  const { online = [], currentUser } = useOutletContext() || {};
+  const { online = [], currentUser, onOpenSidebar } = useOutletContext() || {};
   const [conversas, setConversas] = useState([]);
   const [selecionada, setSelecionada] = useState(null);
   const [slaMinutos, setSlaMinutos] = useState(0);
@@ -157,24 +157,35 @@ export default function Inbox() {
 
   return (
     <div className="flex h-full">
-      <ConversationList
-        conversas={conversas}
-        selecionada={selecionada}
-        onSelecionar={setSelecionada}
-        view={filialId ? 'filial' : view}
-        filialId={filialId}
-        online={online}
-        currentUser={currentUser}
-        slaMinutos={slaMinutos}
-      />
+      {/* Lista — ocupa tela toda no mobile quando não há conversa selecionada */}
+      <div className={`h-full ${selecionada ? 'hidden md:block' : 'flex-1 md:flex-none'}`}>
+        <ConversationList
+          conversas={conversas}
+          selecionada={selecionada}
+          onSelecionar={setSelecionada}
+          view={filialId ? 'filial' : view}
+          filialId={filialId}
+          online={online}
+          currentUser={currentUser}
+          slaMinutos={slaMinutos}
+          onOpenSidebar={onOpenSidebar}
+        />
+      </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      {/* Chat/Welcome — escondido no mobile quando nenhuma conversa está aberta */}
+      <div className={`flex-1 flex overflow-hidden ${!selecionada ? 'hidden md:flex' : ''}`}>
         {selecionada ? (
           <>
             <div className="flex-1 overflow-hidden">
-              <ChatWindow conversa={selecionada} onAtualizar={carregarConversas} />
+              <ChatWindow
+                conversa={selecionada}
+                onAtualizar={carregarConversas}
+                onVoltar={() => setSelecionada(null)}
+              />
             </div>
-            <ClientInfoPanel conversa={selecionada} onAtualizar={carregarConversas} />
+            <div className="hidden md:block">
+              <ClientInfoPanel conversa={selecionada} onAtualizar={carregarConversas} />
+            </div>
           </>
         ) : (
           <WelcomePanel currentUser={currentUser} />

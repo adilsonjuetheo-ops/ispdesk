@@ -5,7 +5,7 @@ import { usePolling } from '../../hooks/usePolling.js';
 import { usePushNotifications } from '../../hooks/usePushNotifications.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
-  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap, AlertTriangle, Star,
+  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap, AlertTriangle, Star, X,
 } from 'lucide-react';
 import api from '../../lib/api.js';
 
@@ -24,6 +24,7 @@ export default function TenantLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tenant, setTenant] = useState(null);
   const [filiais, setFiliais] = useState([]);
   const [counts, setCounts] = useState({ todos: 0, mine: 0, fila: 0, porFilial: {} });
@@ -72,6 +73,9 @@ export default function TenantLayout() {
     return () => { clearInterval(pingId); clearInterval(pollId); };
   }, [user?.id]);
 
+  // Fecha sidebar ao navegar no mobile
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname, location.search]);
+
   usePushNotifications(!!user?.tenantId);
   const handleLogout = async () => {
     await api.post('/auth/logout').catch(() => {});
@@ -115,8 +119,25 @@ export default function TenantLayout() {
   const cor = tenant?.corPrimaria || '#0066CC';
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col select-none">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+
+      {/* Backdrop mobile */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-20 bg-black/50 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside className={`
+        fixed md:static inset-y-0 left-0 z-30 h-full
+        w-72 md:w-56 bg-white border-r border-gray-200 flex flex-col select-none
+        transition-transform duration-200 ease-in-out
+        ${sidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full md:translate-x-0'}
+      `}>
+        {/* Botão fechar — mobile only */}
+        <button onClick={() => setSidebarOpen(false)}
+          className="absolute top-3 right-3 md:hidden p-1 text-gray-400 hover:text-gray-700 transition-colors">
+          <X className="w-5 h-5" />
+        </button>
+
         {/* logo / nome do provedor */}
         <div className="p-4 border-b border-gray-200">
           {tenant?.logoUrl ? (
@@ -265,7 +286,7 @@ export default function TenantLayout() {
           </div>
         )}
         <div className="flex-1 overflow-hidden">
-          <Outlet context={{ online, currentUser: user }} />
+          <Outlet context={{ online, currentUser: user, onOpenSidebar: () => setSidebarOpen(true) }} />
         </div>
       </main>
     </div>

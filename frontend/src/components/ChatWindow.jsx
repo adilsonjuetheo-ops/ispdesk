@@ -7,7 +7,7 @@ import {
   Send, UserCheck, Bot, X, Loader2, Paperclip, FileText,
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
-  List, ListOrdered, Plus,
+  List, ListOrdered, Plus, ArrowLeft,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -294,7 +294,7 @@ function TransferModal({ conversa, tenantId, onClose, onTransferred }) {
   );
 }
 
-export default function ChatWindow({ conversa, onAtualizar }) {
+export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
   const { user } = useAuth();
   const [msgs, setMsgs] = useState([]);
   const [texto, setTexto] = useState('');
@@ -538,9 +538,17 @@ export default function ChatWindow({ conversa, onAtualizar }) {
       {/* header */}
       <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-gray-800">{conversa.clienteNome || conversa.clienteWhatsapp}</p>
-            <p className="text-xs text-gray-400">{conversa.clienteWhatsapp}{conversa.clienteFilial ? ` · ${conversa.clienteFilial}` : ''}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            {onVoltar && (
+              <button onClick={onVoltar}
+                className="md:hidden shrink-0 p-1 -ml-1 text-gray-500 hover:text-gray-800 transition-colors">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
+            <div className="min-w-0">
+              <p className="font-semibold text-gray-800 truncate">{conversa.clienteNome || conversa.clienteWhatsapp}</p>
+              <p className="text-xs text-gray-400 truncate">{conversa.clienteWhatsapp}{conversa.clienteFilial ? ` · ${conversa.clienteFilial}` : ''}</p>
+            </div>
           </div>
           <div className="flex gap-2 items-center">
             {eHumano && (

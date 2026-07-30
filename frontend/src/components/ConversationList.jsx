@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { differenceInMinutes } from 'date-fns';
 import clsx from 'clsx';
-import { Search, Check, User } from 'lucide-react';
+import { Search, Check, User, Menu } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.js';
 
 const AVATAR_COLORS = [
@@ -130,7 +130,7 @@ function PreviewMsg({ c }) {
   return <span className="truncate">{ultimaMensagem}</span>;
 }
 
-export default function ConversationList({ conversas, selecionada, onSelecionar, view = 'todos', filialId, online = [], currentUser, slaMinutos = 0 }) {
+export default function ConversationList({ conversas, selecionada, onSelecionar, view = 'todos', filialId, online = [], currentUser, slaMinutos = 0, onOpenSidebar }) {
   const { user } = useAuth();
   const [busca, setBusca] = useState('');
   const filtrados = filtrar(conversas, view, filialId, user?.id, busca);
@@ -149,10 +149,17 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
   const isPendente = c => c.status === 'aguardando' || c.status === 'aguardando_filial';
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-gray-200" style={{ width: 296 }}>
+    <div className="flex flex-col h-full bg-white border-r border-gray-200 w-full md:w-[296px]">
       <div className="px-4 pt-4 pb-3 border-b border-gray-100">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-800">{VIEW_LABEL[view] || 'Conversas'}</h2>
+          <div className="flex items-center gap-2">
+            {onOpenSidebar && (
+              <button onClick={onOpenSidebar} className="md:hidden p-1 -ml-1 text-gray-500 hover:text-gray-800 transition-colors">
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
+            <h2 className="text-sm font-semibold text-gray-800">{VIEW_LABEL[view] || 'Conversas'}</h2>
+          </div>
           <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{filtrados.length}</span>
         </div>
         <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2">
