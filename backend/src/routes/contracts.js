@@ -5,6 +5,8 @@ import { eq, and } from 'drizzle-orm';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
 import { enviarContrato } from '../services/assinatura.js';
 import { enviarMensagem } from '../services/whatsapp.js';
+import { enviarPushParaUsuario, enviarPushParaTenant } from '../services/pushNotification.js';
+import { buscarDadosCliente } from '../services/sgp.js';
 
 const router = Router();
 
@@ -24,6 +26,10 @@ router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, conversaId)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
   if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) return res.status(403).json({ erro: 'Acesso negado' });
+
+  if (conversa.contratoStatus === 'pendente') {
+    return res.status(409).json({ erro: 'Já existe um contrato pendente de assinatura para esta conversa. Aguarde a assinatura do cliente.' });
+  }
 
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
@@ -94,6 +100,18 @@ router.post('/webhook/zapsign', async (req, res) => {
         conteudo: '[Sistema] Contrato assinado digitalmente com sucesso!',
       });
 
+      const nomeCliente = cliente?.nome || cliente?.whatsapp || 'Cliente';
+      const pushPayload = {
+        title: '✅ Contrato assinado!',
+        body: `${nomeCliente} assinou o contrato digital.`,
+        tag: `contrato-${conversa.id}`,
+      };
+      if (conversa.agenteId) {
+        enviarPushParaUsuario(conversa.agenteId, conversa.tenantId, pushPayload).catch(() => {});
+      } else {
+        enviarPushParaTenant(conversa.tenantId, pushPayload).catch(() => {});
+      }
+
       if (tenant?.whatsappToken && cliente?.whatsapp) {
         await enviarMensagem(
           tenant, cliente.whatsapp,
@@ -135,6 +153,19 @@ router.post('/webhook/d4sign', async (req, res) => {
         conteudo: '[Sistema] Contrato assinado digitalmente com sucesso!',
       });
 
+      // Push para o agente responsável (ou broadcast para o tenant)
+      const nomeCliente = cliente?.nome || cliente?.whatsapp || 'Cliente';
+      const pushPayload = {
+        title: '✅ Contrato assinado!',
+        body: `${nomeCliente} assinou o contrato digital.`,
+        tag: `contrato-${conversa.id}`,
+      };
+      if (conversa.agenteId) {
+        enviarPushParaUsuario(conversa.agenteId, conversa.tenantId, pushPayload).catch(() => {});
+      } else {
+        enviarPushParaTenant(conversa.tenantId, pushPayload).catch(() => {});
+      }
+
       if (tenant?.whatsappToken && cliente?.whatsapp) {
         await enviarMensagem(
           tenant, cliente.whatsapp,
@@ -145,6 +176,51 @@ router.post('/webhook/d4sign', async (req, res) => {
   } catch (err) {
     console.error('[Webhook D4Sign]', err.message);
   }
+});
+
+// Prefill: retorna dados disponíveis do cliente para pré-preencher o modal de contrato
+router.get('/:conversaId/prefill', autenticar, apenasAdmin, async (req, res) => {
+  const { conversaId } = req.params;
+
+  const [conversa] = await db.select().from(conversas).where(eq(conversas.id, conversaId)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (req.user.role !== 'superadmin' && conversa.tenantId !== req.user.tenantId) return res.status(403).json({ erro: 'Acesso negado' });
+
+  const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+  const [tenant]  = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+
+  const prefill = {
+    nome_contratante: cliente?.nome || '',
+    telefone:         cliente?.whatsapp || '',
+    email:            '',
+    identificacao_oferta: '',
+    mensalidade:          '',
+    velocidade_download:  '',
+    velocidade_upload:    '',
+  };
+
+  // Dados adicionais do SGP
+  try {
+    const dadosSgp = await buscarDadosCliente(tenant, cliente?.whatsapp);
+    if (dadosSgp?.nome) prefill.nome_contratante = dadosSgp.nome;
+  } catch {}
+
+  // Dados do plano coletados pelo bot no handoff
+  if (conversa.motivoHandoff?.startsWith('CONTRATO|')) {
+    for (const part of conversa.motivoHandoff.split('|').slice(1)) {
+      const idx = part.indexOf(':');
+      if (idx === -1) continue;
+      const k = part.slice(0, idx);
+      const v = part.slice(idx + 1);
+      if (k === 'plano')    prefill.identificacao_oferta = v;
+      if (k === 'valor')    prefill.mensalidade = v;
+      if (k === 'email')    prefill.email = v;
+      if (k === 'download') prefill.velocidade_download = v;
+      if (k === 'upload')   prefill.velocidade_upload = v;
+    }
+  }
+
+  res.json(prefill);
 });
 
 export default router;

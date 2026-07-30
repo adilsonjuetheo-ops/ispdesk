@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Phone, Fingerprint, ChevronDown, User, X, Plus, MapPin, FileSignature, CheckCircle2, Clock } from 'lucide-react';
 import api from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
@@ -48,6 +48,7 @@ function Section({ title, children, defaultOpen = true }) {
 function ContratoModal({ conversa, onClose, onEnviado }) {
   const nomeInicial = conversa.clienteNome && !/^\d+$/.test(conversa.clienteNome) ? conversa.clienteNome : '';
   const [enviando, setEnviando] = useState(false);
+  const [carregandoPrefill, setCarregandoPrefill] = useState(true);
   const [erro, setErro] = useState('');
   const [dados, setDados] = useState({
     nome_contratante: nomeInicial,
@@ -61,6 +62,22 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
     forma_pagamento: 'PIX', modalidade_equipamento: 'comodato',
     nome_representante: '', numero_anatel: '',
   });
+
+  useEffect(() => {
+    api.get(`/contracts/${conversa.id}/prefill`)
+      .then(r => {
+        setDados(prev => {
+          const next = { ...prev };
+          // Só sobrescreve campos vazios com dados do prefill
+          for (const [k, v] of Object.entries(r.data)) {
+            if (v && !next[k]) next[k] = v;
+          }
+          return next;
+        });
+      })
+      .catch(() => {})
+      .finally(() => setCarregandoPrefill(false));
+  }, [conversa.id]);
 
   const set = (k, v) => setDados(p => ({ ...p, [k]: v }));
   const field = (label, key, opts = {}) => (
@@ -100,6 +117,7 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
           <div className="flex items-center gap-2">
             <FileSignature className="w-4 h-4 text-blue-600" />
             <span className="font-semibold text-gray-800 text-sm">Enviar Contrato</span>
+            {carregandoPrefill && <span className="text-[10px] text-blue-400 animate-pulse">Buscando dados...</span>}
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X className="w-4 h-4" /></button>
         </div>

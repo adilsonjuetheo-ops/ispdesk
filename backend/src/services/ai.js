@@ -28,6 +28,13 @@ ${temSgp ? `- Use apenas os dados fornecidos pelo SGP acima. Nunca invente infor
 - Ao receber o CPF ou CNPJ: use a ferramenta buscar_por_documento imediatamente.
 - Se o cliente NÃO for encontrado mesmo com CPF/CNPJ (cliente novo): informe que vai transferir para um atendente realizar o cadastro e escreva ACTION:HANDOFF:cliente novo — encaminhar para cadastro
 - NUNCA envie formulários de cadastro — isso é responsabilidade exclusiva do atendente humano.` : ''}
+
+FLUXO DE NOVA ADESÃO (contrato):
+- Quando o cliente demonstrar interesse em assinar um plano ou contratar internet, colete as seguintes informações em ordem natural na conversa: nome do plano/velocidade desejada, valor mensal combinado e e-mail do cliente (para receber o contrato digital).
+- Quando tiver coletado nome do plano, valor E e-mail, confirme com o cliente: "Perfeito! Vou transferir para um atendente que enviará o contrato digital para [e-mail]. Pode confirmar?"
+- Após confirmação do cliente, diga "Estou transferindo agora!" e escreva na última linha: ACTION:HANDOFF:CONTRATO|plano:[nome do plano]|valor:[valor sem R$]|email:[email]|download:[velocidade download em Mbps]|upload:[velocidade upload em Mbps]
+- Exemplo: ACTION:HANDOFF:CONTRATO|plano:FIBRA 300MB|valor:89,90|email:cliente@email.com|download:300|upload:150
+- Se não souber a velocidade de upload, use metade do download como estimativa.
 ${primeiraMsg ? `- Na PRIMEIRA mensagem do cliente, identifique o assunto principal e inclua ao final da resposta (linha separada): TAG:categoria — onde categoria é exatamente uma de: ${TAGS_VALIDAS.join(', ')}.` : ''}
 
 PROVEDOR: ${tenant.nome}
