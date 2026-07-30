@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { npsRespostas, clientes } from '../db/schema.js';
+import { npsRespostas, clientes, mensagens } from '../db/schema.js';
 import { eq, and, gt } from 'drizzle-orm';
 import { enviarMensagem } from './whatsapp.js';
 
@@ -34,6 +34,13 @@ export async function enviarNps(tenant, conversa, clienteId, clienteWhatsapp) {
     console.error('[NPS] Erro ao enviar:', err.message);
     return;
   }
+
+  // Registra a pergunta NPS no histórico da conversa
+  await db.insert(mensagens).values({
+    conversaId: conversa.id,
+    origem: 'bot',
+    conteudo: msg,
+  }).catch(() => {});
 
   await db.insert(npsRespostas).values({
     tenantId: tenant.id,
@@ -75,6 +82,12 @@ export async function processarRespostaNps(tenant, remetente, texto) {
 
   try {
     await enviarMensagem(tenant, remetente, agradecimentos[categoria]);
+    // Registra o agradecimento no histórico da conversa
+    await db.insert(mensagens).values({
+      conversaId: pendente.conversaId,
+      origem: 'bot',
+      conteudo: agradecimentos[categoria],
+    }).catch(() => {});
   } catch {}
 
   console.log(`[NPS] ${remetente} respondeu ${nota} (${categoria})`);
