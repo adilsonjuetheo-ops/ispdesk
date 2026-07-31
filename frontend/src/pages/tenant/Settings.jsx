@@ -571,6 +571,9 @@ export default function Settings() {
   const [savingFilial, setSavingFilial] = useState(false);
   const [erroFilial, setErroFilial] = useState('');
 
+  const [conectandoFilialId, setConectandoFilialId] = useState(null);
+  const [erroFilialWpp, setErroFilialWpp] = useState({});
+
   const [formSenha, setFormSenha] = useState({ senhaAtual: '', novaSenha: '', confirmar: '' });
   const [savingSenha, setSavingSenha] = useState(false);
   const [sucessoSenha, setSucessoSenha] = useState('');
@@ -616,6 +619,57 @@ export default function Settings() {
     await api.delete(`/tenants/${user.tenantId}/filiais/${id}`);
     carregarFiliais();
     sinalizarMudancaFiliais();
+  };
+
+  const handleConectarFilial = async (filialId) => {
+    setErroFilialWpp(e => ({ ...e, [filialId]: '' }));
+    if (!import.meta.env.VITE_META_APP_ID) {
+      setErroFilialWpp(e => ({ ...e, [filialId]: 'VITE_META_APP_ID não configurado' }));
+      return;
+    }
+    setConectandoFilialId(filialId);
+    try {
+      await carregarFbSdk();
+      await new Promise((resolve, reject) => {
+        window.FB.login(async (response) => {
+          if (!response.authResponse?.code) {
+            reject(new Error('Login cancelado'));
+            return;
+          }
+          try {
+            const { code } = response.authResponse;
+            const sessionInfo = response.authResponse.data_access_expiration_time
+              ? null
+              : response.authResponse;
+            const wabaId = sessionInfo?.waba_id || null;
+            const phoneNumberId = sessionInfo?.phone_number_id || null;
+            await api.post(`/whatsapp/embedded-signup-filial/${filialId}`, { code, wabaId, phoneNumberId });
+            carregarFiliais();
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        }, {
+          config_id: import.meta.env.VITE_META_APP_ID,
+          response_type: 'code',
+          override_default_response_type: true,
+          extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
+        });
+      });
+    } catch (err) {
+      setErroFilialWpp(e => ({ ...e, [filialId]: err.response?.data?.erro || err.message || 'Erro ao conectar' }));
+    } finally {
+      setConectandoFilialId(null);
+    }
+  };
+
+  const handleDesconectarFilial = async (filialId) => {
+    try {
+      await api.delete(`/whatsapp/desconectar-filial/${filialId}`);
+      carregarFiliais();
+    } catch (err) {
+      setErroFilialWpp(e => ({ ...e, [filialId]: err.response?.data?.erro || 'Erro ao desconectar' }));
+    }
   };
 
   const set = (campo, valor) => setTenant(t => ({ ...t, [campo]: valor }));
@@ -880,16 +934,41 @@ export default function Settings() {
             {filiais.filter(f => f.ativo).length > 0 && (
               <div className="mb-4 space-y-2">
                 {filiais.filter(f => f.ativo).map(f => (
-                  <div key={f.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-indigo-500" />
-                      <span className="text-sm font-medium text-gray-800">{f.nome}</span>
-                      <span className="text-xs text-gray-400">{f.cidade}{f.uf ? ` — ${f.uf}` : ''}</span>
+                  <div key={f.id} className="bg-gray-50 rounded-lg border border-gray-200 px-3 py-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-indigo-500" />
+                        <span className="text-sm font-medium text-gray-800">{f.nome}</span>
+                        <span className="text-xs text-gray-400">{f.cidade}{f.uf ? ` — ${f.uf}` : ''}</span>
+                        {f.whatsappConectado
+                          ? <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 border border-green-200 rounded-full px-2 py-0.5"><Wifi className="w-3 h-3" /> WhatsApp</span>
+                          : null}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {f.whatsappConectado ? (
+                          <button type="button" onClick={() => handleDesconectarFilial(f.id)}
+                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors">
+                            <WifiOff className="w-3 h-3" /> Desconectar
+                          </button>
+                        ) : (
+                          <button type="button" onClick={() => handleConectarFilial(f.id)}
+                            disabled={conectandoFilialId === f.id}
+                            className="flex items-center gap-1 text-xs text-[#25D366] hover:text-[#1ebe5d] disabled:opacity-50 transition-colors font-medium">
+                            {conectandoFilialId === f.id
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <Wifi className="w-3 h-3" />}
+                            Conectar WhatsApp
+                          </button>
+                        )}
+                        <button type="button" onClick={() => handleRemoverFilial(f.id)}
+                          className="text-gray-400 hover:text-red-500 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <button type="button" onClick={() => handleRemoverFilial(f.id)}
-                      className="text-gray-400 hover:text-red-500 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {erroFilialWpp[f.id] && (
+                      <p className="text-xs text-red-500 mt-1">{erroFilialWpp[f.id]}</p>
+                    )}
                   </div>
                 ))}
               </div>
