@@ -16,6 +16,7 @@ import cobrancaRouter from './routes/cobranca.js';
 import npsRouter from './routes/nps.js';
 import whatsappRouter from './routes/whatsapp.js';
 import contractsRouter from './routes/contracts.js';
+import incidentesRouter from './routes/incidentes.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
 import { agendarCobrancaRecorrente } from './jobs/cobrancaRecorrente.js';
@@ -74,6 +75,7 @@ app.use('/api/whatsapp', whatsappRouter);
 app.use('/api', cobrancaRouter);
 app.use('/api/nps', npsRouter);
 app.use('/api/contracts', contractsRouter);
+app.use('/api/incidentes', incidentesRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

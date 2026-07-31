@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight } from 'lucide-react';
 
 function carregarFbSdk() {
   return new Promise((resolve) => {
@@ -432,6 +432,124 @@ function TagsSection() {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
           Adicionar
         </button>
+      </div>
+    </section>
+  );
+}
+
+function RoteamentoSection() {
+  const { user } = useAuth();
+  const [regras, setRegras] = useState([]);
+  const [filiais, setFiliais] = useState([]);
+  const [agentes, setAgentes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [nova, setNova] = useState({ nome: '', tipo: 'keyword', valor: '', acao: 'filial', destinoId: '' });
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/tenants/me/horarios'),
+      api.get(`/tenants/${user.tenantId}/filiais`),
+      api.get(`/tenants/${user.tenantId}/agents`),
+    ]).then(([h, f, a]) => {
+      setRegras(h.data?.regrasRoteamento || []);
+      setFiliais((f.data || []).filter(x => x.ativo));
+      setAgentes((a.data || []).filter(x => x.ativo));
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const salvar = async (novas) => {
+    setSaving(true);
+    try {
+      const { data: atual } = await api.get('/tenants/me/horarios');
+      await api.put('/tenants/me/horarios', { horarios: { ...(atual || {}), regrasRoteamento: novas } });
+      setRegras(novas);
+    } finally { setSaving(false); }
+  };
+
+  const adicionar = async () => {
+    if (!nova.nome.trim() || !nova.valor.trim() || !nova.destinoId) return;
+    const id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+    await salvar([...regras, { ...nova, id, ativo: true }]);
+    setNova({ nome: '', tipo: 'keyword', valor: '', acao: 'filial', destinoId: '' });
+  };
+
+  const remover = (id) => salvar(regras.filter(r => r.id !== id));
+  const toggleAtivo = (id) => salvar(regras.map(r => r.id === id ? { ...r, ativo: !r.ativo } : r));
+
+  const destinos = nova.acao === 'filial' ? filiais : agentes;
+
+  if (loading) return null;
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-5 mt-5">
+      <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+        <GitBranch className="w-4 h-4 text-purple-500" /> Roteamento Automático
+      </h2>
+      <p className="text-xs text-gray-400 mb-4">
+        Crie regras para direcionar atendimentos a filiais ou agentes específicos com base em palavras-chave na mensagem do cliente. A primeira regra que casar vence.
+      </p>
+
+      {regras.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {regras.map(r => {
+            const destinoLista = r.acao === 'filial' ? filiais : agentes;
+            const destinoNome = destinoLista.find(d => d.id === r.destinoId)?.nome || r.destinoId;
+            return (
+              <div key={r.id}
+                className={`flex items-start gap-3 p-3 rounded-lg border transition-opacity ${r.ativo !== false ? 'bg-gray-50 border-gray-200' : 'bg-gray-50/50 border-gray-100 opacity-50'}`}>
+                <button type="button" onClick={() => toggleAtivo(r.id)} className="mt-0.5 shrink-0 transition-colors">
+                  {r.ativo !== false
+                    ? <ToggleRight className="w-5 h-5 text-purple-600" />
+                    : <ToggleLeft className="w-5 h-5 text-gray-300" />
+                  }
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{r.nome}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Palavras: <code className="bg-gray-100 px-1 rounded text-gray-700">{r.valor}</code>
+                    {' → '}
+                    <span className={r.acao === 'filial' ? 'text-indigo-600' : 'text-amber-600'}>
+                      {r.acao === 'filial' ? 'Filial' : 'Agente'}: {destinoNome}
+                    </span>
+                  </p>
+                </div>
+                <button type="button" onClick={() => remover(r.id)}
+                  className="text-gray-300 hover:text-red-500 transition-colors shrink-0 mt-0.5">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="border border-dashed border-purple-200 rounded-lg p-3 space-y-2 bg-purple-50/30">
+        <p className="text-xs font-medium text-purple-700">Nova regra</p>
+        <input type="text" value={nova.nome} onChange={e => setNova(n => ({ ...n, nome: e.target.value }))}
+          placeholder="Nome da regra (ex: Suporte Fibra)"
+          className="w-full border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+        <input type="text" value={nova.valor} onChange={e => setNova(n => ({ ...n, valor: e.target.value }))}
+          placeholder="Palavras-chave separadas por vírgula: fibra, cabo, sem internet, lento"
+          className="w-full border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+        <div className="flex gap-2 flex-wrap">
+          <select value={nova.acao} onChange={e => setNova(n => ({ ...n, acao: e.target.value, destinoId: '' }))}
+            className="border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+            <option value="filial">→ Filial</option>
+            <option value="agente">→ Agente</option>
+          </select>
+          <select value={nova.destinoId} onChange={e => setNova(n => ({ ...n, destinoId: e.target.value }))}
+            className="flex-1 min-w-36 border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+            <option value="">Selecionar destino...</option>
+            {destinos.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
+          </select>
+          <button type="button" onClick={adicionar}
+            disabled={saving || !nova.nome.trim() || !nova.valor.trim() || !nova.destinoId}
+            className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium shrink-0 transition-colors">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            Adicionar
+          </button>
+        </div>
       </div>
     </section>
   );
@@ -917,6 +1035,7 @@ export default function Settings() {
         {/* Fora do form principal */}
         <HorariosSection />
         <TagsSection />
+        <RoteamentoSection />
 
         <form onSubmit={handleAlterarSenha} className="mt-5">
           <section className="bg-white rounded-xl border border-gray-200 p-5">

@@ -88,6 +88,19 @@ export async function runMigrations() {
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS contrato_enviado_em timestamp`;
     await sql`ALTER TABLE super_admins ADD COLUMN IF NOT EXISTS singleton boolean NOT NULL DEFAULT true`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_super_admin_singleton ON super_admins(singleton)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS incidentes (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        titulo text NOT NULL,
+        descricao text,
+        mensagem_bot text,
+        status text DEFAULT 'ativo',
+        criado_em timestamp DEFAULT now(),
+        resolvido_em timestamp
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_incidentes_tenant ON incidentes(tenant_id, status)`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

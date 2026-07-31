@@ -153,6 +153,17 @@ export const npsRespostas = pgTable('nps_respostas', {
   respondidoEm:    timestamp('respondido_em'),
 });
 
+export const incidentes = pgTable('incidentes', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  tenantId:    uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  titulo:      text('titulo').notNull(),
+  descricao:   text('descricao'),
+  mensagemBot: text('mensagem_bot'),
+  status:      text('status').default('ativo'),
+  criadoEm:   timestamp('criado_em').defaultNow(),
+  resolvidoEm: timestamp('resolvido_em'),
+});
+
 export const usoIa = pgTable('uso_ia', {
   tenantId:        uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   mes:             text('mes').notNull(), // YYYY-MM

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { tenants, clientes, conversas, mensagens, webhookLog, filiais } from '../db/schema.js';
+import { tenants, clientes, conversas, mensagens, webhookLog, filiais, incidentes } from '../db/schema.js';
 import { eq, and, ne } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { buscarDadosCliente } from '../services/sgp.js';
@@ -259,6 +259,20 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
   // Se humano está atendendo, não aciona IA
   if (conversa.status === 'humano') return;
 
+  // Verifica incidente ativo — responde automaticamente ao cliente
+  const [incidenteAtivo] = await db.select().from(incidentes)
+    .where(and(eq(incidentes.tenantId, tenant.id), eq(incidentes.status, 'ativo')))
+    .orderBy(incidentes.criadoEm)
+    .limit(1);
+  if (incidenteAtivo) {
+    const msg = incidenteAtivo.mensagemBot ||
+      `⚠️ *${incidenteAtivo.titulo}*\n\nEstamos cientes do problema e nossa equipe já está trabalhando na solução. Pedimos desculpas pelo transtorno.`;
+    await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msg });
+    await atualizarUltMsg(conversa.id, msg, 'bot');
+    try { await enviarMensagem(tenant, remetente, msg); } catch {}
+    return;
+  }
+
   // Verifica horário de atendimento
   if (!dentroDoHorario(tenant.horarios)) {
     const msg = tenant.horarios?.msgForaHorario ||
@@ -290,7 +304,22 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
         await db.update(conversas).set({ filialId }).where(eq(conversas.id, conversa.id));
         conversa = { ...conversa, filialId };
       }
-      // Sem match automático: prossegue sem filial — SGP fará o roteamento quando integrado
+      // Sem match automático: tenta roteamento por palavra-chave se disponível
+      if (!filialId) {
+        const regrasFilial = (tenant.horarios?.regrasRoteamento || [])
+          .filter(r => r.ativo !== false && r.acao === 'filial' && r.tipo === 'keyword');
+        if (regrasFilial.length > 0) {
+          const textoLower = texto.toLowerCase();
+          for (const regra of regrasFilial) {
+            const keywords = (regra.valor || '').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+            if (keywords.some(k => textoLower.includes(k)) && regra.destinoId) {
+              await db.update(conversas).set({ filialId: regra.destinoId }).where(eq(conversas.id, conversa.id));
+              conversa = { ...conversa, filialId: regra.destinoId };
+              break;
+            }
+          }
+        }
+      }
     }
   }
 

@@ -25,6 +25,7 @@ export default function TenantLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [temIncidenteAtivo, setTemIncidenteAtivo] = useState(false);
   const [tenant, setTenant] = useState(null);
   const [filiais, setFiliais] = useState([]);
   const [counts, setCounts] = useState({ todos: 0, mine: 0, fila: 0, porFilial: {} });
@@ -39,6 +40,10 @@ export default function TenantLayout() {
   usePolling(() => {
     api.get('/tenants/me/uso-ia').then(r => setUsoIa(r.data)).catch(() => {});
   }, 60000, user?.role === 'admin');
+
+  usePolling(() => {
+    api.get('/incidentes/ativo').then(r => setTemIncidenteAtivo(!!r.data)).catch(() => {});
+  }, 30000, user?.role === 'admin');
 
   const fetchFiliais = () => {
     if (!user?.tenantId) return;
@@ -214,6 +219,16 @@ export default function TenantLayout() {
               </NavLink>
               <NavLink to="/atalhos" className={navClass}>
                 <Zap className="w-4 h-4" /> Atalhos
+              </NavLink>
+              <NavLink to="/incidentes" className={({ isActive }) =>
+                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive ? 'bg-red-50 text-red-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}>
+                <AlertTriangle className="w-4 h-4" />
+                <span className="flex-1">Incidentes</span>
+                {temIncidenteAtivo && (
+                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                )}
               </NavLink>
             </div>
           )}
