@@ -4,7 +4,7 @@ import { tenants, clientes, conversas, mensagens, webhookLog, filiais, incidente
 import { eq, and, ne } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { buscarDadosCliente } from '../services/sgp.js';
-import { enviarMensagem, transcreverAudioMeta } from '../services/whatsapp.js';
+import { enviarMensagem, transcreverAudioMeta, downloadMidiaBase64 } from '../services/whatsapp.js';
 import { realizarHandoff } from '../services/handoff.js';
 import { enviarPushParaTenant } from '../services/pushNotification.js';
 import { dentroDoHorario } from '../services/horarios.js';
@@ -78,10 +78,36 @@ router.post('/', async (req, res) => {
         const msgs = value.messages;
         if (!msgs?.length) continue;
 
-        const [tenant] = await db.select().from(tenants)
+        // Resolve tenant — primeiro pelo número principal, depois por número de filial
+        let tenant = null;
+        let filialEntrada = null;
+
+        const [tenantDireto] = await db.select().from(tenants)
           .where(and(eq(tenants.whatsappNumberId, phoneNumberId), eq(tenants.ativo, true)))
           .limit(1);
+
+        if (tenantDireto) {
+          tenant = tenantDireto;
+        } else {
+          const [filialWpp] = await db.select().from(filiais)
+            .where(eq(filiais.whatsappNumberId, phoneNumberId))
+            .limit(1);
+          if (filialWpp) {
+            const [tenantDaFilial] = await db.select().from(tenants)
+              .where(and(eq(tenants.id, filialWpp.tenantId), eq(tenants.ativo, true)))
+              .limit(1);
+            if (tenantDaFilial) {
+              tenant = tenantDaFilial;
+              filialEntrada = filialWpp;
+            }
+          }
+        }
         if (!tenant) continue;
+
+        // Config efetiva de envio — usa token/número da filial se ela tiver o próprio
+        const wConfig = (filialEntrada?.whatsappToken && filialEntrada?.whatsappNumberId)
+          ? { ...tenant, whatsappNumberId: filialEntrada.whatsappNumberId, whatsappToken: filialEntrada.whatsappToken }
+          : tenant;
 
         // Mapa wa_id -> nome do perfil WhatsApp do remetente
         const contatosWa = {};
@@ -96,7 +122,7 @@ router.post('/', async (req, res) => {
 
           // Ligações: avisa e ignora
           if (msg.type === 'call') {
-            try { await enviarMensagem(tenant, remetente, 'Este *whatsapp* é automatizado, não permite ligações por aqui.\n\nMande um *áudio* ou *mensagem* dizendo o que deseja.'); } catch {}
+            try { await enviarMensagem(wConfig, remetente, 'Este *whatsapp* é automatizado, não permite ligações por aqui.\n\nMande um *áudio* ou *mensagem* dizendo o que deseja.'); } catch {}
             continue;
           }
 
@@ -110,12 +136,12 @@ router.post('/', async (req, res) => {
             const mediaId = msg.audio?.id;
             if (!mediaId) continue;
             try {
-              texto = await transcreverAudioMeta(tenant, mediaId);
+              texto = await transcreverAudioMeta(wConfig, mediaId);
               if (!texto) continue;
               isAudio = true;
             } catch (err) {
               console.error('[Webhook] Erro ao transcrever áudio:', err.message);
-              try { await enviarMensagem(tenant, remetente, 'Recebi seu áudio, mas não consegui processá-lo. Por favor, tente enviar uma mensagem de texto.'); } catch {}
+              try { await enviarMensagem(wConfig, remetente, 'Recebi seu áudio, mas não consegui processá-lo. Por favor, tente enviar uma mensagem de texto.'); } catch {}
               continue;
             }
           } else if (msg.type === 'image') {
@@ -123,17 +149,27 @@ router.post('/', async (req, res) => {
             if (!mediaId) continue;
             const caption = msg.image?.caption ? ` — "${msg.image.caption}"` : '';
             texto = `[Imagem]${caption}`;
-            isAudio = false;
+            let midiaData = null;
+            try { midiaData = await downloadMidiaBase64(wConfig, mediaId); } catch (err) {
+              console.error('[Webhook] Erro ao baixar imagem:', err.message);
+            }
             await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
-            await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa);
+            await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa, filialEntrada, midiaData);
             continue;
           } else if (msg.type === 'document') {
             const mediaId = msg.document?.id;
             if (!mediaId) continue;
             const nomeArquivo = msg.document?.filename || 'documento';
             texto = `[Documento] ${nomeArquivo}`;
+            let midiaData = null;
+            const mimeDoc = msg.document?.mime_type || '';
+            if (mimeDoc === 'application/pdf') {
+              try { midiaData = await downloadMidiaBase64(wConfig, mediaId); } catch (err) {
+                console.error('[Webhook] Erro ao baixar PDF:', err.message);
+              }
+            }
             await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
-            await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa);
+            await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa, filialEntrada, midiaData);
             continue;
           } else {
             // Ignora outros tipos silenciosamente (vídeo, sticker, etc.)
@@ -146,7 +182,7 @@ router.post('/', async (req, res) => {
             continue;
           }
 
-          await processarWebhookMsg(tenant, remetente, texto, wamid, isAudio, null, nomeWa);
+          await processarWebhookMsg(tenant, remetente, texto, wamid, isAudio, null, nomeWa, filialEntrada);
         }
       }
     }
@@ -169,8 +205,12 @@ async function atualizarUltMsg(conversaId, conteudo, origem, nome = null) {
   }).where(eq(conversas.id, conversaId));
 }
 
-async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false, midiaUrl = null, nomeWa = null) {
+async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false, midiaUrl = null, nomeWa = null, filialEntrada = null, midiaData = null) {
   registrarAtividade();
+  // Config efetiva de envio — usa número/token da filial se ela tiver o próprio
+  const wConfig = (filialEntrada?.whatsappToken && filialEntrada?.whatsappNumberId)
+    ? { ...tenant, whatsappNumberId: filialEntrada.whatsappNumberId, whatsappToken: filialEntrada.whatsappToken }
+    : tenant;
 
   let [cliente] = await db.select().from(clientes)
     .where(and(eq(clientes.tenantId, tenant.id), eq(clientes.whatsapp, remetente)))
@@ -230,6 +270,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
       tenantId: tenant.id,
       clienteId: cliente.id,
       status: 'bot',
+      filialId: filialEntrada?.id || null,
     }).returning();
   }
 
@@ -269,7 +310,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
       `⚠️ *${incidenteAtivo.titulo}*\n\nEstamos cientes do problema e nossa equipe já está trabalhando na solução. Pedimos desculpas pelo transtorno.`;
     await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msg });
     await atualizarUltMsg(conversa.id, msg, 'bot');
-    try { await enviarMensagem(tenant, remetente, msg); } catch {}
+    try { await enviarMensagem(wConfig, remetente, msg); } catch {}
     return;
   }
 
@@ -278,7 +319,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     const msg = tenant.horarios?.msgForaHorario ||
       'Nosso atendimento está encerrado no momento. Em breve retornaremos!';
     await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msg });
-    try { await enviarMensagem(tenant, remetente, msg); } catch {}
+    try { await enviarMensagem(wConfig, remetente, msg); } catch {}
     return;
   }
 
@@ -326,7 +367,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
   // Bloqueia bot se conta suspensa por inadimplência
   if (tenant.statusPagamento === 'suspenso') {
     const msg = 'Nosso atendimento automático está temporariamente suspenso. Por favor, entre em contato diretamente com o provedor.';
-    try { await enviarMensagem(tenant, remetente, msg); } catch {}
+    try { await enviarMensagem(wConfig, remetente, msg); } catch {}
     return;
   }
 
@@ -336,7 +377,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
   if (contagemAtual >= limiteAtual) {
     const msgBloqueio = '⛔ Nosso assistente virtual está temporariamente indisponível. Por favor, aguarde ou entre em contato pelo telefone do provedor.';
     await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msgBloqueio });
-    try { await enviarMensagem(tenant, remetente, msgBloqueio); } catch {}
+    try { await enviarMensagem(wConfig, remetente, msgBloqueio); } catch {}
     return;
   }
 
@@ -345,11 +386,11 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     .where(eq(mensagens.conversaId, conversa.id))
     .orderBy(mensagens.enviadaEm);
 
-  const resultado = await processarMensagem(tenant, conversa, historico, texto, remetente);
+  const resultado = await processarMensagem(tenant, conversa, historico, texto, remetente, midiaData);
 
   if (resultado.tag) {
-    const tagsAtuais = Array.isArray(conversa.tags) ? conversa.tags : [];
-    if (tagsAtuais.length === 0) {
+    const tagAtual = Array.isArray(conversa.tags) ? conversa.tags[0] : null;
+    if (!tagAtual || tagAtual === 'Outros') {
       await db.update(conversas)
         .set({ tags: JSON.stringify([resultado.tag]) })
         .where(eq(conversas.id, conversa.id));
@@ -362,7 +403,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
   if (resultado.resposta) {
     let botWamid = null;
     try {
-      const apiRes = await enviarMensagem(tenant, remetente, resultado.resposta);
+      const apiRes = await enviarMensagem(wConfig, remetente, resultado.resposta);
       botWamid = apiRes?.messages?.[0]?.id || null;
     } catch (err) {
       console.error('Erro ao enviar resposta IA:', err.message);
@@ -378,7 +419,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
   }
 
   if (resultado.devePelearHumano) {
-    await realizarHandoff(tenant, conversa, cliente, resultado.motivo);
+    await realizarHandoff(tenant, conversa, cliente, resultado.motivo, wConfig);
   }
 }
 

@@ -4,7 +4,7 @@ import { buscarContextoSgp, getTools, executarTool } from './sgp.js';
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // clienteWhatsapp: número do remetente vindo direto do payload do webhook
-const TAGS_VALIDAS = ['Suporte Técnico','Cobrança','Cancelamento','Instalação','Velocidade','Sem Sinal','Mudança de Plano','Outros'];
+const TAGS_VALIDAS = ['Financeiro','Sem Conexão','Lentidão','Mudança de Endereço','Cancelamento','Nova Contratação','Problema no Roteador','Segunda Via','Outros'];
 
 function extrairIdsAutorizados(contexto) {
   const idsCliente = new Set();
@@ -25,8 +25,26 @@ function toolAutorizada(toolName, input, ids) {
   return true;
 }
 
-export async function processarMensagem(tenant, conversa, historico, novaMensagem, clienteWhatsapp) {
-  const primeiraMsg = historico.filter(m => m.origem === 'cliente').length <= 1;
+const MIMES_IMAGEM_CLAUDE = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+
+function buildConteudoMidia(texto, midiaData) {
+  const { base64, mimeType } = midiaData;
+  const content = [];
+  if (MIMES_IMAGEM_CLAUDE.has(mimeType)) {
+    content.push({ type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } });
+  } else if (mimeType === 'application/pdf') {
+    content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } });
+  } else {
+    return texto; // tipo não suportado → texto simples
+  }
+  content.push({ type: 'text', text: texto || 'Cliente enviou este arquivo.' });
+  return content;
+}
+
+export async function processarMensagem(tenant, conversa, historico, novaMensagem, clienteWhatsapp, midiaData = null) {
+  // Classifica até ter uma tag específica (não "Outros" e não vazia)
+  const tagAtual = Array.isArray(conversa.tags) ? conversa.tags[0] : null;
+  const precisaClassificar = !tagAtual || tagAtual === 'Outros';
 
   // 1. Busca dados do cliente no SGP em tempo real
   const contextoSgp = await buscarContextoSgp(tenant, clienteWhatsapp);
@@ -48,13 +66,18 @@ ${temSgp ? `- Use apenas os dados fornecidos pelo SGP acima. Nunca invente infor
 - Se o cliente NÃO for encontrado mesmo com CPF/CNPJ (cliente novo): informe que vai transferir para um atendente realizar o cadastro e escreva ACTION:HANDOFF:cliente novo — encaminhar para cadastro
 - NUNCA envie formulários de cadastro — isso é responsabilidade exclusiva do atendente humano.` : ''}
 
+IMAGENS E DOCUMENTOS:
+- Quando o cliente enviar uma imagem ou PDF, você consegue visualizar o conteúdo diretamente.
+- Se for um comprovante de pagamento: descreva brevemente o que está visível (data, valor, destinatário, tipo de pagamento) e informe que o pagamento será confirmado pelo provedor em breve.
+- Se não conseguir identificar o conteúdo, peça que o cliente descreva o que enviou.
+
 FLUXO DE NOVA ADESÃO (contrato):
 - Quando o cliente demonstrar interesse em assinar um plano ou contratar internet, colete as seguintes informações em ordem natural na conversa: nome do plano/velocidade desejada, valor mensal combinado e e-mail do cliente (para receber o contrato digital).
 - Quando tiver coletado nome do plano, valor E e-mail, confirme com o cliente: "Perfeito! Vou transferir para um atendente que enviará o contrato digital para [e-mail]. Pode confirmar?"
 - Após confirmação do cliente, diga "Estou transferindo agora!" e escreva na última linha: ACTION:HANDOFF:CONTRATO|plano:[nome do plano]|valor:[valor sem R$]|email:[email]|download:[velocidade download em Mbps]|upload:[velocidade upload em Mbps]
 - Exemplo: ACTION:HANDOFF:CONTRATO|plano:FIBRA 300MB|valor:89,90|email:cliente@email.com|download:300|upload:150
 - Se não souber a velocidade de upload, use metade do download como estimativa.
-${primeiraMsg ? `- Na PRIMEIRA mensagem do cliente, identifique o assunto principal e inclua ao final da resposta (linha separada): TAG:categoria — onde categoria é exatamente uma de: ${TAGS_VALIDAS.join(', ')}.` : ''}
+${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclua ao final da sua resposta (linha separada): TAG:categoria — onde categoria é exatamente uma de: ${TAGS_VALIDAS.join(', ')}.` : ''}
 
 PROVEDOR: ${tenant.nome}
 ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
@@ -84,6 +107,14 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
     }
     return acc;
   }, []);
+
+  // Se a última mensagem do usuário tem mídia (imagem/PDF), converte para bloco de visão
+  if (midiaData) {
+    const ultima = conversaAcumulada[conversaAcumulada.length - 1];
+    if (ultima?.role === 'user') {
+      ultima.content = buildConteudoMidia(ultima.content, midiaData);
+    }
+  }
 
   // Garante que a primeira mensagem sempre seja do usuário
   while (conversaAcumulada.length > 0 && conversaAcumulada[0].role !== 'user') {

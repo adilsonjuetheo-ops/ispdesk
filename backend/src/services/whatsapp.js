@@ -1,3 +1,19 @@
+export async function downloadMidiaBase64(wConfig, mediaId) {
+  const infoRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
+    headers: { Authorization: `Bearer ${wConfig.whatsappToken}` },
+  });
+  if (!infoRes.ok) throw new Error(`Meta media info ${infoRes.status}`);
+  const { url, mime_type } = await infoRes.json();
+
+  const mediaRes = await fetch(url, {
+    headers: { Authorization: `Bearer ${wConfig.whatsappToken}` },
+  });
+  if (!mediaRes.ok) throw new Error(`Meta media download ${mediaRes.status}`);
+  const buffer = Buffer.from(await mediaRes.arrayBuffer());
+
+  return { base64: buffer.toString('base64'), mimeType: mime_type || 'image/jpeg' };
+}
+
 export async function renovarTokenLongoPrazo(tenant) {
   const url = `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&fb_exchange_token=${tenant.whatsappToken}`;
   const res = await fetch(url);

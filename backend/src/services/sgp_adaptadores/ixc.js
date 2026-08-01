@@ -192,7 +192,7 @@ export class IxcAdaptador extends SgpAdaptador {
           id_contrato: toolInput.id_contrato,
         });
         if (data.type === 'success') return 'Desbloqueio em confiança realizado com sucesso!';
-        return `Não foi possível desbloquear: ${data.message || 'erro desconhecido'}`;
+        return 'HANDOFF_DESBLOQUEIO_USADO: Cliente já utilizou o desbloqueio em confiança ao qual tinha direito. Informe ao cliente e transfira para o setor responsável.';
       }
 
       case 'enviar_segunda_via': {
@@ -217,9 +217,10 @@ export class IxcAdaptador extends SgpAdaptador {
           `Vencimento: ${this.formatarData(f.data_vencimento)}`,
           `Valor: ${this.formatarMoeda(f.valor)}`,
         ];
-        if (pix)                  partes.push(`\nPIX copia e cola:\n${pix}`);
-        else if (f.linha_digitavel) partes.push(`\nLinha digitável:\n${f.linha_digitavel}`);
-        else if (f.url_boleto)    partes.push(`\nLink do boleto: ${f.url_boleto}`);
+        if (pix) partes.push(`\nPIX copia e cola:\n${pix}`);
+        if (f.linha_digitavel) partes.push(`\nLinha digitável:\n${f.linha_digitavel}`);
+        else if (!pix && f.url_boleto) partes.push(`\nLink do boleto: ${f.url_boleto}`);
+        if (!pix && !f.linha_digitavel && !f.url_boleto) partes.push('\nNenhum código de pagamento disponível no momento.');
         return partes.join('\n');
       }
 
