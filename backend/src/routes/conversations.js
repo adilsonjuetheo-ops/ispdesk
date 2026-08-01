@@ -9,6 +9,18 @@ import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { enviarNps } from '../services/nps.js';
 import { criarRateLimit } from '../middleware/security.js';
 
+async function resolverWConfig(tenant, conversa) {
+  if (!conversa?.filialId) return tenant;
+  const [filial] = await db.select({
+    whatsappNumberId: filiais.whatsappNumberId,
+    whatsappToken: filiais.whatsappToken,
+  }).from(filiais).where(eq(filiais.id, conversa.filialId)).limit(1);
+  if (filial?.whatsappToken && filial?.whatsappNumberId) {
+    return { ...tenant, whatsappNumberId: filial.whatsappNumberId, whatsappToken: filial.whatsappToken };
+  }
+  return tenant;
+}
+
 const MIME_TYPES_PERMITIDOS = new Set([
   'image/jpeg', 'image/png', 'image/webp',
   'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/webm',
@@ -168,7 +180,8 @@ router.post('/:id/assume', async (req, res) => {
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
   if (tenant?.whatsappToken && cliente?.whatsapp) {
     try {
-      await enviarMensagem(tenant, cliente.whatsapp, `Olá! Agora você está sendo atendido por ${req.user.nome}.`);
+      const wConfig = await resolverWConfig(tenant, conversa);
+      await enviarMensagem(wConfig, cliente.whatsapp, `Olá! Agora você está sendo atendido por ${req.user.nome}.`);
     } catch (err) {
       console.error('Erro ao notificar assume:', err.message);
     }
@@ -241,10 +254,11 @@ router.post('/:id/send', async (req, res) => {
 
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+  const wConfig = await resolverWConfig(tenant, conversa);
 
   let sentWamid = null;
   try {
-    const apiRes = await enviarMensagem(tenant, cliente.whatsapp, texto);
+    const apiRes = await enviarMensagem(wConfig, cliente.whatsapp, texto);
     sentWamid = apiRes?.messages?.[0]?.id || null;
   } catch (err) {
     console.error('Erro enviarMensagem:', err.message);
@@ -284,6 +298,7 @@ router.post('/:id/send-media', limitarUpload, upload.single('arquivo'), async (r
 
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
   const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+  const wConfig = await resolverWConfig(tenant, conversa);
 
   const tipo = arquivo.mimetype.startsWith('image/')
     ? 'image'
@@ -292,8 +307,8 @@ router.post('/:id/send-media', limitarUpload, upload.single('arquivo'), async (r
       : 'document';
 
   const mimeType = tipo === 'audio' ? 'audio/ogg; codecs=opus' : arquivo.mimetype;
-  const { id: mediaId } = await uploadMidia(tenant, arquivo.buffer, mimeType, arquivo.originalname);
-  const mediaApiRes = await enviarMidia(tenant, cliente.whatsapp, mediaId, tipo, arquivo.originalname);
+  const { id: mediaId } = await uploadMidia(wConfig, arquivo.buffer, mimeType, arquivo.originalname);
+  const mediaApiRes = await enviarMidia(wConfig, cliente.whatsapp, mediaId, tipo, arquivo.originalname);
   const mediaWamid = mediaApiRes?.messages?.[0]?.id || null;
 
   const prefixo = tipo === 'image' ? '[Imagem]' : tipo === 'audio' ? '[Áudio]' : '[Arquivo]';

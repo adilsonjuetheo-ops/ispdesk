@@ -41,13 +41,18 @@ export const tenants = pgTable('tenants', {
 });
 
 export const filiais = pgTable('filiais', {
-  id:       uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  nome:     text('nome').notNull(),
-  cidade:   text('cidade').notNull(),
-  uf:       text('uf'),
-  ativo:    boolean('ativo').default(true),
-  criadoEm: timestamp('criado_em').defaultNow(),
+  id:                    uuid('id').primaryKey().defaultRandom(),
+  tenantId:              uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  nome:                  text('nome').notNull(),
+  cidade:                text('cidade').notNull(),
+  uf:                    text('uf'),
+  ativo:                 boolean('ativo').default(true),
+  whatsappNumberId:      text('whatsapp_number_id').unique(),
+  whatsappToken:         text('whatsapp_token'),
+  whatsappTokenExpiraEm: timestamp('whatsapp_token_expira_em'),
+  wabaId:                text('waba_id'),
+  whatsappConectadoEm:   timestamp('whatsapp_conectado_em'),
+  criadoEm:              timestamp('criado_em').defaultNow(),
 });
 
 export const tenantUsers = pgTable('tenant_users', {

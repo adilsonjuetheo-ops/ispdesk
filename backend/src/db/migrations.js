@@ -101,6 +101,12 @@ export async function runMigrations() {
       )
     `;
     await sql`CREATE INDEX IF NOT EXISTS idx_incidentes_tenant ON incidentes(tenant_id, status)`;
+    await sql`ALTER TABLE filiais ADD COLUMN IF NOT EXISTS whatsapp_number_id text`;
+    await sql`ALTER TABLE filiais ADD COLUMN IF NOT EXISTS whatsapp_token text`;
+    await sql`ALTER TABLE filiais ADD COLUMN IF NOT EXISTS whatsapp_token_expira_em timestamp`;
+    await sql`ALTER TABLE filiais ADD COLUMN IF NOT EXISTS waba_id text`;
+    await sql`ALTER TABLE filiais ADD COLUMN IF NOT EXISTS whatsapp_conectado_em timestamp`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_filiais_wpp_number ON filiais(whatsapp_number_id) WHERE whatsapp_number_id IS NOT NULL`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

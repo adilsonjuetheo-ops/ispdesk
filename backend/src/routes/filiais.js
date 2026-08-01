@@ -13,7 +13,18 @@ router.get('/', async (req, res) => {
     return res.status(403).json({ erro: 'Acesso negado a este provedor' });
   }
   try {
-    const rows = await db.select().from(filiais)
+    const rows = await db.select({
+      id: filiais.id,
+      tenantId: filiais.tenantId,
+      nome: filiais.nome,
+      cidade: filiais.cidade,
+      uf: filiais.uf,
+      ativo: filiais.ativo,
+      criadoEm: filiais.criadoEm,
+      whatsappConectado: filiais.whatsappConectadoEm,
+      whatsappNumberId: filiais.whatsappNumberId,
+      wabaId: filiais.wabaId,
+    }).from(filiais)
       .where(eq(filiais.tenantId, tenantId))
       .orderBy(filiais.nome);
     res.json(rows);
