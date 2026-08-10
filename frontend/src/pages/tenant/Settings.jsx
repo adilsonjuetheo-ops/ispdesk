@@ -890,12 +890,12 @@ export default function Settings() {
                 </select>
               </div>
 
-              {['ixc', 'mkauth', 'generico'].includes(tenant.sgpTipo) && (
+              {['ixc', 'mkauth', 'generico', 'tsmx'].includes(tenant.sgpTipo) && (
                 <Field
                   label="URL base da API do SGP"
                   value={tenant.sgpApiUrl || ''}
                   onChange={v => set('sgpApiUrl', v)}
-                  placeholder="https://sistema.meuprovedor.com.br"
+                  placeholder={tenant.sgpTipo === 'tsmx' ? 'https://seuprovedor.sgp.tsmx.com.br' : 'https://sistema.meuprovedor.com.br'}
                 />
               )}
 
@@ -905,7 +905,7 @@ export default function Settings() {
                     {tenant.sgpTipo === 'atlaz'    && 'Token Atlaz'}
                     {tenant.sgpTipo === 'ixc'      && 'Credencial IXC — usuário:token (ex: admin:abc123)'}
                     {tenant.sgpTipo === 'mkauth'   && 'Auth token MK-Auth'}
-                    {tenant.sgpTipo === 'tsmx'     && 'Credencial SGP — app:token (gerado em Sistema > Ferramentas > Painel Admin > Tokens)'}
+                    {tenant.sgpTipo === 'tsmx'     && 'Credencial SGP — app:token (o "app" é o valor em Aplicações ao editar o token, ex: Bia)'}
                     {tenant.sgpTipo === 'generico' && 'Token de autenticação'}
                   </label>
                   <input

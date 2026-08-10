@@ -1,19 +1,20 @@
 import { SgpAdaptador } from './base.js';
 
-// API pública e compartilhada do SGP TSMX (https://www.tsmx.net.br/developers)
-// Credenciais (app + token) são geradas por provedor em:
-//   Sistema -> Ferramentas -> Painel Admin -> Tokens
-const BASE_URL = 'https://api.sgp.net.br';
-
+// Cada provedor roda sua própria instância do SGP TSMX no próprio domínio
+// (ex: https://<provedor>.sgp.tsmx.com.br) — não existe API compartilhada única.
+// Credenciais (app + token) são geradas em:
+//   Administração -> Sistema -> Ferramentas -> Painel Admin -> Tokens
 export class SgpTsmxAdaptador extends SgpAdaptador {
 
   // sgpApiKey armazenado como "app:token" (mesmo padrão usado pelo adapter IXC)
+  // "app" é o valor do campo "Aplicações" vinculado ao token (ex: "Bia"), NÃO a descrição do token.
   #credenciais() {
     const [app, ...resto] = (this.apiKey || '').split(':');
     return { app: app || '', token: resto.join(':') || '' };
   }
 
   async #consultarCliente(filtro) {
+    const base = await this.validarApiUrl();
     const { app, token } = this.#credenciais();
     const form = new FormData();
     form.append('app', app);
@@ -21,7 +22,8 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     for (const [k, v] of Object.entries(filtro)) {
       if (v != null) form.append(k, String(v));
     }
-    const res = await fetch(`${BASE_URL}/api/ura/consultacliente/`, {
+    const url = new URL('api/ura/consultacliente/', `${base.toString().replace(/\/$/, '')}/`);
+    const res = await fetch(url, {
       method: 'POST',
       body: form,
     });
@@ -57,10 +59,10 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
       '',
     ];
 
-    if (titulos > 0 || valorAberto > 0) {
-      linhas.push(`FINANCEIRO: ${titulos} título(s) em aberto, valor total ${this.formatarMoeda(valorAberto)}.`);
+    if (valorAberto > 0) {
+      linhas.push(`FINANCEIRO: Valor em aberto ${this.formatarMoeda(valorAberto)} (${titulos} título(s) no total).`);
     } else {
-      linhas.push('FINANCEIRO: Sem faturas em aberto.');
+      linhas.push('FINANCEIRO: Sem valores em aberto.');
     }
     linhas.push('');
 
