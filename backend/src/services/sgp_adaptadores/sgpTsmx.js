@@ -13,7 +13,7 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     return { app: app || '', token: resto.join(':') || '' };
   }
 
-  async #consultarCliente(filtro) {
+  async #chamar(endpoint, filtro) {
     const base = await this.validarApiUrl();
     const { app, token } = this.#credenciais();
     const form = new FormData();
@@ -22,13 +22,18 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     for (const [k, v] of Object.entries(filtro)) {
       if (v != null) form.append(k, String(v));
     }
-    const url = new URL('api/ura/consultacliente/', `${base.toString().replace(/\/$/, '')}/`);
-    const res = await fetch(url, {
-      method: 'POST',
-      body: form,
-    });
+    const url = new URL(`api/ura/${endpoint}/`, `${base.toString().replace(/\/$/, '')}/`);
+    const res = await fetch(url, { method: 'POST', body: form });
     if (!res.ok) throw new Error(`SGP HTTP ${res.status}`);
     return res.json();
+  }
+
+  #consultarCliente(filtro) {
+    return this.#chamar('consultacliente', filtro);
+  }
+
+  #consultarTitulos(filtro) {
+    return this.#chamar('titulos', filtro);
   }
 
   // A API espera CPF/CNPJ formatado (ex: 999.999.999-99 ou 99.999.999/0001-99)
@@ -52,7 +57,7 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     const linhas = [
       '=== DADOS DO CLIENTE (SGP) ===',
       `Nome: ${nome}`,
-      `ID: ${c.clienteId} | CPF/CNPJ: ${c.cpfCnpj || 'não informado'}`,
+      `ID: ${c.contratoId} | CPF/CNPJ: ${c.cpfCnpj || 'não informado'}`,
       `Plano: ${c.planointernet || c.servico_plano || 'não identificado'}`,
       `Status: ${status}`,
       `Cidade: ${c.endereco_cidade || 'não informada'}`,
@@ -67,10 +72,12 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     linhas.push('');
 
     linhas.push('=== AÇÕES AUTOMÁTICAS ===');
-    linhas.push('Desbloqueio, 2ª via e chamado técnico ainda não estão automatizados para este SGP. Transfira para atendente humano quando o cliente precisar de alguma dessas ações.');
+    linhas.push('Desbloqueio e chamado técnico ainda não estão automatizados para este SGP. Transfira para atendente humano quando o cliente precisar de alguma dessas ações. 2ª via/PIX já funciona normalmente.');
 
     linhas.push('');
-    linhas.push(`ID_INTERNO: id_cliente=${c.clienteId} | id_contrato=${c.contratoId || ''}`);
+    // id_cliente aqui carrega o ID do contrato (é o identificador usado pelas
+    // ações deste SGP, ex: listar títulos), não um id de cliente separado.
+    linhas.push(`ID_INTERNO: id_cliente=${c.contratoId} | id_contrato=${c.contratoId || ''}`);
     linhas.push('=== FIM ===');
 
     return linhas.join('\n');
@@ -99,13 +106,37 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
 
     return {
       nome: c.razaoSocial || null,
-      contratoId: String(c.contratoId || c.clienteId || ''),
+      contratoId: String(c.contratoId || ''),
       statusContrato: (c.contratoStatusDisplay || '').trim().toLowerCase() || 'inativo',
       filialNome: c.endereco_cidade || null,
     };
   }
 
   async executarTool(toolName, toolInput) {
+    if (toolName === 'enviar_segunda_via') {
+      const contrato = toolInput.id_cliente || toolInput.id_contrato;
+      if (!contrato) return 'ID do contrato não informado.';
+
+      const data = await this.#consultarTitulos({ contrato }).catch(() => null);
+      const abertos = (data?.titulos || []).filter(t => t.status === 'aberto');
+      if (!abertos.length) return 'Nenhuma fatura em aberto encontrada.';
+
+      const f = abertos.sort(
+        (a, b) => new Date(a.dataVencimento) - new Date(b.dataVencimento)
+      )[0];
+
+      const partes = [
+        f.demonstrativo || 'Mensalidade',
+        `Vencimento: ${this.formatarData(f.dataVencimento)}`,
+        `Valor: ${this.formatarMoeda(f.valorCorrigido || f.valor)}`,
+      ];
+      if (f.codigoPix)      partes.push(`\nPIX copia e cola:\n${f.codigoPix}`);
+      if (f.linhaDigitavel) partes.push(`\nLinha digitável:\n${f.linhaDigitavel}`);
+      else if (!f.codigoPix && f.link) partes.push(`\nLink do boleto: ${f.link}`);
+
+      return partes.join('\n');
+    }
+
     return 'Esta ação ainda não está disponível para este SGP. Transfira para um atendente humano.';
   }
 }
