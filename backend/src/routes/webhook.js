@@ -4,7 +4,7 @@ import { tenants, clientes, conversas, mensagens, webhookLog, filiais, incidente
 import { eq, and, ne } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { buscarDadosCliente } from '../services/sgp.js';
-import { enviarMensagem, transcreverAudioMeta, downloadMidiaBase64 } from '../services/whatsapp.js';
+import { enviarMensagem, transcreverAudioMeta, downloadMidiaBase64, baixarArquivoUrl, uploadMidia, enviarMidia } from '../services/whatsapp.js';
 import { realizarHandoff } from '../services/handoff.js';
 import { enviarPushParaTenant } from '../services/pushNotification.js';
 import { dentroDoHorario } from '../services/horarios.js';
@@ -416,6 +416,25 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
       status: 'enviada',
     });
     await atualizarUltMsg(conversa.id, resultado.resposta, 'bot');
+  }
+
+  for (const midia of resultado.midias || []) {
+    try {
+      const { buffer, mimeType } = await baixarArquivoUrl(midia.url);
+      const { id: mediaId } = await uploadMidia(wConfig, buffer, mimeType || 'application/pdf', midia.nome);
+      await enviarMidia(wConfig, remetente, mediaId, 'document', midia.nome);
+      const conteudoMidia = `[Arquivo] ${midia.nome}`;
+      await db.insert(mensagens).values({
+        conversaId: conversa.id,
+        origem: 'bot',
+        conteudo: conteudoMidia,
+        midiaUrl: mediaId,
+        status: 'enviada',
+      });
+      await atualizarUltMsg(conversa.id, conteudoMidia, 'bot');
+    } catch (err) {
+      console.error('[Webhook] Erro ao enviar mídia do bot:', err.message);
+    }
   }
 
   if (resultado.devePelearHumano) {

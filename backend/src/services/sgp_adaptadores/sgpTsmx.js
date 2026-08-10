@@ -167,7 +167,10 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
       if (f.linhaDigitavel) partes.push(`\nLinha digitável:\n${f.linhaDigitavel}`);
       else if (!f.codigoPix && f.link) partes.push(`\nLink do boleto: ${f.link}`);
 
-      return partes.join('\n');
+      return {
+        texto: partes.join('\n'),
+        midia: f.link ? { url: f.link, nome: `boleto-${f.id}.pdf` } : null,
+      };
     }
 
     return 'Esta ação ainda não está disponível para este SGP. Transfira para um atendente humano.';

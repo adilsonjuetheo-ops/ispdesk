@@ -60,7 +60,7 @@ INSTRUÇÕES IMPORTANTES:
 - Se não conseguir resolver o problema: escreva ACTION:HANDOFF:motivo detalhado
 ${temSgp ? `- Use apenas os dados fornecidos pelo SGP acima. Nunca invente informações.
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
-- Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem.
+- Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem e avise que o PDF do boleto será enviado a seguir.
 - Se o cliente NÃO for encontrado pelo número de WhatsApp: peça APENAS o CPF ou CNPJ para localizá-lo no sistema.
 - Ao receber o CPF ou CNPJ: use a ferramenta buscar_por_documento imediatamente.
 - Se o cliente NÃO for encontrado mesmo com CPF/CNPJ (cliente novo): informe que vai transferir para um atendente realizar o cadastro e escreva ACTION:HANDOFF:cliente novo — encaminhar para cadastro
@@ -130,6 +130,8 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
     messages: conversaAcumulada,
   });
 
+  const midiasParaEnviar = [];
+
   while (response.stop_reason === 'tool_use') {
     const toolBlocks = response.content.filter(b => b.type === 'tool_use');
     if (!toolBlocks.length) break;
@@ -144,15 +146,22 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
         console.log(`[IA] Executando tool autorizada: ${toolBlock.name}`);
         resultado = await executarTool(toolBlock.name, toolBlock.input, tenant);
         if (toolBlock.name === 'buscar_por_documento') {
-          const novosIds = extrairIdsAutorizados(resultado);
+          const novosIds = extrairIdsAutorizados(typeof resultado === 'object' ? resultado.texto : resultado);
           novosIds.idsCliente.forEach(id => idsAutorizados.idsCliente.add(id));
           novosIds.idsContrato.forEach(id => idsAutorizados.idsContrato.add(id));
         }
       }
+      // Tools podem retornar { texto, midia } quando há um arquivo a enviar
+      // (ex: boleto em PDF) além do texto que vai pro contexto do Claude.
+      let conteudoTool = resultado;
+      if (resultado && typeof resultado === 'object') {
+        conteudoTool = resultado.texto;
+        if (resultado.midia) midiasParaEnviar.push(resultado.midia);
+      }
       toolResults.push({
         type: 'tool_result',
         tool_use_id: toolBlock.id,
-        content: resultado,
+        content: conteudoTool,
       });
     }
 
@@ -192,8 +201,9 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
       devePelearHumano: true,
       motivo,
       tag,
+      midias: midiasParaEnviar,
     };
   }
 
-  return { resposta: textoLimpo, devePelearHumano: false, tag };
+  return { resposta: textoLimpo, devePelearHumano: false, tag, midias: midiasParaEnviar };
 }

@@ -59,6 +59,14 @@ export async function transcreverAudioMeta(tenant, mediaId) {
   return text?.trim() || null;
 }
 
+export async function baixarArquivoUrl(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Download de arquivo ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const mimeType = res.headers.get('content-type') || 'application/octet-stream';
+  return { buffer, mimeType };
+}
+
 export async function uploadMidia(tenant, buffer, mimeType, filename) {
   const formData = new FormData();
   formData.append('file', new Blob([buffer], { type: mimeType }), filename);
