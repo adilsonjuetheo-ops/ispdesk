@@ -885,6 +885,7 @@ export default function Settings() {
                   <option value="atlaz">Atlaz</option>
                   <option value="ixc">IXC Soft</option>
                   <option value="mkauth">MK-Auth</option>
+                  <option value="tsmx">SGP TSMX</option>
                   <option value="generico">Outro (API genérica)</option>
                 </select>
               </div>
@@ -904,6 +905,7 @@ export default function Settings() {
                     {tenant.sgpTipo === 'atlaz'    && 'Token Atlaz'}
                     {tenant.sgpTipo === 'ixc'      && 'Credencial IXC — usuário:token (ex: admin:abc123)'}
                     {tenant.sgpTipo === 'mkauth'   && 'Auth token MK-Auth'}
+                    {tenant.sgpTipo === 'tsmx'     && 'Credencial SGP — app:token (gerado em Sistema > Ferramentas > Painel Admin > Tokens)'}
                     {tenant.sgpTipo === 'generico' && 'Token de autenticação'}
                   </label>
                   <input

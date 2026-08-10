@@ -2,12 +2,14 @@ import { AtlazAdaptador }    from './sgp_adaptadores/atlaz.js';
 import { IxcAdaptador }      from './sgp_adaptadores/ixc.js';
 import { MkAuthAdaptador }   from './sgp_adaptadores/mkauth.js';
 import { GenericoAdaptador } from './sgp_adaptadores/generico.js';
+import { SgpTsmxAdaptador }  from './sgp_adaptadores/sgpTsmx.js';
 
 const ADAPTADORES = {
   atlaz:    AtlazAdaptador,
   ixc:      IxcAdaptador,
   mkauth:   MkAuthAdaptador,
   generico: GenericoAdaptador,
+  tsmx:     SgpTsmxAdaptador,
 };
 
 function criarSgp(tenant) {
