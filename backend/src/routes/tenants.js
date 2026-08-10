@@ -127,12 +127,23 @@ router.post('/', async (req, res) => {
 
   const webhookVerifyToken = crypto.randomBytes(20).toString('hex');
 
-  const [tenant] = await db.insert(tenants).values({
-    slug, nome, logoUrl, corPrimaria, whatsappNumberId, whatsappToken,
-    webhookVerifyToken, systemPrompt, nomeAssistente, sgpApiUrl, sgpApiKey, plano,
-  }).returning();
+  try {
+    const [tenant] = await db.insert(tenants).values({
+      slug, nome, logoUrl, corPrimaria,
+      whatsappNumberId: whatsappNumberId || null,
+      whatsappToken: whatsappToken || null,
+      webhookVerifyToken, systemPrompt, nomeAssistente, sgpApiUrl, sgpApiKey, plano,
+    }).returning();
 
-  res.status(201).json(tenant);
+    res.status(201).json(tenant);
+  } catch (err) {
+    if (err.code === '23505') {
+      const campo = err.constraint?.includes('whatsapp') ? 'Número de WhatsApp' : 'Slug';
+      return res.status(409).json({ erro: `${campo} já está em uso por outro provedor` });
+    }
+    console.error('[tenants] Erro ao criar provedor:', err);
+    res.status(500).json({ erro: 'Erro ao criar provedor' });
+  }
 });
 
 router.get('/:id', async (req, res) => {
@@ -161,20 +172,30 @@ router.put('/:id', async (req, res) => {
     systemPrompt, nomeAssistente, sgpTipo, sgpApiUrl, sgpApiKey, plano, ativo,
   } = req.body;
 
-  const [tenant] = await db.update(tenants)
-    .set({
-      slug, nome, nomeFantasia, logoUrl, corPrimaria,
-      cnpj, telefone, whatsappContato, email, website,
-      endereco, cidade, uf, cep,
-      whatsappNumberId, whatsappToken,
-      systemPrompt, nomeAssistente, sgpTipo, sgpApiUrl, sgpApiKey, plano, ativo,
-      atualizadoEm: new Date(),
-    })
-    .where(eq(tenants.id, req.params.id))
-    .returning();
+  try {
+    const [tenant] = await db.update(tenants)
+      .set({
+        slug, nome, nomeFantasia, logoUrl, corPrimaria,
+        cnpj, telefone, whatsappContato, email, website,
+        endereco, cidade, uf, cep,
+        whatsappNumberId: whatsappNumberId || null,
+        whatsappToken: whatsappToken || null,
+        systemPrompt, nomeAssistente, sgpTipo, sgpApiUrl, sgpApiKey, plano, ativo,
+        atualizadoEm: new Date(),
+      })
+      .where(eq(tenants.id, req.params.id))
+      .returning();
 
-  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
-  res.json(tenant);
+    if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+    res.json(tenant);
+  } catch (err) {
+    if (err.code === '23505') {
+      const campo = err.constraint?.includes('whatsapp') ? 'Número de WhatsApp' : 'Slug';
+      return res.status(409).json({ erro: `${campo} já está em uso por outro provedor` });
+    }
+    console.error('[tenants] Erro ao atualizar provedor:', err);
+    res.status(500).json({ erro: 'Erro ao atualizar provedor' });
+  }
 });
 
 router.delete('/:id', async (req, res) => {
