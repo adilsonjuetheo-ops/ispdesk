@@ -39,6 +39,20 @@ export async function buscarContextoSgp(tenant, whatsapp) {
   }
 }
 
+export async function buscarContextoPorDocumentoSgp(tenant, documento) {
+  const sgp = criarSgp(tenant);
+  if (!sgp) return '(Integração com SGP não configurada para este provedor)';
+  const doc = (documento || '').replace(/\D/g, '');
+  if (!doc) return '(Documento inválido)';
+  try {
+    const contexto = await sgp.buscarContextoPorDocumento(doc);
+    return contexto || '(Cliente não encontrado com este CPF/CNPJ)';
+  } catch (err) {
+    console.error(`[SGP:${tenant.sgpTipo}] Erro buscarContextoPorDocumento:`, err.message);
+    return `(Erro ao consultar SGP: ${err.message})`;
+  }
+}
+
 export function getTools(tenant) {
   const sgp = criarSgp(tenant);
   return sgp ? sgp.tools() : [];

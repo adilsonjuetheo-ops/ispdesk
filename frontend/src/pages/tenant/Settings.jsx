@@ -309,18 +309,22 @@ const ESTADOS_BR = [
 ];
 
 function TestarSgp() {
-  const [telefone, setTelefone] = useState('');
+  const [modo, setModo] = useState('telefone'); // 'telefone' | 'documento'
+  const [valor, setValor] = useState('');
   const [carregando, setCarregando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState('');
 
   async function testar() {
-    if (!telefone.trim()) return;
+    if (!valor.trim()) return;
     setCarregando(true);
     setResultado(null);
     setErro('');
     try {
-      const { data } = await api.post('/tenants/me/testar-sgp', { telefone: telefone.trim() });
+      const body = modo === 'documento'
+        ? { documento: valor.trim() }
+        : { telefone: valor.trim() };
+      const { data } = await api.post('/tenants/me/testar-sgp', body);
       setResultado(data.resultado);
     } catch (err) {
       setErro(err.response?.data?.erro || err.message || 'Erro ao testar');
@@ -332,19 +336,35 @@ function TestarSgp() {
   return (
     <div className="mt-3 border border-dashed border-gray-200 rounded-lg p-3 space-y-2">
       <p className="text-xs font-medium text-gray-500">Testar conexão com SGP</p>
+      <div className="flex gap-1 text-xs">
+        <button
+          type="button"
+          onClick={() => { setModo('telefone'); setResultado(null); setErro(''); }}
+          className={`px-2.5 py-1 rounded-md transition-colors ${modo === 'telefone' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}
+        >
+          Por telefone
+        </button>
+        <button
+          type="button"
+          onClick={() => { setModo('documento'); setResultado(null); setErro(''); }}
+          className={`px-2.5 py-1 rounded-md transition-colors ${modo === 'documento' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}
+        >
+          Por CPF/CNPJ
+        </button>
+      </div>
       <div className="flex gap-2">
         <input
           type="text"
-          value={telefone}
-          onChange={e => setTelefone(e.target.value)}
+          value={valor}
+          onChange={e => setValor(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && testar()}
-          placeholder="Telefone do cliente (ex: 31999887766)"
+          placeholder={modo === 'documento' ? 'CPF ou CNPJ do cliente' : 'Telefone do cliente (ex: 31999887766)'}
           className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
         <button
           type="button"
           onClick={testar}
-          disabled={carregando || !telefone.trim()}
+          disabled={carregando || !valor.trim()}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
         >
           {carregando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

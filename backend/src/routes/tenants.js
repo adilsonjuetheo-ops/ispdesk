@@ -5,7 +5,7 @@ import { eq, count, and } from 'drizzle-orm';
 import { autenticar, apenasSuper } from '../middleware/auth.js';
 import crypto from 'crypto';
 import { getLimite, getUso, getMes } from '../services/limites.js';
-import { buscarContextoSgp } from '../services/sgp.js';
+import { buscarContextoSgp, buscarContextoPorDocumentoSgp } from '../services/sgp.js';
 
 const router = Router();
 
@@ -99,11 +99,15 @@ router.post('/me/testar-sgp', autenticar, async (req, res) => {
     return res.status(400).json({ erro: 'SGP não configurado' });
   }
 
-  const { telefone } = req.body;
-  if (!telefone) return res.status(400).json({ erro: 'Informe um telefone para teste' });
+  const { telefone, documento } = req.body;
+  if (!telefone && !documento) {
+    return res.status(400).json({ erro: 'Informe um telefone ou CPF/CNPJ para teste' });
+  }
 
   try {
-    const resultado = await buscarContextoSgp(tenant, telefone);
+    const resultado = documento
+      ? await buscarContextoPorDocumentoSgp(tenant, documento)
+      : await buscarContextoSgp(tenant, telefone);
     res.json({ ok: true, resultado });
   } catch (err) {
     res.status(502).json({ ok: false, erro: err.message });
