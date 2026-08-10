@@ -28,6 +28,19 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     return res.json();
   }
 
+  async #chamarJson(endpoint, corpo) {
+    const base = await this.validarApiUrl();
+    const { app, token } = this.#credenciais();
+    const url = new URL(`api/ura/${endpoint}/`, `${base.toString().replace(/\/$/, '')}/`);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app, token, ...corpo }),
+    });
+    if (!res.ok) throw new Error(`SGP HTTP ${res.status}`);
+    return res.json();
+  }
+
   #consultarCliente(filtro) {
     return this.#chamar('consultacliente', filtro);
   }
@@ -72,7 +85,7 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     linhas.push('');
 
     linhas.push('=== AÇÕES AUTOMÁTICAS ===');
-    linhas.push('Desbloqueio e chamado técnico ainda não estão automatizados para este SGP. Transfira para atendente humano quando o cliente precisar de alguma dessas ações. 2ª via/PIX já funciona normalmente.');
+    linhas.push('Chamado técnico ainda não está automatizado para este SGP — transfira para atendente humano quando o cliente precisar. Desbloqueio (liberação por confiança) e 2ª via/PIX já funcionam normalmente.');
 
     linhas.push('');
     // id_cliente aqui carrega o ID do contrato (é o identificador usado pelas
@@ -113,6 +126,26 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
   }
 
   async executarTool(toolName, toolInput) {
+    if (toolName === 'desbloquear_cliente') {
+      const contrato = toolInput.id_cliente || toolInput.id_contrato;
+      if (!contrato) return 'ID do contrato não informado.';
+
+      // Prazo de confiança padrão: 2 dias para o cliente regularizar o pagamento.
+      const dataPromessa = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+        .toISOString().slice(0, 10);
+
+      const data = await this.#chamarJson('liberacaopromessa', {
+        contrato,
+        data_promessa: dataPromessa,
+        enviar_sms: 1,
+      }).catch(err => ({ liberado: false, msg: err.message }));
+
+      if (data.liberado) {
+        return `Desbloqueio realizado com sucesso! Válido até ${this.formatarData(dataPromessa)} — combine com o cliente o pagamento até essa data.`;
+      }
+      return `Não foi possível liberar automaticamente: ${data.msg || 'motivo não informado'}. Transfira para um atendente humano.`;
+    }
+
     if (toolName === 'enviar_segunda_via') {
       const contrato = toolInput.id_cliente || toolInput.id_contrato;
       if (!contrato) return 'ID do contrato não informado.';
