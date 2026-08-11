@@ -139,6 +139,9 @@ router.post('/', async (req, res) => {
               texto = await transcreverAudioMeta(wConfig, mediaId);
               if (!texto) continue;
               isAudio = true;
+              await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
+              await processarWebhookMsg(tenant, remetente, texto, wamid, true, mediaId, nomeWa, filialEntrada);
+              continue;
             } catch (err) {
               console.error('[Webhook] Erro ao transcrever áudio:', err.message);
               try { await enviarMensagem(wConfig, remetente, 'Recebi seu áudio, mas não consegui processá-lo. Por favor, tente enviar uma mensagem de texto.'); } catch {}

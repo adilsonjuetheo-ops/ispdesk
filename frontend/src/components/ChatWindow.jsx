@@ -86,6 +86,24 @@ function MidiaBolao({ msg, isCliente }) {
     );
   }
 
+  if (isAudio && midiaUrl) {
+    return (
+      <div className={`rounded-2xl px-3 py-2.5 text-sm max-w-[280px] ${cor}`}>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Mic className="w-4 h-4 opacity-60 shrink-0" />
+          <p className="text-xs opacity-60 font-medium">Áudio</p>
+        </div>
+        <audio
+          src={`/api/conversations/${conversaId}/media/${midiaUrl}`}
+          controls
+          className="w-full h-8"
+          style={{ colorScheme: 'light' }}
+        />
+        {nome && <p className="text-xs leading-relaxed mt-1.5 opacity-80">{nome}</p>}
+      </div>
+    );
+  }
+
   const Icon = isImagem ? ImageIcon : isAudio ? Mic : isVideo ? Video : FileText;
   const label = isImagem ? 'Imagem enviada'
     : isAudio  ? (isCliente ? 'Áudio transcrito' : 'Áudio enviado')
