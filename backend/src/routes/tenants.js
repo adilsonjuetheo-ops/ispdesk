@@ -214,4 +214,24 @@ router.delete('/:id/excluir', async (req, res) => {
   res.json({ mensagem: 'Provedor excluído permanentemente' });
 });
 
+router.post('/:id/ativar-trial', async (req, res) => {
+  const expira = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const [tenant] = await db.update(tenants)
+    .set({ statusPagamento: 'trial', proximoVencimento: expira, atualizadoEm: new Date() })
+    .where(eq(tenants.id, req.params.id))
+    .returning({ statusPagamento: tenants.statusPagamento, proximoVencimento: tenants.proximoVencimento });
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+  res.json(tenant);
+});
+
+router.post('/:id/renovar', async (req, res) => {
+  const expira = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const [tenant] = await db.update(tenants)
+    .set({ statusPagamento: 'ativo', proximoVencimento: expira, atualizadoEm: new Date() })
+    .where(eq(tenants.id, req.params.id))
+    .returning({ statusPagamento: tenants.statusPagamento, proximoVencimento: tenants.proximoVencimento });
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+  res.json(tenant);
+});
+
 export default router;
