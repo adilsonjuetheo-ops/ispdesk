@@ -45,6 +45,8 @@ export default function TenantDetail() {
   const [erroCobranca, setErroCobranca] = useState('');
   const [verificandoPIX, setVerificandoPIX] = useState(false);
   const [resultadoVerif, setResultadoVerif] = useState(null);
+  const [ativandoTrial, setAtivandoTrial] = useState(false);
+  const [renovando, setRenovando] = useState(false);
 
   const handleLogoUpload = e => {
     const file = e.target.files?.[0];
@@ -185,6 +187,26 @@ export default function TenantDetail() {
     } finally {
       setGerandoPIX(false);
     }
+  };
+
+  const handleAtivarTrial = async () => {
+    setAtivandoTrial(true);
+    try {
+      const { data } = await api.post(`/tenants/${id}/ativar-trial`);
+      setTenant(t => ({ ...t, statusPagamento: data.statusPagamento, proximoVencimento: data.proximoVencimento }));
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Erro ao ativar trial');
+    } finally { setAtivandoTrial(false); }
+  };
+
+  const handleRenovar = async () => {
+    setRenovando(true);
+    try {
+      const { data } = await api.post(`/tenants/${id}/renovar`);
+      setTenant(t => ({ ...t, statusPagamento: data.statusPagamento, proximoVencimento: data.proximoVencimento }));
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Erro ao renovar');
+    } finally { setRenovando(false); }
   };
 
   const handleExcluirDefinitivo = async () => {
@@ -424,12 +446,77 @@ export default function TenantDetail() {
       {/* Cobrança */}
       <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6">
         <h2 className="text-white font-semibold mb-4 flex items-center gap-2">
-          <QrCode className="w-4 h-4 text-indigo-400" /> Cobrança
+          <QrCode className="w-4 h-4 text-indigo-400" /> Assinatura
         </h2>
 
-        {/* WhatsApp destino */}
+        {/* Status e dias restantes */}
+        {(() => {
+          const venc = tenant.proximoVencimento ? new Date(tenant.proximoVencimento) : null;
+          const dias = venc ? Math.ceil((venc - new Date()) / 86_400_000) : null;
+          const vencido = dias !== null && dias < 0;
+          return (
+            <div className="flex flex-wrap items-center gap-3 mb-5">
+              {tenant.statusPagamento === 'trial' && !vencido && (
+                <span className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-300 border border-amber-700/40 px-3 py-1 rounded-full">
+                  <Clock className="w-3.5 h-3.5" /> Trial — {dias} dia(s) restante(s)
+                </span>
+              )}
+              {tenant.statusPagamento === 'ativo' && !vencido && (
+                <span className="flex items-center gap-1.5 text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-700/40 px-3 py-1 rounded-full">
+                  <CheckCircle className="w-3.5 h-3.5" /> Ativo — vence em {dias} dia(s)
+                </span>
+              )}
+              {vencido && (
+                <span className="flex items-center gap-1.5 text-xs bg-red-500/20 text-red-300 border border-red-700/40 px-3 py-1 rounded-full">
+                  <Ban className="w-3.5 h-3.5" /> Vencido há {Math.abs(dias)} dia(s)
+                </span>
+              )}
+              {tenant.statusPagamento === 'pendente' && (
+                <span className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-300 border border-amber-700/40 px-3 py-1 rounded-full">
+                  <Clock className="w-3.5 h-3.5" /> PIX pendente
+                </span>
+              )}
+              {(!tenant.statusPagamento || tenant.statusPagamento === 'suspenso') && !venc && (
+                <span className="flex items-center gap-1.5 text-xs bg-gray-500/20 text-gray-400 border border-gray-600 px-3 py-1 rounded-full">
+                  <Clock className="w-3.5 h-3.5" /> Sem assinatura ativa
+                </span>
+              )}
+              {venc && (
+                <span className="text-xs text-gray-400">
+                  Vencimento: <strong className="text-gray-300">{venc.toLocaleDateString('pt-BR')}</strong>
+                </span>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Ações manuais */}
+        <div className="flex flex-wrap gap-3 mb-5">
+          <button
+            onClick={handleAtivarTrial}
+            disabled={ativandoTrial}
+            className="flex items-center gap-2 bg-amber-700/40 hover:bg-amber-700/60 border border-amber-700/60 disabled:opacity-50 text-amber-300 px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            {ativandoTrial ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+            Ativar 30 dias (trial)
+          </button>
+          <button
+            onClick={handleRenovar}
+            disabled={renovando}
+            className="flex items-center gap-2 bg-emerald-700/40 hover:bg-emerald-700/60 border border-emerald-700/60 disabled:opacity-50 text-emerald-300 px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            {renovando ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+            Renovar 30 dias
+          </button>
+        </div>
+
+        <hr className="border-gray-700 mb-5" />
+
+        {/* Cobrança via PIX (Mercado Pago) */}
+        <p className="text-xs text-gray-500 mb-3 uppercase tracking-wide">Cobrança automática via PIX</p>
+
         <div className="mb-4">
-          <label className="block text-xs text-gray-400 mb-1">WhatsApp do responsável (destino da cobrança)</label>
+          <label className="block text-xs text-gray-400 mb-1">WhatsApp do responsável (destino do PIX)</label>
           <div className="flex gap-2">
             <input
               type="tel"
@@ -450,67 +537,37 @@ export default function TenantDetail() {
               Salvar
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-1">Número com DDI (ex: 5531987654321). O PIX será enviado para este WhatsApp.</p>
         </div>
 
-        {/* Status atual */}
-        <div className="flex items-center gap-3 mb-4">
-          {(!tenant.statusPagamento || tenant.statusPagamento === 'ativo') && (
-            <span className="flex items-center gap-1.5 text-xs bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full">
-              <CheckCircle className="w-3.5 h-3.5" />
-              {tenant.statusPagamento === 'ativo' ? 'Ativo — pago' : 'Aguardando primeira cobrança'}
-            </span>
-          )}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <button
+            onClick={handleGerarCobranca}
+            disabled={gerandoPIX || !tenant.whatsappContato}
+            title={!tenant.whatsappContato ? 'Informe o WhatsApp do responsável antes de gerar' : ''}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            {gerandoPIX ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+            Gerar cobrança PIX
+          </button>
           {tenant.statusPagamento === 'pendente' && (
-            <>
-              <span className="flex items-center gap-1.5 text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full">
-                <Clock className="w-3.5 h-3.5" /> PIX pendente
-              </span>
-              <button
-                onClick={handleVerificarPagamento}
-                disabled={verificandoPIX}
-                className="flex items-center gap-1.5 text-xs bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 px-3 py-1 rounded-full transition-colors"
-              >
-                {verificandoPIX ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                Verificar pagamento
-              </button>
-            </>
-          )}
-          {tenant.statusPagamento === 'suspenso' && (
-            <span className="flex items-center gap-1.5 text-xs bg-red-500/20 text-red-300 px-3 py-1 rounded-full">
-              <Ban className="w-3.5 h-3.5" /> Suspenso — inadimplente
-            </span>
-          )}
-          {tenant.proximoVencimento && (
-            <span className="text-xs text-gray-400">
-              {tenant.statusPagamento === 'pendente' ? 'PIX expira em: ' : 'Próximo vencimento: '}
-              <strong className="text-gray-300">
-                {new Date(tenant.proximoVencimento).toLocaleDateString('pt-BR')}
-              </strong>
-            </span>
+            <button
+              onClick={handleVerificarPagamento}
+              disabled={verificandoPIX}
+              className="flex items-center gap-1.5 text-xs bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 px-3 py-2 rounded-lg transition-colors"
+            >
+              {verificandoPIX ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+              Verificar pagamento
+            </button>
           )}
         </div>
 
+        {erroCobranca && <p className="text-red-400 text-sm mb-3">{erroCobranca}</p>}
         {resultadoVerif && (
           <p className={`text-xs mb-3 ${resultadoVerif.ok ? 'text-emerald-400' : 'text-amber-400'}`}>
             {resultadoVerif.msg}
           </p>
         )}
 
-        {/* Botão gerar cobrança */}
-        <button
-          onClick={handleGerarCobranca}
-          disabled={gerandoPIX || !tenant.whatsappContato}
-          title={!tenant.whatsappContato ? 'Informe o WhatsApp do responsável antes de gerar' : ''}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium mb-4"
-        >
-          {gerandoPIX ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
-          {tenant.statusPagamento === 'suspenso' ? 'Gerar novo PIX (reativar)' : tenant.statusPagamento === 'pendente' ? 'Gerar novo PIX' : 'Gerar cobrança PIX'}
-        </button>
-
-        {erroCobranca && <p className="text-red-400 text-sm mb-3">{erroCobranca}</p>}
-
-        {/* PIX gerado */}
         {pixGerado && (
           <div className="bg-gray-900 rounded-lg p-4 border border-indigo-700/50">
             <p className="text-xs text-gray-400 mb-2">PIX enviado ao WhatsApp do provedor ✅</p>
@@ -530,7 +587,6 @@ export default function TenantDetail() {
             )}
           </div>
         )}
-
       </div>
 
       {/* Zona de perigo */}

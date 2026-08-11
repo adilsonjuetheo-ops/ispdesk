@@ -22,6 +22,7 @@ import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
 import { agendarCobrancaRecorrente } from './jobs/cobrancaRecorrente.js';
 import { agendarRenovacaoTokenMeta } from './jobs/renovarTokenMeta.js';
 import { agendarLembretesFatura } from './jobs/lembreteFaturas.js';
+import { agendarAlertaVencimento } from './jobs/alertaVencimento.js';
 import { runMigrations } from './db/migrations.js';
 import { criarRateLimit, headersSeguranca } from './middleware/security.js';
 
@@ -101,4 +102,5 @@ app.listen(PORT, async () => {
   agendarCobrancaRecorrente();
   agendarRenovacaoTokenMeta();
   agendarLembretesFatura();
+  agendarAlertaVencimento();
 });
