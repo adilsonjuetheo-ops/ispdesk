@@ -107,6 +107,10 @@ export async function runMigrations() {
     await sql`ALTER TABLE filiais ADD COLUMN IF NOT EXISTS waba_id text`;
     await sql`ALTER TABLE filiais ADD COLUMN IF NOT EXISTS whatsapp_conectado_em timestamp`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_filiais_wpp_number ON filiais(whatsapp_number_id) WHERE whatsapp_number_id IS NOT NULL`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_ativo boolean DEFAULT false`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_template_pre text`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_template_pos text`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_idioma text DEFAULT 'pt_BR'`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

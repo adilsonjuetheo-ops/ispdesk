@@ -36,6 +36,10 @@ export const tenants = pgTable('tenants', {
   assinaturaTipo:     text('assinatura_tipo'),   // 'zapsign' | 'd4sign' | null
   assinaturaToken:    text('assinatura_token'),
   assinaturaExtra:    jsonb('assinatura_extra'), // { templateToken, cofreUuid, cryptKey }
+  lembreteFaturaAtivo:         boolean('lembrete_fatura_ativo').default(false),
+  lembreteFaturaTemplatePre:   text('lembrete_fatura_template_pre'), // nome do template aprovado — D-1
+  lembreteFaturaTemplatePos:   text('lembrete_fatura_template_pos'), // nome do template aprovado — D+5
+  lembreteFaturaIdioma:        text('lembrete_fatura_idioma').default('pt_BR'),
   criadoEm:           timestamp('criado_em').defaultNow(),
   atualizadoEm:       timestamp('atualizado_em').defaultNow(),
 });

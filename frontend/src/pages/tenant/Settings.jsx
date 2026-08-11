@@ -929,6 +929,44 @@ export default function Settings() {
               )}
 
               {tenant.sgpTipo && <TestarSgp />}
+
+              {tenant.sgpTipo === 'tsmx' && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-1">Lembretes automáticos de fatura</h3>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Envia um template do WhatsApp 1 dia antes do vencimento e outro 5 dias depois do vencimento.
+                    Requer templates já aprovados pela Meta (categoria "Utilidade") no WhatsApp Manager do provedor.
+                  </p>
+                  <label className="flex items-center gap-2 text-sm text-gray-700 mb-3">
+                    <input
+                      type="checkbox"
+                      checked={!!tenant.lembreteFaturaAtivo}
+                      onChange={e => set('lembreteFaturaAtivo', e.target.checked)}
+                    />
+                    Ativar lembretes automáticos
+                  </label>
+                  <div className="space-y-3">
+                    <Field
+                      label="Nome do template — pré-vencimento (D-1)"
+                      value={tenant.lembreteFaturaTemplatePre || ''}
+                      onChange={v => set('lembreteFaturaTemplatePre', v)}
+                      placeholder="ex: lembrete_vencimento"
+                    />
+                    <Field
+                      label="Nome do template — pós-vencimento (D+5)"
+                      value={tenant.lembreteFaturaTemplatePos || ''}
+                      onChange={v => set('lembreteFaturaTemplatePos', v)}
+                      placeholder="ex: lembrete_atraso"
+                    />
+                    <Field
+                      label="Idioma do template"
+                      value={tenant.lembreteFaturaIdioma || 'pt_BR'}
+                      onChange={v => set('lembreteFaturaIdioma', v)}
+                      placeholder="pt_BR"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 

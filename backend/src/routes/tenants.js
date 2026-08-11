@@ -70,6 +70,7 @@ router.put('/me', autenticar, async (req, res) => {
     whatsappNumberId, whatsappToken, systemPrompt, nomeAssistente,
     sgpTipo, sgpApiUrl, sgpApiKey,
     assinaturaTipo, assinaturaToken, assinaturaExtra,
+    lembreteFaturaAtivo, lembreteFaturaTemplatePre, lembreteFaturaTemplatePos, lembreteFaturaIdioma,
   } = req.body;
   const [tenant] = await db.update(tenants)
     .set({
@@ -81,6 +82,10 @@ router.put('/me', autenticar, async (req, res) => {
       assinaturaTipo: assinaturaTipo || null,
       assinaturaToken: assinaturaToken || null,
       assinaturaExtra: assinaturaExtra || null,
+      lembreteFaturaAtivo: !!lembreteFaturaAtivo,
+      lembreteFaturaTemplatePre: lembreteFaturaTemplatePre || null,
+      lembreteFaturaTemplatePos: lembreteFaturaTemplatePos || null,
+      lembreteFaturaIdioma: lembreteFaturaIdioma || 'pt_BR',
       atualizadoEm: new Date(),
     })
     .where(eq(tenants.id, req.user.tenantId))

@@ -26,6 +26,17 @@ export class SgpAdaptador {
     return TOOLS_PADRAO;
   }
 
+  // Lista títulos (de todos os clientes) com vencimento numa data "AAAA-MM-DD".
+  // Usado pelos lembretes automáticos de fatura. Retorna [] se o SGP não suportar.
+  async listarTitulosPorVencimento(data) {
+    return [];
+  }
+
+  // Retorna o telefone (formato apto a WhatsApp) do cliente pelo CPF/CNPJ, ou null.
+  async buscarTelefonePorDocumento(doc) {
+    return null;
+  }
+
   async executarTool(toolName, toolInput) {
     throw new Error(`${this.constructor.name}: executarTool não implementado`);
   }

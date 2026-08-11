@@ -12,7 +12,7 @@ const ADAPTADORES = {
   tsmx:     SgpTsmxAdaptador,
 };
 
-function criarSgp(tenant) {
+export function criarSgp(tenant) {
   // tenant.sgpTipo e tenant.sgpApiKey — camelCase conforme schema Drizzle
   if (!tenant.sgpTipo || !tenant.sgpApiKey) return null;
   const Adaptador = ADAPTADORES[tenant.sgpTipo] ?? GenericoAdaptador;

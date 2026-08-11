@@ -61,6 +61,14 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     return contratos.find(c => c.contratoStatus === 1) || contratos[0];
   }
 
+  // Converte "(38) 99733-8693" -> "5538997338693" (formato aceito pela API do WhatsApp)
+  #formatarTelefoneWhatsapp(tel) {
+    let d = (tel || '').replace(/\D/g, '');
+    if (!d) return null;
+    if (d.length === 10 || d.length === 11) d = `55${d}`;
+    return d;
+  }
+
   #formatarContexto(c) {
     const nome = c.razaoSocial || c.nome || 'não informado';
     const status = (c.contratoStatusDisplay || '').trim() || 'não informado';
@@ -123,6 +131,38 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
       statusContrato: (c.contratoStatusDisplay || '').trim().toLowerCase() || 'inativo',
       filialNome: c.endereco_cidade || null,
     };
+  }
+
+  // Lista títulos (todos os clientes) vencendo em uma data específica ("AAAA-MM-DD"),
+  // já filtrados por status "aberto". Usado pelos lembretes automáticos de fatura.
+  async listarTitulosPorVencimento(data) {
+    const limit = 250;
+    let offset = 0;
+    let todos = [];
+
+    while (true) {
+      const resp = await this.#consultarTitulos({
+        data_vencimento_inicio: data,
+        data_vencimento_fim: data,
+        offset,
+        limit,
+      });
+      const pagina = resp?.titulos || [];
+      todos = todos.concat(pagina);
+
+      const total = resp?.paginacao?.total ?? todos.length;
+      if (pagina.length === 0 || todos.length >= total) break;
+      offset += limit;
+    }
+
+    return todos.filter(t => t.status === 'aberto');
+  }
+
+  async buscarTelefonePorDocumento(doc) {
+    const data = await this.#consultarCliente({ cpfcnpj: this.#formatarDocumento(doc) }).catch(() => null);
+    if (!data?.contratos?.length) return null;
+    const c = this.#contratoAtivo(data.contratos);
+    return this.#formatarTelefoneWhatsapp(c?.telefones?.[0]?.contato);
   }
 
   async executarTool(toolName, toolInput) {
