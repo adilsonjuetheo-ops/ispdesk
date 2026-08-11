@@ -7,7 +7,7 @@ import {
   Send, UserCheck, Bot, X, Loader2, Paperclip, FileText,
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
-  List, ListOrdered, Plus, ArrowLeft,
+  List, ListOrdered, Plus, ArrowLeft, Video,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -46,8 +46,9 @@ function DateSeparator({ date }) {
 function MidiaBolao({ msg, isCliente }) {
   const { conteudo, midiaUrl, conversaId } = msg;
   const isImagem = conteudo.startsWith('[Imagem]');
-  const isAudio = conteudo.startsWith('[Áudio]');
-  const nome = conteudo.replace(/^\[(Imagem|Arquivo|Áudio)\] /, '');
+  const isAudio  = conteudo.startsWith('[Áudio]');
+  const isVideo  = conteudo.startsWith('[Vídeo]');
+  const nome = conteudo.replace(/^\[(Imagem|Arquivo|Áudio|Vídeo)\] /, '');
   const cor = isCliente
     ? 'bg-white border border-gray-200 text-gray-700'
     : 'bg-blue-50 border border-blue-100 text-blue-800';
@@ -72,8 +73,24 @@ function MidiaBolao({ msg, isCliente }) {
     );
   }
 
-  const Icon = isImagem ? ImageIcon : isAudio ? Mic : FileText;
-  const label = isImagem ? 'Imagem enviada' : isAudio ? (isCliente ? 'Áudio transcrito' : 'Áudio enviado') : 'Documento enviado';
+  if (isVideo && midiaUrl) {
+    return (
+      <div className="rounded-2xl overflow-hidden max-w-[280px]">
+        <video
+          src={`/api/conversations/${conversaId}/media/${midiaUrl}`}
+          controls
+          preload="metadata"
+          className="w-full rounded-2xl"
+        />
+      </div>
+    );
+  }
+
+  const Icon = isImagem ? ImageIcon : isAudio ? Mic : isVideo ? Video : FileText;
+  const label = isImagem ? 'Imagem enviada'
+    : isAudio  ? (isCliente ? 'Áudio transcrito' : 'Áudio enviado')
+    : isVideo  ? 'Vídeo enviado'
+    : 'Documento enviado';
   return (
     <div className={`flex items-start gap-2 rounded-2xl px-3 py-2.5 text-sm max-w-[280px] ${cor}`}>
       <Icon className="w-5 h-5 shrink-0 opacity-60 mt-0.5" />
@@ -108,7 +125,7 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
   const isBot = msg.origem === 'bot';
   const isNota = msg.origem === 'nota';
   const isSistema = msg.conteudo.startsWith('[Sistema]');
-  const isMidia = msg.conteudo.startsWith('[Arquivo]') || msg.conteudo.startsWith('[Imagem]') || msg.conteudo.startsWith('[Áudio]');
+  const isMidia = msg.conteudo.startsWith('[Arquivo]') || msg.conteudo.startsWith('[Imagem]') || msg.conteudo.startsWith('[Áudio]') || msg.conteudo.startsWith('[Vídeo]');
 
   if (isSistema) {
     return (

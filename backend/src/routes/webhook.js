@@ -171,8 +171,16 @@ router.post('/', async (req, res) => {
             await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
             await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa, filialEntrada, midiaData);
             continue;
+          } else if (msg.type === 'video') {
+            const mediaId = msg.video?.id;
+            if (!mediaId) continue;
+            const caption = msg.video?.caption ? ` — "${msg.video.caption}"` : '';
+            texto = `[Vídeo]${caption}`;
+            await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
+            await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa, filialEntrada, null);
+            continue;
           } else {
-            // Ignora outros tipos silenciosamente (vídeo, sticker, etc.)
+            // Ignora outros tipos silenciosamente (sticker, reação, etc.)
             continue;
           }
 
