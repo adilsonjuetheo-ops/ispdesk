@@ -51,7 +51,10 @@ export async function processarMensagem(tenant, conversa, historico, novaMensage
 
   // 2. System prompt com contexto SGP injetado
   const temSgp = !!(tenant.sgpTipo && tenant.sgpApiKey);
+  const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' });
   const systemPrompt = `${tenant.systemPrompt || ''}
+
+DATA E HORA ATUAL: ${agora} (horário de Brasília). Use isso para saudar o cliente corretamente (bom dia até 12h, boa tarde até 18h, boa noite após 18h) e para contextualizar qualquer referência a datas.
 
 ${contextoSgp}
 
