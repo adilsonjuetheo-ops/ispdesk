@@ -444,6 +444,93 @@ function TestarLembretes() {
   );
 }
 
+function TestarLembreteCliente() {
+  const [documento, setDocumento] = useState('');
+  const [tipo, setTipo] = useState('pre');
+  const [carregando, setCarregando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [erro, setErro] = useState('');
+
+  async function testar() {
+    if (!documento.trim()) return;
+    const confirmado = window.confirm(
+      `Isso vai enviar o template "${tipo === 'pos' ? 'pós-vencimento' : 'pré-vencimento'}" de verdade pro cliente com esse CPF/CNPJ, agora. Confirma?`
+    );
+    if (!confirmado) return;
+
+    setCarregando(true);
+    setResultado(null);
+    setErro('');
+    try {
+      const { data } = await api.post('/tenants/me/testar-lembretes-cliente', { documento: documento.trim(), tipo });
+      setResultado(data.resultado);
+    } catch (err) {
+      setErro(err.response?.data?.erro || err.message || 'Erro ao testar');
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 border border-dashed border-amber-300 bg-amber-50 rounded-lg p-3 space-y-2">
+      <p className="text-xs text-amber-700">Testa o envio real com um cliente específico (por CPF/CNPJ), sem depender da data de vencimento de hoje.</p>
+      <div className="flex gap-1 text-xs">
+        <button
+          type="button"
+          onClick={() => setTipo('pre')}
+          className={`px-2.5 py-1 rounded-md transition-colors ${tipo === 'pre' ? 'bg-amber-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+        >
+          Pré-vencimento
+        </button>
+        <button
+          type="button"
+          onClick={() => setTipo('pos')}
+          className={`px-2.5 py-1 rounded-md transition-colors ${tipo === 'pos' ? 'bg-amber-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+        >
+          Pós-vencimento
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={documento}
+          onChange={e => setDocumento(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && testar()}
+          placeholder="CPF ou CNPJ do cliente"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+        />
+        <button
+          type="button"
+          onClick={testar}
+          disabled={carregando || !documento.trim()}
+          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+        >
+          {carregando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          Enviar teste
+        </button>
+      </div>
+      {erro && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 whitespace-pre-wrap">{erro}</div>
+      )}
+      {resultado && (
+        <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 space-y-1">
+          {resultado.erro ? (
+            <p className="text-red-600">{resultado.erro}</p>
+          ) : (
+            <>
+              <p>Cliente: {resultado.cliente}</p>
+              <p>Valor: R$ {resultado.valor} | Vencimento: {resultado.vencimento}</p>
+              <p className={resultado.enviado ? 'text-green-600' : 'text-red-600'}>
+                {resultado.enviado ? '✓ Enviado com sucesso' : `✗ Falha: ${resultado.motivo}`}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const CORES_TAGS = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6'];
 
 function TagsSection() {
@@ -1029,6 +1116,7 @@ export default function Settings() {
                     />
                   </div>
                   {tenant.lembreteFaturaAtivo && <TestarLembretes />}
+                  {tenant.lembreteFaturaAtivo && <TestarLembreteCliente />}
                 </div>
               )}
             </div>

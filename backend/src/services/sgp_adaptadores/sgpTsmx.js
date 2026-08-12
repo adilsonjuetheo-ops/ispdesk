@@ -165,6 +165,20 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     return this.#formatarTelefoneWhatsapp(c?.telefones?.[0]?.contato);
   }
 
+  // Busca o título em aberto mais próximo do vencimento para um cliente
+  // específico, independente de data — usado no teste manual por CPF.
+  async buscarTituloAbertoPorDocumento(doc) {
+    const data = await this.#consultarCliente({ cpfcnpj: this.#formatarDocumento(doc) }).catch(() => null);
+    if (!data?.contratos?.length) return null;
+    const c = this.#contratoAtivo(data.contratos);
+
+    const tituloResp = await this.#consultarTitulos({ contrato: c.contratoId }).catch(() => null);
+    const abertos = (tituloResp?.titulos || []).filter(t => t.status === 'aberto');
+    if (!abertos.length) return null;
+
+    return abertos.sort((a, b) => new Date(a.dataVencimento) - new Date(b.dataVencimento))[0];
+  }
+
   async executarTool(toolName, toolInput) {
     if (toolName === 'desbloquear_cliente') {
       const contrato = toolInput.id_cliente || toolInput.id_contrato;

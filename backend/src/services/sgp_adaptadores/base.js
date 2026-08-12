@@ -37,6 +37,12 @@ export class SgpAdaptador {
     return null;
   }
 
+  // Retorna o título em aberto mais próximo do vencimento de um cliente pelo
+  // CPF/CNPJ, independente de data. Usado no teste manual de lembretes.
+  async buscarTituloAbertoPorDocumento(doc) {
+    return null;
+  }
+
   async executarTool(toolName, toolInput) {
     throw new Error(`${this.constructor.name}: executarTool não implementado`);
   }

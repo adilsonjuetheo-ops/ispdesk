@@ -6,7 +6,7 @@ import { autenticar, apenasSuper } from '../middleware/auth.js';
 import crypto from 'crypto';
 import { getLimite, getUso, getMes } from '../services/limites.js';
 import { buscarContextoSgp, buscarContextoPorDocumentoSgp } from '../services/sgp.js';
-import { processarProvedor as processarLembretesProvedor } from '../jobs/lembreteFaturas.js';
+import { processarProvedor as processarLembretesProvedor, testarClienteEspecifico } from '../jobs/lembreteFaturas.js';
 
 const router = Router();
 
@@ -134,6 +134,30 @@ router.post('/me/testar-lembretes', autenticar, async (req, res) => {
 
   try {
     const resultado = await processarLembretesProvedor(tenant);
+    res.json({ ok: true, resultado });
+  } catch (err) {
+    res.status(502).json({ ok: false, erro: err.message });
+  }
+});
+
+// Dispara o envio de um lembrete de fatura pra um cliente específico (por
+// CPF/CNPJ), independente da data de vencimento — útil pra validar o envio.
+router.post('/me/testar-lembretes-cliente', autenticar, async (req, res) => {
+  if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+  if (req.user.role !== 'admin') return res.status(403).json({ erro: 'Apenas admins' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, req.user.tenantId)).limit(1);
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+  if (!tenant.lembreteFaturaAtivo) {
+    return res.status(400).json({ erro: 'Lembretes automáticos não estão ativados para este provedor' });
+  }
+
+  const { documento, tipo } = req.body;
+  if (!documento) return res.status(400).json({ erro: 'Informe o CPF/CNPJ do cliente' });
+  if (!['pre', 'pos'].includes(tipo)) return res.status(400).json({ erro: 'Tipo deve ser "pre" ou "pos"' });
+
+  try {
+    const resultado = await testarClienteEspecifico(tenant, documento, tipo);
     res.json({ ok: true, resultado });
   } catch (err) {
     res.status(502).json({ ok: false, erro: err.message });

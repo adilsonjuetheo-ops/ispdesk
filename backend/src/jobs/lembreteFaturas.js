@@ -88,6 +88,30 @@ async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo) {
   }
 }
 
+// Envia (de verdade) o template pra um cliente específico, independente da
+// data de vencimento — usado pra validar o envio manualmente durante testes.
+export async function testarClienteEspecifico(tenant, documento, tipo) {
+  const sgp = criarSgp(tenant);
+  if (!sgp || typeof sgp.buscarTituloAbertoPorDocumento !== 'function') {
+    return { erro: 'Este SGP não tem suporte a lembretes automáticos.' };
+  }
+
+  const doc = (documento || '').replace(/\D/g, '');
+  const titulo = await sgp.buscarTituloAbertoPorDocumento(doc);
+  if (!titulo) return { erro: 'Cliente não encontrado ou sem fatura em aberto.' };
+
+  const nomeTemplate = tipo === 'pos' ? tenant.lembreteFaturaTemplatePos : tenant.lembreteFaturaTemplatePre;
+  const rotulo = tipo === 'pos' ? 'pós-vencimento' : 'pré-vencimento';
+
+  const r = await enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo);
+  return {
+    ...r,
+    cliente: titulo.clienteNome,
+    valor: titulo.valor,
+    vencimento: titulo.dataVencimento,
+  };
+}
+
 export async function processarProvedor(tenant) {
   const sgp = criarSgp(tenant);
   if (!sgp || typeof sgp.listarTitulosPorVencimento !== 'function') {
