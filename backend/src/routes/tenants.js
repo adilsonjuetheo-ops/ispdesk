@@ -6,6 +6,7 @@ import { autenticar, apenasSuper } from '../middleware/auth.js';
 import crypto from 'crypto';
 import { getLimite, getUso, getMes } from '../services/limites.js';
 import { buscarContextoSgp, buscarContextoPorDocumentoSgp } from '../services/sgp.js';
+import { processarProvedor as processarLembretesProvedor } from '../jobs/lembreteFaturas.js';
 
 const router = Router();
 
@@ -113,6 +114,26 @@ router.post('/me/testar-sgp', autenticar, async (req, res) => {
     const resultado = documento
       ? await buscarContextoPorDocumentoSgp(tenant, documento)
       : await buscarContextoSgp(tenant, telefone);
+    res.json({ ok: true, resultado });
+  } catch (err) {
+    res.status(502).json({ ok: false, erro: err.message });
+  }
+});
+
+// Dispara manualmente o job de lembretes de fatura para o próprio provedor
+// (envia templates de verdade — mesmo processo que roda automaticamente às 9h)
+router.post('/me/testar-lembretes', autenticar, async (req, res) => {
+  if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+  if (req.user.role !== 'admin') return res.status(403).json({ erro: 'Apenas admins' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, req.user.tenantId)).limit(1);
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+  if (!tenant.lembreteFaturaAtivo) {
+    return res.status(400).json({ erro: 'Lembretes automáticos não estão ativados para este provedor' });
+  }
+
+  try {
+    const resultado = await processarLembretesProvedor(tenant);
     res.json({ ok: true, resultado });
   } catch (err) {
     res.status(502).json({ ok: false, erro: err.message });

@@ -57,13 +57,13 @@ async function registrarMensagemBot(tenant, telefone, texto) {
 }
 
 async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo) {
-  if (!nomeTemplate) return;
+  if (!nomeTemplate) return { enviado: false, motivo: 'Template não configurado' };
 
   try {
     const telefone = await sgp.buscarTelefonePorDocumento(titulo.clienteCpfcnpj);
     if (!telefone) {
       console.warn(`[lembretes] Sem telefone para ${titulo.clienteNome} (fatura ${titulo.id})`);
-      return;
+      return { enviado: false, motivo: 'Telefone não encontrado no SGP' };
     }
 
     const valor = Number(titulo.valorCorrigido || titulo.valor || 0).toFixed(2).replace('.', ',');
@@ -81,14 +81,18 @@ async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo) {
     await registrarMensagemBot(tenant, telefone, resumo);
 
     console.log(`[lembretes] ${rotulo} enviado: ${titulo.clienteNome} (fatura ${titulo.id})`);
+    return { enviado: true };
   } catch (err) {
     console.error(`[lembretes] Falha ao enviar ${rotulo} (fatura ${titulo.id}):`, err.message);
+    return { enviado: false, motivo: err.message };
   }
 }
 
-async function processarProvedor(tenant) {
+export async function processarProvedor(tenant) {
   const sgp = criarSgp(tenant);
-  if (!sgp || typeof sgp.listarTitulosPorVencimento !== 'function') return;
+  if (!sgp || typeof sgp.listarTitulosPorVencimento !== 'function') {
+    return { erro: 'Este SGP não tem suporte a lembretes automáticos.' };
+  }
 
   const amanha = paraDataISO(1);
   const ha5dias = paraDataISO(-5);
@@ -104,12 +108,26 @@ async function processarProvedor(tenant) {
     }),
   ]);
 
+  const resultado = {
+    preEncontradas: venceAmanha.length,
+    preEnviadas: 0,
+    posEncontradas: venceu5dias.length,
+    posEnviadas: 0,
+    falhas: [],
+  };
+
   for (const titulo of venceAmanha) {
-    await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePre, 'pré-vencimento');
+    const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePre, 'pré-vencimento');
+    if (r.enviado) resultado.preEnviadas++;
+    else resultado.falhas.push(`${titulo.clienteNome} (pré-vencimento): ${r.motivo}`);
   }
   for (const titulo of venceu5dias) {
-    await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePos, 'pós-vencimento');
+    const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePos, 'pós-vencimento');
+    if (r.enviado) resultado.posEnviadas++;
+    else resultado.falhas.push(`${titulo.clienteNome} (pós-vencimento): ${r.motivo}`);
   }
+
+  return resultado;
 }
 
 async function processarLembretes() {

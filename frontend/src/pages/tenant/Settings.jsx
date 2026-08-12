@@ -381,6 +381,69 @@ function TestarSgp() {
   );
 }
 
+function TestarLembretes() {
+  const [carregando, setCarregando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [erro, setErro] = useState('');
+
+  async function testar() {
+    const confirmado = window.confirm(
+      'Isso vai enviar lembretes REAIS agora para todos os clientes com fatura vencendo amanhã ou vencida há 5 dias. Não é uma simulação. Confirma?'
+    );
+    if (!confirmado) return;
+
+    setCarregando(true);
+    setResultado(null);
+    setErro('');
+    try {
+      const { data } = await api.post('/tenants/me/testar-lembretes');
+      setResultado(data.resultado);
+    } catch (err) {
+      setErro(err.response?.data?.erro || err.message || 'Erro ao testar');
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 border border-dashed border-amber-300 bg-amber-50 rounded-lg p-3 space-y-2">
+      <p className="text-xs text-amber-700">Isso dispara o processo real agora — envia mensagem de verdade para os clientes elegíveis hoje, não é uma simulação.</p>
+      <button
+        type="button"
+        onClick={testar}
+        disabled={carregando}
+        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+      >
+        {carregando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+        Testar agora (envio real)
+      </button>
+      {erro && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 whitespace-pre-wrap">{erro}</div>
+      )}
+      {resultado && (
+        <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 space-y-1">
+          {resultado.erro ? (
+            <p className="text-red-600">{resultado.erro}</p>
+          ) : (
+            <>
+              <p>Pré-vencimento: {resultado.preEnviadas}/{resultado.preEncontradas} enviados</p>
+              <p>Pós-vencimento: {resultado.posEnviadas}/{resultado.posEncontradas} enviados</p>
+              {resultado.falhas?.length > 0 && (
+                <div className="text-red-600 mt-1">
+                  <p className="font-medium">Falhas:</p>
+                  <ul className="list-disc list-inside">
+                    {resultado.falhas.map((f, i) => <li key={i}>{f}</li>)}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const CORES_TAGS = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6'];
 
 function TagsSection() {
@@ -965,6 +1028,7 @@ export default function Settings() {
                       placeholder="pt_BR"
                     />
                   </div>
+                  {tenant.lembreteFaturaAtivo && <TestarLembretes />}
                 </div>
               )}
             </div>
