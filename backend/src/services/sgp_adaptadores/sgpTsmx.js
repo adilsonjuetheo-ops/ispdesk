@@ -13,6 +13,29 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     return { app: app || '', token: resto.join(':') || '' };
   }
 
+  // Retry com timeout — só para chamadas de LEITURA (idempotentes, seguras de repetir).
+  // A API do SGP TSMX vem apresentando timeouts intermitentes em consultas sem
+  // filtro de contrato (ex: listar títulos por data em toda a base).
+  async #fetchComRetry(url, options, tentativas = 3) {
+    let ultimoErro;
+    for (let i = 0; i < tentativas; i++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      try {
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(timeoutId);
+        return res;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        ultimoErro = err;
+        if (i < tentativas - 1) {
+          await new Promise(r => setTimeout(r, 2000 * (i + 1)));
+        }
+      }
+    }
+    throw new Error(`SGP indisponível após ${tentativas} tentativas: ${ultimoErro?.message}`);
+  }
+
   async #chamar(endpoint, filtro) {
     const base = await this.validarApiUrl();
     const { app, token } = this.#credenciais();
@@ -23,7 +46,7 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
       if (v != null) form.append(k, String(v));
     }
     const url = new URL(`api/ura/${endpoint}/`, `${base.toString().replace(/\/$/, '')}/`);
-    const res = await fetch(url, { method: 'POST', body: form });
+    const res = await this.#fetchComRetry(url, { method: 'POST', body: form });
     if (!res.ok) throw new Error(`SGP HTTP ${res.status}`);
     return res.json();
   }

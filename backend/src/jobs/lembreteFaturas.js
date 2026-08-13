@@ -121,31 +121,37 @@ export async function processarProvedor(tenant) {
   const amanha = paraDataISO(1);
   const ha5dias = paraDataISO(-5);
 
+  const falhasConsulta = [];
   const [venceAmanha, venceu5dias] = await Promise.all([
     sgp.listarTitulosPorVencimento(amanha).catch(err => {
       console.error(`[lembretes] Erro ao listar títulos (D-1) de ${tenant.nome}:`, err.message);
-      return [];
+      falhasConsulta.push(`Consulta D-1 falhou: ${err.message}`);
+      return null;
     }),
     sgp.listarTitulosPorVencimento(ha5dias).catch(err => {
       console.error(`[lembretes] Erro ao listar títulos (D+5) de ${tenant.nome}:`, err.message);
-      return [];
+      falhasConsulta.push(`Consulta D+5 falhou: ${err.message}`);
+      return null;
     }),
   ]);
 
   const resultado = {
-    preEncontradas: venceAmanha.length,
+    preEncontradas: venceAmanha?.length ?? null, // null = a consulta falhou, não "achou zero"
     preEnviadas: 0,
-    posEncontradas: venceu5dias.length,
+    posEncontradas: venceu5dias?.length ?? null,
     posEnviadas: 0,
-    falhas: [],
+    falhas: [...falhasConsulta],
   };
 
-  for (const titulo of venceAmanha) {
+  const listaVenceAmanha = venceAmanha || [];
+  const listaVenceu5dias = venceu5dias || [];
+
+  for (const titulo of listaVenceAmanha) {
     const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePre, 'pré-vencimento');
     if (r.enviado) resultado.preEnviadas++;
     else resultado.falhas.push(`${titulo.clienteNome} (pré-vencimento): ${r.motivo}`);
   }
-  for (const titulo of venceu5dias) {
+  for (const titulo of listaVenceu5dias) {
     const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePos, 'pós-vencimento');
     if (r.enviado) resultado.posEnviadas++;
     else resultado.falhas.push(`${titulo.clienteNome} (pós-vencimento): ${r.motivo}`);

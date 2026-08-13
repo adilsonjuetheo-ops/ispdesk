@@ -426,8 +426,8 @@ function TestarLembretes() {
             <p className="text-red-600">{resultado.erro}</p>
           ) : (
             <>
-              <p>Pré-vencimento: {resultado.preEnviadas}/{resultado.preEncontradas} enviados</p>
-              <p>Pós-vencimento: {resultado.posEnviadas}/{resultado.posEncontradas} enviados</p>
+              <p>Pré-vencimento: {resultado.preEncontradas === null ? 'erro na consulta' : `${resultado.preEnviadas}/${resultado.preEncontradas} enviados`}</p>
+              <p>Pós-vencimento: {resultado.posEncontradas === null ? 'erro na consulta' : `${resultado.posEnviadas}/${resultado.posEncontradas} enviados`}</p>
               {resultado.falhas?.length > 0 && (
                 <div className="text-red-600 mt-1">
                   <p className="font-medium">Falhas:</p>
