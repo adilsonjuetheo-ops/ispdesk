@@ -801,24 +801,20 @@ export default function Settings() {
     try {
       await carregarFbSdk();
       await new Promise((resolve, reject) => {
-        window.FB.login(async (response) => {
+        window.FB.login((response) => {
           if (!response.authResponse?.code) {
             reject(new Error('Login cancelado'));
             return;
           }
-          try {
-            const { code } = response.authResponse;
-            const sessionInfo = response.authResponse.data_access_expiration_time
-              ? null
-              : response.authResponse;
-            const wabaId = sessionInfo?.waba_id || null;
-            const phoneNumberId = sessionInfo?.phone_number_id || null;
-            await api.post(`/whatsapp/embedded-signup-filial/${filialId}`, { code, wabaId, phoneNumberId });
-            carregarFiliais();
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
+          const { code } = response.authResponse;
+          const sessionInfo = response.authResponse.data_access_expiration_time
+            ? null
+            : response.authResponse;
+          const wabaId = sessionInfo?.waba_id || null;
+          const phoneNumberId = sessionInfo?.phone_number_id || null;
+          api.post(`/whatsapp/embedded-signup-filial/${filialId}`, { code, wabaId, phoneNumberId })
+            .then(() => { carregarFiliais(); resolve(); })
+            .catch(err => reject(err));
         }, {
           config_id: import.meta.env.VITE_META_APP_ID,
           response_type: 'code',
