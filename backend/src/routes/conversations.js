@@ -361,10 +361,29 @@ router.get('/:id/media/:mediaId', async (req, res) => {
     });
     if (!mediaRes.ok) return res.status(502).end();
 
-    res.setHeader('Content-Type', mime_type || 'image/jpeg');
-    res.setHeader('Cache-Control', 'private, no-store');
     const buffer = Buffer.from(await mediaRes.arrayBuffer());
-    res.send(buffer);
+    res.setHeader('Content-Type', mime_type || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    // Áudio do WhatsApp vem em Ogg/Opus sem duração no cabeçalho: o navegador
+    // precisa de Range para descobrir o tamanho e liberar o play.
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    const range = /^bytes=(\d*)-(\d*)$/.exec((req.headers.range || '').trim());
+    if (range) {
+      const inicio = range[1] ? parseInt(range[1], 10) : 0;
+      const fim    = range[2] ? parseInt(range[2], 10) : buffer.length - 1;
+      if (inicio >= buffer.length || fim >= buffer.length || inicio > fim) {
+        res.setHeader('Content-Range', `bytes */${buffer.length}`);
+        return res.status(416).end();
+      }
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${inicio}-${fim}/${buffer.length}`);
+      res.setHeader('Content-Length', fim - inicio + 1);
+      return res.end(buffer.subarray(inicio, fim + 1));
+    }
+
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   } catch {
     res.status(502).end();
   }
