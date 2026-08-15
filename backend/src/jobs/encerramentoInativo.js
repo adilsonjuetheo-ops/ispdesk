@@ -2,7 +2,7 @@ import { db } from '../db/index.js';
 import { conversas, mensagens } from '../db/schema.js';
 import { and, ne, inArray, sql } from 'drizzle-orm';
 
-const INATIVIDADE_MS = 60 * 60 * 1000; // 1 hora
+const INATIVIDADE_MS = 4 * 60 * 60 * 1000; // 4 horas
 
 // Controle de atividade em memória: evita varrer o banco quando não há nada
 // que possa expirar, permitindo o autosuspend do Neon em períodos ociosos.
@@ -43,7 +43,7 @@ export async function encerramentoInativo() {
     await db.insert(mensagens).values({
       conversaId: c.id,
       origem: 'bot',
-      conteudo: '[Sistema] Conversa encerrada automaticamente por inatividade (1 hora).',
+      conteudo: '[Sistema] Conversa encerrada automaticamente por inatividade (4 horas).',
     });
   }
 
