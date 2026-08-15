@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import api from '../lib/api.js';
+import api, { urlMidia } from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { usePolling } from '../hooks/usePolling.js';
 import { useNotificationSound } from '../hooks/useNotificationSound.js';
@@ -57,7 +57,7 @@ function MidiaBolao({ msg, isCliente }) {
     return (
       <div className="rounded-2xl overflow-hidden max-w-[280px]">
         <img
-          src={`/api/conversations/${conversaId}/media/${midiaUrl}`}
+          src={urlMidia(conversaId, midiaUrl)}
           alt="Imagem"
           className="w-full object-cover rounded-2xl"
           onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
@@ -77,7 +77,7 @@ function MidiaBolao({ msg, isCliente }) {
     return (
       <div className="rounded-2xl overflow-hidden max-w-[280px]">
         <video
-          src={`/api/conversations/${conversaId}/media/${midiaUrl}`}
+          src={urlMidia(conversaId, midiaUrl)}
           controls
           preload="metadata"
           className="w-full rounded-2xl"
@@ -94,7 +94,7 @@ function MidiaBolao({ msg, isCliente }) {
           <p className="text-xs opacity-60 font-medium">Áudio</p>
         </div>
         <audio
-          src={`/api/conversations/${conversaId}/media/${midiaUrl}`}
+          src={urlMidia(conversaId, midiaUrl)}
           controls
           className="w-full h-8"
           style={{ colorScheme: 'light' }}
