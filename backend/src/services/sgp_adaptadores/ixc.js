@@ -1,6 +1,12 @@
 import { SgpAdaptador } from './base.js';
 
+// O IXC costuma responder em menos de 2s; acima disso a conversa no WhatsApp
+// já travou. Sem teto, uma instância lenta seguraria o webhook indefinidamente.
+const TIMEOUT_MS = 15000;
+
 export class IxcAdaptador extends SgpAdaptador {
+
+  #urlValidada = null;
 
   #headers(ixcsoft) {
     const encoded = Buffer.from(this.apiKey).toString('base64');
@@ -12,9 +18,12 @@ export class IxcAdaptador extends SgpAdaptador {
     return h;
   }
 
+  // A validação faz resolução de DNS; uma busca chega a disparar várias
+  // consultas, então guardamos o resultado por instância.
   async #url(recurso) {
-    const base = await this.validarApiUrl();
-    return new URL(`webservice/v1/${recurso}`, `${base.toString().replace(/\/$/, '')}/`).toString();
+    this.#urlValidada ||= await this.validarApiUrl();
+    const base = this.#urlValidada.toString().replace(/\/$/, '');
+    return new URL(`webservice/v1/${recurso}`, `${base}/`).toString();
   }
 
   // Consulta: o IXC exige POST com header ixcsoft:listar e todos os valores como
@@ -36,11 +45,12 @@ export class IxcAdaptador extends SgpAdaptador {
       method: 'POST',
       headers: this.#headers('listar'),
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!res.ok) throw new Error(`IXC HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`IXC HTTP ${res.status} em ${recurso}`);
 
     const data = await res.json();
-    if (data?.type === 'error') throw new Error(`IXC: ${data.message}`);
+    if (data?.type === 'error') throw new Error(`IXC ${recurso}: ${data.message}`);
     return data;
   }
 
@@ -50,8 +60,9 @@ export class IxcAdaptador extends SgpAdaptador {
       method: 'POST',
       headers: this.#headers(),
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!res.ok) throw new Error(`IXC HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`IXC HTTP ${res.status} em ${recurso}`);
     return res.json();
   }
 
@@ -61,6 +72,7 @@ export class IxcAdaptador extends SgpAdaptador {
       method: 'POST',
       headers: this.#headers(),
       body: JSON.stringify({ id_areceber: String(idAreceber) }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
@@ -85,6 +97,9 @@ export class IxcAdaptador extends SgpAdaptador {
     return [...variantes];
   }
 
+  // Erros de rede NÃO viram "não encontrado": se a consulta falhar, propagamos
+  // para o chamador avisar que o sistema está indisponível. Dizer ao cliente
+  // que ele não tem cadastro quando a API caiu é pior do que não responder.
   async #buscarClientePorTelefone(whatsapp) {
     for (const campo of ['cliente.telefone_celular', 'cliente.whatsapp']) {
       for (const tel of this.#variantesTelefone(whatsapp)) {
@@ -93,7 +108,7 @@ export class IxcAdaptador extends SgpAdaptador {
           query: tel,
           oper: '=',
           rp: '1',
-        }).catch(() => null);
+        });
         if (data?.registros?.length) return data.registros[0];
       }
     }
@@ -125,20 +140,28 @@ export class IxcAdaptador extends SgpAdaptador {
       (contData.registros || []).find(ct => ct.status === 'A') ||
       contData.registros?.[0];
 
-    const fatData = await this.#listar('fn_areceber', {
-      qtype: 'fn_areceber.id_cliente',
-      query: c.id,
-      oper: '=',
-      rp: '10',
-      sortname: 'fn_areceber.data_vencimento',
-      sortorder: 'asc',
-      grid_param: JSON.stringify([{ TB: 'fn_areceber.status', OP: '=', P: 'A' }]),
-    }).catch(() => ({ registros: [] }));
+    // faturas === null significa que a consulta falhou. Não dá para tratar isso
+    // como "sem débito": o bot afirmaria que um inadimplente está em dia e ainda
+    // ofereceria desbloqueio.
+    let faturas = null;
+    try {
+      const fatData = await this.#listar('fn_areceber', {
+        qtype: 'fn_areceber.id_cliente',
+        query: c.id,
+        oper: '=',
+        rp: '10',
+        sortname: 'fn_areceber.data_vencimento',
+        sortorder: 'asc',
+        grid_param: JSON.stringify([{ TB: 'fn_areceber.status', OP: '=', P: 'A' }]),
+      });
+      faturas = fatData.registros || [];
+    } catch (err) {
+      console.error(`[IXC] Falha ao consultar faturas do cliente ${c.id}:`, err.message);
+    }
 
-    const faturas = fatData.registros || [];
     const hoje = new Date();
-    const vencidas = faturas.filter(f => new Date(f.data_vencimento) < hoje);
-    const aVencer  = faturas.filter(f => new Date(f.data_vencimento) >= hoje);
+    const vencidas = (faturas || []).filter(f => new Date(f.data_vencimento) < hoje);
+    const aVencer  = (faturas || []).filter(f => new Date(f.data_vencimento) >= hoje);
 
     const cidade = await this.#nomeCidade(c.cidade).catch(() => null);
     const internetAtiva = contratoAtivo?.status_internet === 'A';
@@ -174,13 +197,22 @@ export class IxcAdaptador extends SgpAdaptador {
       linhas.push('');
     }
 
-    if (faturas.length === 0) {
+    if (faturas === null) {
+      linhas.push('FINANCEIRO: não foi possível consultar as faturas agora (falha no sistema do provedor).');
+      linhas.push('');
+    } else if (faturas.length === 0) {
       linhas.push('FINANCEIRO: Sem faturas em aberto.');
       linhas.push('');
     }
 
     linhas.push('=== REGRA DE DESBLOQUEIO ===');
-    if (vencidas.length === 0) {
+    if (faturas === null) {
+      linhas.push(
+        'Situação financeira desconhecida — a consulta falhou. NÃO afirme que o cliente está em dia, ' +
+        'NÃO ofereça 2ª via e NÃO ofereça desbloqueio. Se o assunto for financeiro ou bloqueio, ' +
+        'escreva ACTION:HANDOFF:consulta financeira indisponível no IXC'
+      );
+    } else if (vencidas.length === 0) {
       linhas.push('Sem faturas vencidas. Pode oferecer desbloqueio.');
     } else if (vencidas.length === 1) {
       linhas.push('1 fatura vencida. Ofereça 2ª via + desbloqueio após promessa de pagamento.');
@@ -225,7 +257,7 @@ export class IxcAdaptador extends SgpAdaptador {
         query: v,
         oper: '=',
         rp: '1',
-      }).catch(() => null);
+      });
       if (data?.registros?.length) return data.registros[0];
     }
     return null;
