@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
 import { Plus, X, Loader2, Pencil, UserX, MapPin } from 'lucide-react';
 
-const FORM_VAZIO = { nome: '', email: '', senha: '', confirmar: '', role: 'agente', filialId: '' };
+const FORM_VAZIO = { nome: '', email: '', senha: '', confirmar: '', role: 'agente', filialId: '', ativo: true };
 
 export default function Agents() {
   const { user } = useAuth();
@@ -33,7 +33,7 @@ export default function Agents() {
 
   const abrirEditar = ag => {
     setEditando(ag);
-    setForm({ nome: ag.nome, email: ag.email, senha: '', confirmar: '', role: ag.role, filialId: ag.filialId || '' });
+    setForm({ nome: ag.nome, email: ag.email, senha: '', confirmar: '', role: ag.role, filialId: ag.filialId || '', ativo: ag.ativo });
     setErro('');
     setModal(true);
   };
@@ -46,7 +46,7 @@ export default function Agents() {
 
     setSaving(true);
     try {
-      const payload = { nome: form.nome, email: form.email, role: form.role, filialId: form.filialId || null };
+      const payload = { nome: form.nome, email: form.email, role: form.role, filialId: form.filialId || null, ativo: form.ativo };
       if (form.senha) payload.senha = form.senha;
 
       if (editando) {
@@ -181,6 +181,15 @@ export default function Agents() {
                       <option key={f.id} value={f.id}>{f.nome} — {f.cidade}</option>
                     ))}
                   </select>
+                </div>
+              )}
+              {editando && (
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-sm text-gray-700">Status da conta</span>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, ativo: !f.ativo }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.ativo ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.ativo ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
                 </div>
               )}
               {erro && <p className="text-red-500 text-sm">{erro}</p>}
