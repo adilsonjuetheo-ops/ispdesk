@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { conversas, mensagens, clientes, tenantUsers, filiais, tenants } from '../db/schema.js';
-import { eq, and, or, desc, ne, count, inArray, isNull } from 'drizzle-orm';
+import { eq, and, desc, ne, count, inArray } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.js';
@@ -47,14 +47,12 @@ const limitarUpload = criarRateLimit({
   mensagem: 'Muitos uploads em pouco tempo. Aguarde antes de tentar novamente.',
 });
 
+// A filial do atendente organiza a visão (filtro na lateral), não restringe
+// acesso: qualquer um da equipe abre, assume e responde qualquer conversa do
+// próprio provedor.
 function podeAcessarConversa(req, conversa) {
   if (req.user.role === 'superadmin') return true;
-  if (conversa.tenantId !== req.user.tenantId) return false;
-  // Agente preso a uma filial não enxerga as outras, mas continua atendendo o
-  // que ainda não foi roteado: antes, conversa sem filial batia com
-  // "null !== filialDoAgente" e ficava acessível só para admin.
-  if (req.user.filialId && conversa.filialId && conversa.filialId !== req.user.filialId) return false;
-  return true;
+  return conversa.tenantId === req.user.tenantId;
 }
 
 // Passa a conversa para o atendente e avisa cliente e histórico. Usado tanto
@@ -89,13 +87,30 @@ router.use((req, res, next) => {
   next();
 });
 
+// Colegas para o seletor de transferência. A rota de equipe é apenasAdmin, então
+// sem isto o atendente abria o modal e via a lista vazia.
+router.get('/agentes', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  if (!tenantId) return res.json([]);
+
+  const rows = await db.select({
+    id: tenantUsers.id,
+    nome: tenantUsers.nome,
+    role: tenantUsers.role,
+    filialNome: filiais.nome,
+  })
+    .from(tenantUsers)
+    .leftJoin(filiais, eq(tenantUsers.filialId, filiais.id))
+    .where(and(eq(tenantUsers.tenantId, tenantId), eq(tenantUsers.ativo, true)))
+    .orderBy(tenantUsers.nome);
+
+  res.json(rows);
+});
+
 router.get('/counts', async (req, res) => {
   const tenantId = req.user.tenantId;
   if (!tenantId) return res.json({ todos: 0, mine: 0, fila: 0, porFilial: {} });
   const escopo = [eq(conversas.tenantId, tenantId), ne(conversas.status, 'encerrada')];
-  if (req.user.filialId) {
-    escopo.push(or(eq(conversas.filialId, req.user.filialId), isNull(conversas.filialId)));
-  }
 
   const [r1] = await db.select({ total: count() }).from(conversas)
     .where(and(...escopo));
@@ -124,11 +139,6 @@ router.get('/', async (req, res) => {
 
   if (req.user.role !== 'superadmin') {
     conditions.push(eq(conversas.tenantId, req.user.tenantId));
-    if (req.user.filialId) {
-      // Inclui as ainda sem filial: são de todos até serem roteadas, e sem isso
-      // o agente de filial nem chega a vê-las para atender.
-      conditions.push(or(eq(conversas.filialId, req.user.filialId), isNull(conversas.filialId)));
-    }
   }
   if (status) {
     conditions.push(eq(conversas.status, status));
@@ -452,9 +462,13 @@ router.post('/:id/transfer', async (req, res) => {
     eq(tenantUsers.ativo, true),
   )).limit(1);
   if (!agente) return res.status(404).json({ erro: 'Agente não encontrado' });
-  if (conversa.filialId && agente.filialId && agente.filialId !== conversa.filialId) {
-    return res.status(403).json({ erro: 'Agente não pertence à filial desta conversa' });
+  if (conversa.status === 'encerrada') {
+    return res.status(400).json({ erro: 'Conversa encerrada. Reabra antes de transferir.' });
   }
+
+  // Transferir a partir da fila é atribuir direto: a conversa sai do bot e já
+  // fica com o colega, sem ele precisar assumir antes.
+  const eraDoBot = conversa.status !== 'humano';
 
   await db.update(conversas)
     .set({ status: 'humano', agenteId })
@@ -465,6 +479,21 @@ router.post('/:id/transfer', async (req, res) => {
     origem: 'bot',
     conteudo: `[Sistema] Conversa transferida para ${agente.nome} por ${req.user.nome}.`,
   });
+
+  // Só avisa o cliente quando é a primeira vez que sai do atendimento
+  // automático — troca entre atendentes não interessa a ele.
+  if (eraDoBot) {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+    const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+    if (tenant?.whatsappToken && cliente?.whatsapp) {
+      try {
+        const wConfig = await resolverWConfig(tenant, conversa);
+        await enviarMensagem(wConfig, cliente.whatsapp, `Olá! Agora você está sendo atendido por ${agente.nome}.`);
+      } catch (err) {
+        console.error('Erro ao notificar transferência:', err.message);
+      }
+    }
+  }
 
   res.json({ mensagem: 'Conversa transferida' });
 });

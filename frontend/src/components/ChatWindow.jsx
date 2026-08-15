@@ -280,45 +280,63 @@ function TagsBar({ conversa, onUpdate, catalog = [], podeEditar = false }) {
   );
 }
 
-function TransferModal({ conversa, tenantId, onClose, onTransferred }) {
+function TransferModal({ conversa, onClose, onTransferred }) {
   const [agentes, setAgentes] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState('');
+  const naFila = conversa.status !== 'humano';
 
   useEffect(() => {
-    api.get(`/tenants/${tenantId}/agents`).then(r =>
-      setAgentes(r.data.filter(a => a.ativo && a.id !== conversa.agenteId))
-    ).catch(() => {});
-  }, [tenantId, conversa.agenteId]);
+    // Rota própria das conversas: a de equipe é restrita a admin.
+    api.get('/conversations/agentes')
+      .then(r => setAgentes(r.data.filter(a => a.id !== conversa.agenteId)))
+      .catch(() => setErro('Não foi possível carregar a equipe.'));
+  }, [conversa.agenteId]);
 
   const transferir = async (agenteId) => {
     setLoading(true);
+    setErro('');
     try {
       await api.post(`/conversations/${conversa.id}/transfer`, { agenteId });
       onTransferred();
       onClose();
-    } catch { setLoading(false); }
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Não foi possível transferir.');
+      setLoading(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-80 p-5" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-800">Transferir conversa</h3>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-semibold text-gray-800">
+            {naFila ? 'Atribuir conversa' : 'Transferir conversa'}
+          </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
         </div>
+        <p className="text-xs text-gray-400 mb-4">
+          {naFila
+            ? 'O colega escolhido já fica como responsável, sem precisar assumir.'
+            : 'A conversa passa para o colega escolhido.'}
+        </p>
+        {erro && <p className="text-xs text-red-500 mb-2">{erro}</p>}
         {agentes.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">Nenhum agente disponível</p>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-1 max-h-72 overflow-y-auto">
             {agentes.map(a => (
               <button key={a.id} onClick={() => transferir(a.id)} disabled={loading}
-                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 rounded-xl transition-colors text-left">
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 disabled:opacity-50 rounded-xl transition-colors text-left">
                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm shrink-0">
                   {(a.nome || '?')[0].toUpperCase()}
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-800">{a.nome}</p>
-                  <p className="text-xs text-gray-400 capitalize">{a.role}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{a.nome}</p>
+                  <p className="text-xs text-gray-400 truncate">
+                    <span className="capitalize">{a.role}</span>
+                    {a.filialNome ? ` · ${a.filialNome}` : ''}
+                  </p>
                 </div>
               </button>
             ))}
@@ -592,10 +610,10 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
             </div>
           </div>
           <div className="flex gap-2 items-center">
-            {eHumano && (
+            {podeAtuar && (
               <button onClick={() => setShowTransfer(true)}
                 className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-                <ArrowRightLeft className="w-3.5 h-3.5" /> Transferir
+                <ArrowRightLeft className="w-3.5 h-3.5" /> {eHumano ? 'Transferir' : 'Atribuir'}
               </button>
             )}
             {podeAtuar && !eHumano && (
@@ -864,7 +882,6 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
       {showTransfer && (
         <TransferModal
           conversa={conversa}
-          tenantId={user?.tenantId}
           onClose={() => setShowTransfer(false)}
           onTransferred={() => { onAtualizar(); carregarMsgs(); }}
         />
