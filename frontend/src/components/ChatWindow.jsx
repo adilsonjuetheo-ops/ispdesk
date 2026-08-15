@@ -411,18 +411,21 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
   const handleAsumir = async () => {
     setAcao(true);
     try { await api.post(`/conversations/${conversa.id}/assume`); onAtualizar(); carregarMsgs(); }
+    catch (err) { alert(err.response?.data?.erro || 'Não foi possível assumir a conversa.'); }
     finally { setAcao(false); }
   };
 
   const handleLiberar = async () => {
     setAcao(true);
     try { await api.post(`/conversations/${conversa.id}/release`); onAtualizar(); carregarMsgs(); }
+    catch (err) { alert(err.response?.data?.erro || 'Não foi possível liberar a conversa.'); }
     finally { setAcao(false); }
   };
 
   const handleEncerrar = async () => {
     setAcao(true);
     try { await api.post(`/conversations/${conversa.id}/close`); onAtualizar(); carregarMsgs(); }
+    catch (err) { alert(err.response?.data?.erro || 'Não foi possível encerrar a conversa.'); }
     finally { setAcao(false); }
   };
 
@@ -438,6 +441,8 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
       }
       setTexto('');
       carregarMsgs();
+      // Enviar pode ter assumido a conversa — atualiza cabeçalho, fila e contadores.
+      if (!eHumano) onAtualizar();
     } catch (err) {
       alert(err.response?.data?.erro || 'Erro ao enviar mensagem. Verifique o token do WhatsApp.');
     } finally { setEnviando(false); }
@@ -454,6 +459,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       carregarMsgs();
+      if (!eHumano) onAtualizar();
     } catch (err) {
       alert(err.response?.data?.erro || 'Erro ao enviar arquivo');
     } finally {
@@ -723,7 +729,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
             <input ref={fileRef} type="file" className="hidden"
               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
               onChange={handleEnviarArquivo}
-              disabled={!eHumano}
+              disabled={!podeAtuar}
             />
 
             {/* Preview áudio gravado */}
@@ -770,11 +776,13 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEnviar(e); }
                     }}
-                    disabled={!eHumano && !isNota}
+                    disabled={!podeAtuar && !isNota}
                     placeholder={
                       isNota
                         ? 'Lembrete interno (só a equipe vê)...'
-                        : eHumano ? 'Digite uma mensagem e pressione enter para enviar...' : 'Assuma a conversa para responder'
+                        : eHumano
+                          ? 'Digite uma mensagem e pressione enter para enviar...'
+                          : 'Digite para assumir e responder...'
                     }
                     className={clsx(
                       'w-full px-3 pt-2.5 pb-1 text-sm bg-transparent resize-none focus:outline-none placeholder-gray-400 rounded-t-xl',
@@ -796,7 +804,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
                           { icon: List,          title: 'Lista com marcador',action: () => aplicarLista('ul') },
                         ].map(({ icon: Icon, title, action }) => (
                           <button key={title} type="button" onClick={action}
-                            disabled={!eHumano}
+                            disabled={!podeAtuar}
                             title={title}
                             className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-500 hover:text-gray-800 transition-colors">
                             <Icon className="w-3.5 h-3.5" />
@@ -816,14 +824,14 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
                         <>
                           <button type="button"
                             onClick={() => fileRef.current?.click()}
-                            disabled={!eHumano || enviandoArquivo || gravando}
+                            disabled={!podeAtuar || enviandoArquivo || gravando}
                             title="Enviar arquivo"
                             className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-400 hover:text-blue-600 transition-colors">
                             {enviandoArquivo
                               ? <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                               : <Paperclip className="w-4 h-4" />}
                           </button>
-                          {!texto.trim() && eHumano && (
+                          {!texto.trim() && podeAtuar && (
                             <button type="button" onClick={iniciarGravacao}
                               disabled={enviandoArquivo}
                               title="Gravar áudio"
@@ -834,7 +842,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
                         </>
                       )}
                       <button type="submit"
-                        disabled={(!eHumano && !isNota) || !texto.trim() || enviando}
+                        disabled={(!podeAtuar && !isNota) || !texto.trim() || enviando}
                         className={clsx(
                           'ml-1 rounded-lg px-3 py-1.5 disabled:opacity-40 text-white transition-colors shrink-0',
                           isNota ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'
