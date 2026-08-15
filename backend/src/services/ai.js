@@ -79,7 +79,7 @@ INSTRUÇÕES IMPORTANTES:
 - Se não conseguir resolver o problema: escreva ACTION:HANDOFF:motivo detalhado
 ${temSgp ? `- Use apenas os dados fornecidos pelo SGP acima. Nunca invente informações.
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
-- Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem e avise que o PDF do boleto será enviado a seguir.
+- Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem. Só prometa o PDF do boleto se o resultado da ferramenta disser que ele será enviado — nunca anuncie um arquivo que não vai chegar.
 ${tenant.exigirDocumento
   ? `- Este provedor NÃO identifica clientes pelo número de WhatsApp. Na primeira demanda que exija dados do cliente, peça o CPF ou CNPJ do titular — mesmo que o cliente já tenha conversado antes.
 - Só prossiga com consultas, 2ª via ou desbloqueio depois de validar o cliente pelo CPF/CNPJ.`

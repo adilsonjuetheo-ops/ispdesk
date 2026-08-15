@@ -66,6 +66,30 @@ export class IxcAdaptador extends SgpAdaptador {
     return res.json();
   }
 
+  // O boleto em PDF sai por POST autenticado — não há URL pública que sirva de
+  // anexo (o gateway_link da fatura devolve a página de pagamento em HTML).
+  // Sem tipo_boleto=arquivo o IXC responde 200 com corpo vazio.
+  async #baixarBoleto(idFatura) {
+    const res = await fetch(await this.#url('get_boleto'), {
+      method: 'POST',
+      headers: this.#headers(),
+      body: JSON.stringify({
+        boletos: String(idFatura),
+        juro: 'N',
+        multa: 'N',
+        atualiza_boleto: 'N',
+        tipo_boleto: 'arquivo',
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    // Fatura inexistente ou sem boleto gerado devolve corpo vazio/HTML.
+    if (buffer.subarray(0, 4).toString('ascii') !== '%PDF') return null;
+    return buffer;
+  }
+
   // O PIX copia-e-cola não vem no registro da fatura: exige chamada dedicada.
   async #buscarPix(idAreceber) {
     const res = await fetch(await this.#url('get_pix'), {
@@ -332,7 +356,14 @@ export class IxcAdaptador extends SgpAdaptador {
           (a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento)
         )[0];
 
-        const pix = await this.#buscarPix(f.id).catch(() => null);
+        const [pix, boleto] = await Promise.all([
+          this.#buscarPix(f.id).catch(() => null),
+          this.#baixarBoleto(f.id).catch(err => {
+            console.error(`[IXC] Falha ao gerar boleto da fatura ${f.id}:`, err.message);
+            return null;
+          }),
+        ]);
+
         const partes = [
           'Mensalidade',
           `Vencimento: ${this.formatarData(f.data_vencimento)}`,
@@ -342,7 +373,18 @@ export class IxcAdaptador extends SgpAdaptador {
         if (f.linha_digitavel) partes.push(`\nLinha digitável:\n${f.linha_digitavel}`);
         else if (!pix && f.gateway_link) partes.push(`\nLink do boleto: ${f.gateway_link}`);
         if (!pix && !f.linha_digitavel && !f.gateway_link) partes.push('\nNenhum código de pagamento disponível no momento.');
-        return partes.join('\n');
+
+        // Avisa o modelo se pode ou não prometer o anexo.
+        partes.push(boleto
+          ? '\n(O PDF do boleto será enviado automaticamente logo após sua mensagem — pode avisar o cliente.)'
+          : '\n(PDF do boleto indisponível — NÃO prometa envio de arquivo.)');
+
+        return {
+          texto: partes.join('\n'),
+          midia: boleto
+            ? { buffer: boleto, mimeType: 'application/pdf', nome: `boleto-${f.id}.pdf` }
+            : null,
+        };
       }
 
       case 'abrir_chamado_tecnico': {

@@ -428,7 +428,11 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
 
   for (const midia of resultado.midias || []) {
     try {
-      const { buffer, mimeType } = await baixarArquivoUrl(midia.url);
+      // O arquivo pode vir pronto do SGP (quando exige POST autenticado) ou
+      // como URL pública para baixar.
+      const { buffer, mimeType } = midia.buffer
+        ? { buffer: midia.buffer, mimeType: midia.mimeType }
+        : await baixarArquivoUrl(midia.url);
       const { id: mediaId } = await uploadMidia(wConfig, buffer, mimeType || 'application/pdf', midia.nome);
       await enviarMidia(wConfig, remetente, mediaId, 'document', midia.nome);
       const conteudoMidia = `[Arquivo] ${midia.nome}`;

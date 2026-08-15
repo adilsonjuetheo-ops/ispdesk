@@ -61,6 +61,11 @@ export class SgpAdaptador {
 
   formatarData(dataStr) {
     if (!dataStr) return 'não informada';
+    // "2026-07-25" é data pura, sem hora. new Date() a interpreta como UTC e,
+    // em fuso negativo, toLocaleDateString devolve o dia anterior — vencimento
+    // errado para o cliente. Formatamos direto quando o formato é esse.
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dataStr).trim());
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
     return new Date(dataStr).toLocaleDateString('pt-BR');
   }
 }
