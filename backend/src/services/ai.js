@@ -41,7 +41,7 @@ function buildConteudoMidia(texto, midiaData) {
   return content;
 }
 
-export async function processarMensagem(tenant, conversa, historico, novaMensagem, clienteWhatsapp, midiaData = null) {
+export async function processarMensagem(tenant, conversa, historico, novaMensagem, clienteWhatsapp, midiaData = null, atendimento = {}) {
   // Classifica até ter uma tag específica (não "Outros" e não vazia)
   const tagAtual = Array.isArray(conversa.tags) ? conversa.tags[0] : null;
   const precisaClassificar = !tagAtual || tagAtual === 'Outros';
@@ -52,12 +52,28 @@ export async function processarMensagem(tenant, conversa, historico, novaMensage
   // 2. System prompt com contexto SGP injetado
   const temSgp = !!(tenant.sgpTipo && tenant.sgpApiKey);
   const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' });
+  // Fora do horário de atendimento humano o assistente segue atendendo, mas não
+  // pode prometer que alguém da equipe assume a conversa agora.
+  const semAtendente = atendimento.humanoDisponivel === false;
+  const instrucaoForaHorario = (
+    tenant.horarios?.instrucaoForaHorario || tenant.horarios?.msgForaHorario || ''
+  ).trim();
+  const blocoForaHorario = semAtendente ? `
+ATENDIMENTO HUMANO INDISPONÍVEL AGORA:
+- Neste momento não há nenhum atendente humano de plantão — só você.
+- Resolva normalmente tudo que estiver ao seu alcance (consultas, 2ª via, desbloqueio, chamados).
+- Se precisar transferir, transfira mesmo assim: a conversa fica registrada na fila da equipe.
+- Ao transferir, avise que um atendente responde ${atendimento.proximoRetorno || 'no próximo horário de atendimento'}.
+- Nunca diga que vai chamar alguém "agora" nem prometa retorno imediato.${instrucaoForaHorario ? `
+- Orientação do provedor para este período: ${instrucaoForaHorario}` : ''}
+` : '';
+
   const systemPrompt = `${tenant.systemPrompt || ''}
 
 DATA E HORA ATUAL: ${agora} (horário de Brasília). Use isso para saudar o cliente corretamente (bom dia até 12h, boa tarde até 18h, boa noite após 18h) e para contextualizar qualquer referência a datas.
 
 ${contextoSgp}
-
+${blocoForaHorario}
 INSTRUÇÕES IMPORTANTES:
 - Se o cliente pedir para falar com humano: diga que vai transferir e escreva ACTION:HANDOFF:solicitado pelo cliente
 - Se não conseguir resolver o problema: escreva ACTION:HANDOFF:motivo detalhado

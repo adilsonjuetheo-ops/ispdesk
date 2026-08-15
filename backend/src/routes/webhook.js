@@ -7,7 +7,7 @@ import { buscarDadosCliente } from '../services/sgp.js';
 import { enviarMensagem, transcreverAudioMeta, downloadMidiaBase64, baixarArquivoUrl, uploadMidia, enviarMidia } from '../services/whatsapp.js';
 import { realizarHandoff } from '../services/handoff.js';
 import { enviarPushParaTenant } from '../services/pushNotification.js';
-import { dentroDoHorario } from '../services/horarios.js';
+import { dentroDoHorario, proximoAtendimento } from '../services/horarios.js';
 import { getLimite, getUso, incrementarUso } from '../services/limites.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { processarRespostaNps } from '../services/nps.js';
@@ -325,15 +325,6 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     return;
   }
 
-  // Verifica horário de atendimento
-  if (!dentroDoHorario(tenant.horarios)) {
-    const msg = tenant.horarios?.msgForaHorario ||
-      'Nosso atendimento está encerrado no momento. Em breve retornaremos!';
-    await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msg });
-    try { await enviarMensagem(wConfig, remetente, msg); } catch {}
-    return;
-  }
-
   // Verifica se tenant tem filiais e se conversa já tem filial atribuída
   if (!conversa.filialId) {
     const filiaisAtivas = await db.select().from(filiais)
@@ -397,7 +388,13 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     .where(eq(mensagens.conversaId, conversa.id))
     .orderBy(mensagens.enviadaEm);
 
-  const resultado = await processarMensagem(tenant, conversa, historico, texto, remetente, midiaData);
+  // Fora do horário o assistente continua atendendo — só precisa saber que não
+  // há atendente humano para assumir e quando a equipe retorna.
+  const humanoDisponivel = dentroDoHorario(tenant.horarios);
+  const resultado = await processarMensagem(tenant, conversa, historico, texto, remetente, midiaData, {
+    humanoDisponivel,
+    proximoRetorno: humanoDisponivel ? null : proximoAtendimento(tenant.horarios),
+  });
 
   if (resultado.tag) {
     const tagAtual = Array.isArray(conversa.tags) ? conversa.tags[0] : null;

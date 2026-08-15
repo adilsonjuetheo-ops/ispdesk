@@ -202,14 +202,16 @@ function HorariosSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sucesso, setSucesso] = useState(false);
-  const [msgForaHorario, setMsgForaHorario] = useState('');
+  const [instrucaoForaHorario, setInstrucaoForaHorario] = useState('');
   const [slaMinutos, setSlaMinutos] = useState(15);
 
   useEffect(() => {
     api.get('/tenants/me/horarios').then(r => {
       if (r.data) {
         setHorarios(r.data.dias || HORARIO_DEFAULT);
-        setMsgForaHorario(r.data.msgForaHorario || '');
+        // Provedores antigos guardavam aqui a mensagem fixa de "fechado";
+        // ela vira o ponto de partida da instrução.
+        setInstrucaoForaHorario(r.data.instrucaoForaHorario ?? r.data.msgForaHorario ?? '');
         setSlaMinutos(r.data.slaMinutos ?? 15);
       } else {
         setHorarios(HORARIO_DEFAULT);
@@ -225,7 +227,7 @@ function HorariosSection() {
     try {
       const { data: atual } = await api.get('/tenants/me/horarios');
       await api.put('/tenants/me/horarios', {
-        horarios: { ...(atual || {}), dias: horarios, msgForaHorario, slaMinutos: Number(slaMinutos) || 0 },
+        horarios: { ...(atual || {}), dias: horarios, instrucaoForaHorario, slaMinutos: Number(slaMinutos) || 0 },
       });
       setSucesso(true);
       setTimeout(() => setSucesso(false), 3000);
@@ -237,10 +239,11 @@ function HorariosSection() {
   return (
     <section className="bg-white rounded-xl border border-gray-200 p-5">
       <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
-        <Clock className="w-4 h-4 text-gray-400" /> Horário de Atendimento
+        <Clock className="w-4 h-4 text-gray-400" /> Horário de atendimento humano
       </h2>
       <p className="text-xs text-gray-400 mb-4">
-        Fora do horário configurado, o bot responde automaticamente com a mensagem abaixo.
+        Marque os dias e horários em que há atendente de plantão. Fora deles o assistente continua
+        atendendo sozinho e, ao transferir, avisa o cliente de quando a equipe retorna.
       </p>
 
       <div className="space-y-2 mb-4">
@@ -263,17 +266,21 @@ function HorariosSection() {
                   className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </>
             ) : (
-              <span className="text-xs text-gray-300 italic">Fechado</span>
+              <span className="text-xs text-gray-300 italic">Sem atendente</span>
             )}
           </div>
         ))}
       </div>
 
       <div className="mb-4">
-        <label className="block text-xs text-gray-500 mb-1">Mensagem fora do horário</label>
-        <textarea value={msgForaHorario} onChange={e => setMsgForaHorario(e.target.value)} rows={3}
-          placeholder="Ex: Olá! Nosso atendimento funciona de segunda a sexta das 8h às 18h. Deixe sua mensagem e retornaremos em breve!"
+        <label className="block text-xs text-gray-500 mb-1">Instrução para o assistente fora do horário</label>
+        <textarea value={instrucaoForaHorario} onChange={e => setInstrucaoForaHorario(e.target.value)} rows={3}
+          placeholder="Ex: Fora do horário comercial, não prometa visita técnica. Oriente o cliente a reiniciar o roteador e registre o chamado para a equipe avaliar pela manhã."
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
+        <p className="text-xs text-gray-400 mt-1">
+          Vale apenas quando não há atendente de plantão. O assistente já avisa sozinho que a equipe
+          retorna no próximo horário — use este campo para regras específicas do provedor.
+        </p>
       </div>
 
       <div className="mb-4 flex items-center gap-3">
