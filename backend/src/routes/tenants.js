@@ -69,7 +69,7 @@ router.put('/me', autenticar, async (req, res) => {
     cnpj, telefone, whatsappContato, email, website,
     endereco, cidade, uf, cep,
     whatsappNumberId, whatsappToken, systemPrompt, nomeAssistente,
-    sgpTipo, sgpApiUrl, sgpApiKey,
+    sgpTipo, sgpApiUrl, sgpApiKey, exigirDocumento,
     assinaturaTipo, assinaturaToken, assinaturaExtra,
     lembreteFaturaAtivo, lembreteFaturaTemplatePre, lembreteFaturaTemplatePos, lembreteFaturaIdioma,
   } = req.body;
@@ -80,6 +80,7 @@ router.put('/me', autenticar, async (req, res) => {
       endereco, cidade, uf, cep,
       whatsappNumberId, whatsappToken, systemPrompt, nomeAssistente,
       sgpTipo, sgpApiUrl, sgpApiKey,
+      exigirDocumento: !!exigirDocumento,
       assinaturaTipo: assinaturaTipo || null,
       assinaturaToken: assinaturaToken || null,
       assinaturaExtra: assinaturaExtra || null,

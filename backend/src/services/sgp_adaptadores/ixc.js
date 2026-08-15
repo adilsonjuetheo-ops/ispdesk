@@ -2,60 +2,136 @@ import { SgpAdaptador } from './base.js';
 
 export class IxcAdaptador extends SgpAdaptador {
 
-  #headers() {
+  #headers(ixcsoft) {
     const encoded = Buffer.from(this.apiKey).toString('base64');
-    return {
+    const h = {
       Authorization: `Basic ${encoded}`,
       'Content-Type': 'application/json',
-      ixcsoft: 'listar',
     };
+    if (ixcsoft) h.ixcsoft = ixcsoft;
+    return h;
   }
 
-  async #get(recurso, params = {}) {
+  async #url(recurso) {
     const base = await this.validarApiUrl();
-    const url = new URL(`webservice/v1/${recurso}`, `${base.toString().replace(/\/$/, '')}/`);
-    for (const [k, v] of Object.entries(params)) {
-      if (v != null) url.searchParams.set(k, String(v));
+    return new URL(`webservice/v1/${recurso}`, `${base.toString().replace(/\/$/, '')}/`).toString();
+  }
+
+  // Consulta: o IXC exige POST com header ixcsoft:listar e todos os valores como
+  // string. Query params em GET são ignorados pelo webservice.
+  async #listar(recurso, params = {}) {
+    const body = {
+      page: '1',
+      rp: '20',
+      sortname: `${recurso}.id`,
+      sortorder: 'asc',
+      ...params,
+    };
+    for (const [k, v] of Object.entries(body)) {
+      if (v == null) delete body[k];
+      else body[k] = String(v);
     }
-    const res = await fetch(url.toString(), { headers: this.#headers() });
+
+    const res = await fetch(await this.#url(recurso), {
+      method: 'POST',
+      headers: this.#headers('listar'),
+      body: JSON.stringify(body),
+    });
     if (!res.ok) throw new Error(`IXC HTTP ${res.status}`);
-    return res.json();
+
+    const data = await res.json();
+    if (data?.type === 'error') throw new Error(`IXC: ${data.message}`);
+    return data;
   }
 
-  async #post(recurso, body = {}) {
-    const base = await this.validarApiUrl();
-    const headers = this.#headers();
-    delete headers.ixcsoft;
-    const url = new URL(`webservice/v1/${recurso}`, `${base.toString().replace(/\/$/, '')}/`);
-    const res = await fetch(url, {
+  // Gravação: POST sem o header ixcsoft.
+  async #inserir(recurso, body = {}) {
+    const res = await fetch(await this.#url(recurso), {
       method: 'POST',
-      headers,
+      headers: this.#headers(),
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`IXC HTTP ${res.status}`);
     return res.json();
   }
 
+  // O PIX copia-e-cola não vem no registro da fatura: exige chamada dedicada.
+  async #buscarPix(idAreceber) {
+    const res = await fetch(await this.#url('get_pix'), {
+      method: 'POST',
+      headers: this.#headers(),
+      body: JSON.stringify({ id_areceber: String(idAreceber) }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    return data?.pix?.dadosPix?.pixCopiaECola || data?.pix?.qrCode?.qrcode || null;
+  }
+
+  // O IXC grava telefone formatado — "(33) 99952-8928". Como o WhatsApp entrega
+  // só dígitos e o 9º dígito varia, geramos as duas grafias possíveis.
+  #variantesTelefone(whatsapp) {
+    const digitos = this.normalizarTelefone(whatsapp);
+    if (digitos.length < 10) return [];
+
+    const ddd = digitos.slice(0, 2);
+    const numero = digitos.slice(2);
+    const formatar = n => n.length === 9
+      ? `(${ddd}) ${n.slice(0, 5)}-${n.slice(5)}`
+      : `(${ddd}) ${n.slice(0, 4)}-${n.slice(4)}`;
+
+    const variantes = new Set([formatar(numero)]);
+    if (numero.length === 8) variantes.add(formatar(`9${numero}`));
+    if (numero.length === 9 && numero.startsWith('9')) variantes.add(formatar(numero.slice(1)));
+    return [...variantes];
+  }
+
+  async #buscarClientePorTelefone(whatsapp) {
+    for (const campo of ['cliente.telefone_celular', 'cliente.whatsapp']) {
+      for (const tel of this.#variantesTelefone(whatsapp)) {
+        const data = await this.#listar('cliente', {
+          qtype: campo,
+          query: tel,
+          oper: '=',
+          rp: '1',
+        }).catch(() => null);
+        if (data?.registros?.length) return data.registros[0];
+      }
+    }
+    return null;
+  }
+
+  // O cadastro guarda a cidade como ID; a IA precisa do nome.
+  async #nomeCidade(id) {
+    if (!id || !/^\d+$/.test(String(id))) return id || null;
+    const data = await this.#listar('cidade', {
+      qtype: 'cidade.id',
+      query: id,
+      oper: '=',
+      rp: '1',
+    }).catch(() => null);
+    return data?.registros?.[0]?.nome || null;
+  }
+
   // Monta contexto completo a partir do registro de cliente já buscado
   async #buildContexto(c) {
-    const contData = await this.#get('cliente_contrato', {
+    const contData = await this.#listar('cliente_contrato', {
       qtype: 'cliente_contrato.id_cliente',
       query: c.id,
       oper: '=',
-      page: 1,
-      rp: 5,
+      rp: '5',
     }).catch(() => ({ registros: [] }));
 
     const contratoAtivo =
       (contData.registros || []).find(ct => ct.status === 'A') ||
       contData.registros?.[0];
 
-    const fatData = await this.#get('fn_areceber', {
+    const fatData = await this.#listar('fn_areceber', {
       qtype: 'fn_areceber.id_cliente',
       query: c.id,
       oper: '=',
-      page: 1,
-      rp: 10,
+      rp: '10',
+      sortname: 'fn_areceber.data_vencimento',
+      sortorder: 'asc',
       grid_param: JSON.stringify([{ TB: 'fn_areceber.status', OP: '=', P: 'A' }]),
     }).catch(() => ({ registros: [] }));
 
@@ -64,24 +140,26 @@ export class IxcAdaptador extends SgpAdaptador {
     const vencidas = faturas.filter(f => new Date(f.data_vencimento) < hoje);
     const aVencer  = faturas.filter(f => new Date(f.data_vencimento) >= hoje);
 
+    const cidade = await this.#nomeCidade(c.cidade).catch(() => null);
+    const internetAtiva = contratoAtivo?.status_internet === 'A';
+
     const linhas = [
       '=== DADOS DO CLIENTE (IXC Soft) ===',
       `Nome: ${c.razao}`,
       `ID: ${c.id} | CPF/CNPJ: ${c.cnpj_cpf}`,
-      `Status: ${contratoAtivo?.status === 'A' ? 'Ativo' : 'Bloqueado/Inativo'}`,
-      `Plano: ${contratoAtivo?.id_produto || 'não identificado'}`,
-      `Cidade: ${c.cidade || 'não informada'}`,
+      `Status do contrato: ${contratoAtivo?.status === 'A' ? 'Ativo' : 'Inativo/Cancelado'}`,
+      `Internet: ${internetAtiva ? 'Liberada' : 'Bloqueada'}`,
+      `Plano: ${contratoAtivo?.contrato || 'não identificado'}`,
+      `Cidade: ${cidade || 'não informada'}`,
       '',
     ];
 
     if (vencidas.length > 0) {
       linhas.push(`FATURAS VENCIDAS (${vencidas.length}):`);
       vencidas.forEach(f => {
-        const temPix = f.pix_copia_cola || f.pix_qrcode || f.pix;
         linhas.push(
           `  Vencto ${this.formatarData(f.data_vencimento)} | ${this.formatarMoeda(f.valor)}` +
-          (f.linha_digitavel ? ' | Boleto disponível' : '') +
-          (temPix            ? ' | PIX disponível'   : '')
+          (f.linha_digitavel ? ' | Boleto disponível' : '')
         );
       });
       linhas.push('');
@@ -89,11 +167,9 @@ export class IxcAdaptador extends SgpAdaptador {
 
     if (aVencer.length > 0) {
       const prox = aVencer[0];
-      const temPix = prox.pix_copia_cola || prox.pix_qrcode || prox.pix;
       linhas.push(
         `PRÓXIMA FATURA: ${this.formatarData(prox.data_vencimento)} | ${this.formatarMoeda(prox.valor)}` +
-        (prox.linha_digitavel ? ' | Boleto disponível' : '') +
-        (temPix               ? ' | PIX disponível'   : '')
+        (prox.linha_digitavel ? ' | Boleto disponível' : '')
       );
       linhas.push('');
     }
@@ -120,66 +196,66 @@ export class IxcAdaptador extends SgpAdaptador {
   }
 
   async buscarContexto(whatsapp) {
-    const tel = this.normalizarTelefone(whatsapp);
-    const data = await this.#get('cliente', {
-      qtype: 'cliente.celular',
-      query: tel,
-      oper: '=',
-      page: 1,
-      rp: 1,
-    }).catch(() => ({ registros: [] }));
-
-    if (!data.registros?.length) {
+    const cliente = await this.#buscarClientePorTelefone(whatsapp);
+    if (!cliente) {
       return 'DADOS DO CLIENTE: Número não encontrado no IXC. Peça o CPF ou CNPJ para localizar.';
     }
-    return this.#buildContexto(data.registros[0]);
+    return this.#buildContexto(cliente);
   }
 
   async buscarContextoPorDocumento(doc) {
-    const data = await this.#get('cliente', {
-      qtype: 'cliente.cnpj_cpf',
-      query: doc,
-      oper: '=',
-      page: 1,
-      rp: 1,
-    }).catch(() => ({ registros: [] }));
+    const cliente = await this.#buscarClientePorDocumento(doc);
+    if (!cliente) return null;
+    return this.#buildContexto(cliente);
+  }
 
-    if (!data.registros?.length) return null;
-    return this.#buildContexto(data.registros[0]);
+  // O CPF/CNPJ também é gravado formatado no IXC.
+  async #buscarClientePorDocumento(doc) {
+    const digitos = String(doc).replace(/\D/g, '');
+    const variantes = new Set([String(doc), digitos]);
+    if (digitos.length === 11) {
+      variantes.add(`${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`);
+    } else if (digitos.length === 14) {
+      variantes.add(`${digitos.slice(0, 2)}.${digitos.slice(2, 5)}.${digitos.slice(5, 8)}/${digitos.slice(8, 12)}-${digitos.slice(12)}`);
+    }
+
+    for (const v of variantes) {
+      const data = await this.#listar('cliente', {
+        qtype: 'cliente.cnpj_cpf',
+        query: v,
+        oper: '=',
+        rp: '1',
+      }).catch(() => null);
+      if (data?.registros?.length) return data.registros[0];
+    }
+    return null;
   }
 
   async buscarDados(whatsapp) {
-    const tel = this.normalizarTelefone(whatsapp);
-    const data = await this.#get('cliente', {
-      qtype: 'cliente.celular',
-      query: tel,
-      oper: '=',
-      page: 1,
-      rp: 1,
-    }).catch(() => null);
+    const c = await this.#buscarClientePorTelefone(whatsapp);
+    if (!c) return null;
 
-    if (!data?.registros?.length) return null;
-    const c = data.registros[0];
-
-    const contData = await this.#get('cliente_contrato', {
+    const contData = await this.#listar('cliente_contrato', {
       qtype: 'cliente_contrato.id_cliente',
       query: c.id,
       oper: '=',
-      page: 1,
-      rp: 5,
+      rp: '5',
     }).catch(() => ({ registros: [] }));
 
     const contratoAtivo =
       (contData.registros || []).find(ct => ct.status === 'A') ||
       contData.registros?.[0];
 
-    const statusMap = { A: 'ativo', S: 'suspenso', CA: 'cancelado', CM: 'cancelado' };
+    const statusMap = {
+      A: 'ativo', S: 'suspenso', I: 'inativo', N: 'pré-contrato',
+      D: 'cancelado', CA: 'cancelado', CM: 'cancelado', FA: 'suspenso',
+    };
 
     return {
       nome: c.razao || null,
       contratoId: String(contratoAtivo?.id || c.id || ''),
-      statusContrato: statusMap[contratoAtivo?.status] || (contratoAtivo?.status || 'inativo').toLowerCase(),
-      filialNome: c.cidade || null,
+      statusContrato: statusMap[contratoAtivo?.status] || 'inativo',
+      filialNome: await this.#nomeCidade(c.cidade).catch(() => null),
     };
   }
 
@@ -187,21 +263,34 @@ export class IxcAdaptador extends SgpAdaptador {
     switch (toolName) {
 
       case 'desbloquear_cliente': {
-        const data = await this.#post('desbloqueio_confianca', {
-          id_cliente: toolInput.id_cliente,
-          id_contrato: toolInput.id_contrato,
+        if (!toolInput.id_contrato) {
+          return 'Não foi possível desbloquear: contrato não identificado. Transfira para um atendente. ACTION:HANDOFF:desbloqueio de confiança — contrato não identificado';
+        }
+        // O IXC espera exclusivamente { id: <id_contrato> } neste recurso.
+        const data = await this.#inserir('desbloqueio_confianca', {
+          id: String(toolInput.id_contrato),
         });
         if (data.type === 'success') return 'Desbloqueio em confiança realizado com sucesso!';
-        return 'HANDOFF_DESBLOQUEIO_USADO: Cliente já utilizou o desbloqueio em confiança ao qual tinha direito. Informe ao cliente e transfira para o setor responsável.';
+
+        // Qualquer recusa do IXC (direito já utilizado, contrato inelegível etc.)
+        // vira transferência para o atendente resolver manualmente.
+        const motivo = (data.message || 'motivo não informado pelo IXC')
+          .replace(/\\'/g, "'")
+          .replace(/\s+/g, ' ')
+          .trim();
+        return `Não foi possível fazer o desbloqueio automático. Motivo do sistema: ${motivo}. ` +
+          'Informe ao cliente que um atendente vai avaliar o desbloqueio manualmente e NÃO prometa prazo. ' +
+          `ACTION:HANDOFF:desbloqueio de confiança indisponível — ${motivo}`;
       }
 
       case 'enviar_segunda_via': {
-        const data = await this.#get('fn_areceber', {
+        const data = await this.#listar('fn_areceber', {
           qtype: 'fn_areceber.id_cliente',
           query: toolInput.id_cliente,
           oper: '=',
-          page: 1,
-          rp: 5,
+          rp: '5',
+          sortname: 'fn_areceber.data_vencimento',
+          sortorder: 'asc',
           grid_param: JSON.stringify([{ TB: 'fn_areceber.status', OP: '=', P: 'A' }]),
         });
         const faturas = data.registros || [];
@@ -211,7 +300,7 @@ export class IxcAdaptador extends SgpAdaptador {
           (a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento)
         )[0];
 
-        const pix = f.pix_copia_cola || f.pix_qrcode || f.pix || null;
+        const pix = await this.#buscarPix(f.id).catch(() => null);
         const partes = [
           'Mensalidade',
           `Vencimento: ${this.formatarData(f.data_vencimento)}`,
@@ -219,13 +308,13 @@ export class IxcAdaptador extends SgpAdaptador {
         ];
         if (pix) partes.push(`\nPIX copia e cola:\n${pix}`);
         if (f.linha_digitavel) partes.push(`\nLinha digitável:\n${f.linha_digitavel}`);
-        else if (!pix && f.url_boleto) partes.push(`\nLink do boleto: ${f.url_boleto}`);
-        if (!pix && !f.linha_digitavel && !f.url_boleto) partes.push('\nNenhum código de pagamento disponível no momento.');
+        else if (!pix && f.gateway_link) partes.push(`\nLink do boleto: ${f.gateway_link}`);
+        if (!pix && !f.linha_digitavel && !f.gateway_link) partes.push('\nNenhum código de pagamento disponível no momento.');
         return partes.join('\n');
       }
 
       case 'abrir_chamado_tecnico': {
-        const data = await this.#post('su_oss_chamado', {
+        const data = await this.#inserir('su_oss_chamado', {
           id_cliente: toolInput.id_cliente,
           mensagem: toolInput.detalhes,
           assunto: 'Solicitação via WhatsApp',

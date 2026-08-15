@@ -33,6 +33,12 @@ export async function buscarDadosCliente(tenant, whatsapp) {
 export async function buscarContextoSgp(tenant, whatsapp) {
   const sgp = criarSgp(tenant);
   if (!sgp) return '(Integração com SGP não configurada para este provedor)';
+  // Provedores que exigem validação por documento: o número de WhatsApp não
+  // prova quem é o titular, então nem consultamos por telefone. Sem ID_INTERNO
+  // no contexto, nenhuma tool fica autorizada até o CPF/CNPJ ser confirmado.
+  if (tenant.exigirDocumento) {
+    return 'DADOS DO CLIENTE: Não identificado. Este provedor NÃO aceita o número de WhatsApp como identificação — solicite o CPF ou CNPJ do titular antes de qualquer consulta ou ação.';
+  }
   try {
     return await sgp.buscarContexto(whatsapp);
   } catch (err) {

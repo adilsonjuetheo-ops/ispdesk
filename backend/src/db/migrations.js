@@ -111,6 +111,7 @@ export async function runMigrations() {
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_template_pre text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_template_pos text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_idioma text DEFAULT 'pt_BR'`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS exigir_documento boolean DEFAULT false`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

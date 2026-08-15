@@ -64,7 +64,10 @@ INSTRUÇÕES IMPORTANTES:
 ${temSgp ? `- Use apenas os dados fornecidos pelo SGP acima. Nunca invente informações.
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
 - Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem e avise que o PDF do boleto será enviado a seguir.
-- Se o cliente NÃO for encontrado pelo número de WhatsApp: peça APENAS o CPF ou CNPJ para localizá-lo no sistema.
+${tenant.exigirDocumento
+  ? `- Este provedor NÃO identifica clientes pelo número de WhatsApp. Na primeira demanda que exija dados do cliente, peça o CPF ou CNPJ do titular — mesmo que o cliente já tenha conversado antes.
+- Só prossiga com consultas, 2ª via ou desbloqueio depois de validar o cliente pelo CPF/CNPJ.`
+  : '- Se o cliente NÃO for encontrado pelo número de WhatsApp: peça APENAS o CPF ou CNPJ para localizá-lo no sistema.'}
 - Ao receber o CPF ou CNPJ: use a ferramenta buscar_por_documento imediatamente.
 - Se o cliente NÃO for encontrado mesmo com CPF/CNPJ (cliente novo): informe que vai transferir para um atendente realizar o cadastro e escreva ACTION:HANDOFF:cliente novo — encaminhar para cadastro
 - NUNCA envie formulários de cadastro — isso é responsabilidade exclusiva do atendente humano.` : ''}
@@ -134,6 +137,9 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
   });
 
   const midiasParaEnviar = [];
+  // Tools podem exigir transferência (ex: desbloqueio já utilizado). Guardamos o
+  // motivo para garantir o handoff mesmo que o modelo não repita a marcação.
+  let handoffForcado = null;
 
   while (response.stop_reason === 'tool_use') {
     const toolBlocks = response.content.filter(b => b.type === 'tool_use');
@@ -160,6 +166,9 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
       if (resultado && typeof resultado === 'object') {
         conteudoTool = resultado.texto;
         if (resultado.midia) midiasParaEnviar.push(resultado.midia);
+      }
+      if (typeof conteudoTool === 'string' && conteudoTool.includes('ACTION:HANDOFF:')) {
+        handoffForcado = conteudoTool.split('ACTION:HANDOFF:')[1].split('\n')[0].trim();
       }
       toolResults.push({
         type: 'tool_result',
@@ -203,6 +212,16 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
       resposta: textoLimpo.split('ACTION:HANDOFF:')[0].trim(),
       devePelearHumano: true,
       motivo,
+      tag,
+      midias: midiasParaEnviar,
+    };
+  }
+
+  if (handoffForcado) {
+    return {
+      resposta: textoLimpo,
+      devePelearHumano: true,
+      motivo: handoffForcado,
       tag,
       midias: midiasParaEnviar,
     };

@@ -25,6 +25,7 @@ export const tenants = pgTable('tenants', {
   sgpTipo:            text('sgp_tipo'),   // 'atlaz' | 'ixc' | 'mkauth' | 'generico'
   sgpApiUrl:          text('sgp_api_url'),
   sgpApiKey:          text('sgp_api_key'),
+  exigirDocumento:    boolean('exigir_documento').default(false), // ignora o número do WhatsApp: só identifica por CPF/CNPJ
   plano:              text('plano').default('basic'),
   mpPaymentId:        text('mp_payment_id'),
   statusPagamento:    text('status_pagamento'), // null | 'pendente' | 'ativo' | 'suspenso'

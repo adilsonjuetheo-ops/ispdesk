@@ -1074,6 +1074,24 @@ export default function Settings() {
                 </div>
               )}
 
+              {tenant.sgpTipo && (
+                <label className="flex items-start gap-2 text-sm text-gray-700 pt-1">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={!!tenant.exigirDocumento}
+                    onChange={e => set('exigirDocumento', e.target.checked)}
+                  />
+                  <span>
+                    Exigir CPF/CNPJ para identificar o cliente
+                    <span className="block text-xs text-gray-400">
+                      O assistente ignora o número do WhatsApp e sempre pede o documento do titular antes de
+                      consultar dados, enviar 2ª via ou desbloquear.
+                    </span>
+                  </span>
+                </label>
+              )}
+
               {tenant.sgpTipo && <TestarSgp />}
 
               {tenant.sgpTipo === 'tsmx' && (
