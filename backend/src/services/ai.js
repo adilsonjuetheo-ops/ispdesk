@@ -25,6 +25,15 @@ function toolAutorizada(toolName, input, ids) {
   return true;
 }
 
+// O WhatsApp marca negrito com um asterisco só; o modelo escreve markdown
+// padrão, e "**200 MB**" chega ao cliente com os asteriscos à mostra.
+function paraFormatacaoWhatsapp(texto) {
+  return (texto || '')
+    .replace(/\*\*\*(.+?)\*\*\*/gs, '*_$1_*')
+    .replace(/\*\*(.+?)\*\*/gs, '*$1*')
+    .replace(/__(.+?)__/gs, '_$1_');
+}
+
 const MIMES_IMAGEM_CLAUDE = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
 function buildConteudoMidia(texto, midiaData) {
@@ -213,12 +222,12 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
 
   // 8. Extrai TAG automática (só presente na primeira mensagem)
   let tag = null;
-  let textoLimpo = texto;
-  const tagMatch = texto.match(/\nTAG:(.+)$/m);
+  let textoLimpo = paraFormatacaoWhatsapp(texto);
+  const tagMatch = textoLimpo.match(/\nTAG:(.+)$/m);
   if (tagMatch) {
     const candidata = tagMatch[1].trim();
     if (TAGS_VALIDAS.includes(candidata)) tag = candidata;
-    textoLimpo = texto.replace(tagMatch[0], '').trim();
+    textoLimpo = textoLimpo.replace(tagMatch[0], '').trim();
   }
 
   // 9. Detecta handoff

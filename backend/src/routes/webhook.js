@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { tenants, clientes, conversas, mensagens, webhookLog, filiais, incidentes } from '../db/schema.js';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, lt, sql as sqlRaw } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { buscarDadosCliente } from '../services/sgp.js';
 import { enviarMensagem, transcreverAudioMeta, downloadMidiaBase64, baixarArquivoUrl, uploadMidia, enviarMidia } from '../services/whatsapp.js';
@@ -15,6 +15,44 @@ import crypto from 'crypto';
 
 const router = Router();
 let avisoAppSecretAusenteExibido = false;
+
+// Janela após a qual uma entrega não concluída é considerada abandonada. Serve
+// para separar a retentativa da Meta (que vem depois) de uma entrega duplicada
+// quase simultânea. O corte é calculado no banco: recebido_em é timestamp sem
+// fuso e uma Date do JS chega com offset local, que o Postgres descarta —
+// a comparação erraria por horas fora de UTC.
+const REPROCESSAR_APOS = sqlRaw`now() - interval '60 seconds'`;
+
+// Marca a mensagem como "em processamento" e devolve se cabe a nós tratá-la.
+// Antes o wamid era gravado antes de processar e nunca confirmado: se o
+// processo caísse no meio — um deploy, por exemplo — a retentativa da Meta era
+// descartada como duplicada e o cliente ficava sem resposta.
+async function reservarWamid(wamid, tenantId) {
+  const [novo] = await db.insert(webhookLog)
+    .values({ wamid, tenantId })
+    .onConflictDoNothing()
+    .returning({ wamid: webhookLog.wamid });
+  if (novo) return true;
+
+  // Já existe: só reprocessa o que ficou pendente tempo suficiente. O
+  // UPDATE ... RETURNING é atômico, então só uma entrega concorrente assume.
+  const [retomado] = await db.update(webhookLog)
+    .set({ recebidoEm: sqlRaw`now()` })
+    .where(and(
+      eq(webhookLog.wamid, wamid),
+      eq(webhookLog.processado, false),
+      lt(webhookLog.recebidoEm, REPROCESSAR_APOS),
+    ))
+    .returning({ wamid: webhookLog.wamid });
+  return !!retomado;
+}
+
+async function confirmarWamid(wamid) {
+  await db.update(webhookLog)
+    .set({ processado: true })
+    .where(eq(webhookLog.wamid, wamid))
+    .catch(err => console.error('[Webhook] Falha ao confirmar wamid:', err.message));
+}
 
 function assinaturaMetaValida(req) {
   const appSecret = process.env.META_APP_SECRET;
@@ -139,8 +177,9 @@ router.post('/', async (req, res) => {
               texto = await transcreverAudioMeta(wConfig, mediaId);
               if (!texto) continue;
               isAudio = true;
-              await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
+              if (!await reservarWamid(wamid, tenant.id)) continue;
               await processarWebhookMsg(tenant, remetente, texto, wamid, true, mediaId, nomeWa, filialEntrada);
+              await confirmarWamid(wamid);
               continue;
             } catch (err) {
               console.error('[Webhook] Erro ao transcrever áudio:', err.message);
@@ -156,8 +195,9 @@ router.post('/', async (req, res) => {
             try { midiaData = await downloadMidiaBase64(wConfig, mediaId); } catch (err) {
               console.error('[Webhook] Erro ao baixar imagem:', err.message);
             }
-            await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
+            if (!await reservarWamid(wamid, tenant.id)) continue;
             await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa, filialEntrada, midiaData);
+            await confirmarWamid(wamid);
             continue;
           } else if (msg.type === 'document') {
             const mediaId = msg.document?.id;
@@ -171,29 +211,27 @@ router.post('/', async (req, res) => {
                 console.error('[Webhook] Erro ao baixar PDF:', err.message);
               }
             }
-            await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
+            if (!await reservarWamid(wamid, tenant.id)) continue;
             await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa, filialEntrada, midiaData);
+            await confirmarWamid(wamid);
             continue;
           } else if (msg.type === 'video') {
             const mediaId = msg.video?.id;
             if (!mediaId) continue;
             const caption = msg.video?.caption ? ` — "${msg.video.caption}"` : '';
             texto = `[Vídeo]${caption}`;
-            await db.insert(webhookLog).values({ wamid, tenantId: tenant.id }).catch(() => {});
+            if (!await reservarWamid(wamid, tenant.id)) continue;
             await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa, filialEntrada, null);
+            await confirmarWamid(wamid);
             continue;
           } else {
             // Ignora outros tipos silenciosamente (sticker, reação, etc.)
             continue;
           }
 
-          try {
-            await db.insert(webhookLog).values({ wamid, tenantId: tenant.id });
-          } catch {
-            continue;
-          }
-
+          if (!await reservarWamid(wamid, tenant.id)) continue;
           await processarWebhookMsg(tenant, remetente, texto, wamid, isAudio, null, nomeWa, filialEntrada);
+          await confirmarWamid(wamid);
         }
       }
     }
