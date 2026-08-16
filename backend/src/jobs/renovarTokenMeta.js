@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { tenants } from '../db/schema.js';
+import { tenants, filiais, filialWhatsappExtra } from '../db/schema.js';
 import { eq, and, isNotNull, lte } from 'drizzle-orm';
 import { renovarTokenLongoPrazo } from '../services/whatsapp.js';
 
@@ -21,9 +21,47 @@ async function renovarTokens() {
       await db.update(tenants)
         .set({ whatsappToken: accessToken, whatsappTokenExpiraEm: expiraEm, atualizadoEm: new Date() })
         .where(eq(tenants.id, tenant.id));
-      console.log(`[whatsapp-token] Renovado: ${tenant.nome}`);
+      console.log(`[whatsapp-token] Renovado (tenant): ${tenant.nome}`);
     } catch (err) {
-      console.error(`[whatsapp-token] Falha ao renovar ${tenant.nome}:`, err.message);
+      console.error(`[whatsapp-token] Falha ao renovar (tenant) ${tenant.nome}:`, err.message);
+    }
+  }
+
+  const filiaisParaRenovar = await db.select().from(filiais)
+    .where(and(
+      isNotNull(filiais.whatsappToken),
+      isNotNull(filiais.whatsappTokenExpiraEm),
+      lte(filiais.whatsappTokenExpiraEm, limite),
+    ));
+
+  for (const filial of filiaisParaRenovar) {
+    try {
+      const { accessToken, expiraEm } = await renovarTokenLongoPrazo(filial);
+      await db.update(filiais)
+        .set({ whatsappToken: accessToken, whatsappTokenExpiraEm: expiraEm })
+        .where(eq(filiais.id, filial.id));
+      console.log(`[whatsapp-token] Renovado (filial): ${filial.nome}`);
+    } catch (err) {
+      console.error(`[whatsapp-token] Falha ao renovar (filial) ${filial.nome}:`, err.message);
+    }
+  }
+
+  const extrasParaRenovar = await db.select().from(filialWhatsappExtra)
+    .where(and(
+      isNotNull(filialWhatsappExtra.whatsappToken),
+      isNotNull(filialWhatsappExtra.whatsappTokenExpiraEm),
+      lte(filialWhatsappExtra.whatsappTokenExpiraEm, limite),
+    ));
+
+  for (const extra of extrasParaRenovar) {
+    try {
+      const { accessToken, expiraEm } = await renovarTokenLongoPrazo(extra);
+      await db.update(filialWhatsappExtra)
+        .set({ whatsappToken: accessToken, whatsappTokenExpiraEm: expiraEm })
+        .where(eq(filialWhatsappExtra.id, extra.id));
+      console.log(`[whatsapp-token] Renovado (número extra): ${extra.rotulo || extra.whatsappNumberId}`);
+    } catch (err) {
+      console.error(`[whatsapp-token] Falha ao renovar (número extra) ${extra.rotulo || extra.whatsappNumberId}:`, err.message);
     }
   }
 }

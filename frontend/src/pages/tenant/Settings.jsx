@@ -750,6 +750,7 @@ export default function Settings() {
 
   const [conectandoFilialId, setConectandoFilialId] = useState(null);
   const [erroFilialWpp, setErroFilialWpp] = useState({});
+  const [conectandoExtraFilialId, setConectandoExtraFilialId] = useState(null);
 
   const [formSenha, setFormSenha] = useState({ senhaAtual: '', novaSenha: '', confirmar: '' });
   const [savingSenha, setSavingSenha] = useState(false);
@@ -839,6 +840,53 @@ export default function Settings() {
   const handleDesconectarFilial = async (filialId) => {
     try {
       await api.delete(`/whatsapp/desconectar-filial/${filialId}`);
+      carregarFiliais();
+    } catch (err) {
+      setErroFilialWpp(e => ({ ...e, [filialId]: err.response?.data?.erro || 'Erro ao desconectar' }));
+    }
+  };
+
+  const handleConectarNumeroExtra = async (filialId) => {
+    setErroFilialWpp(e => ({ ...e, [filialId]: '' }));
+    if (!import.meta.env.VITE_META_APP_ID) {
+      setErroFilialWpp(e => ({ ...e, [filialId]: 'VITE_META_APP_ID não configurado' }));
+      return;
+    }
+    setConectandoExtraFilialId(filialId);
+    try {
+      await carregarFbSdk();
+      await new Promise((resolve, reject) => {
+        window.FB.login((response) => {
+          if (!response.authResponse?.code) {
+            reject(new Error('Login cancelado'));
+            return;
+          }
+          const { code } = response.authResponse;
+          const sessionInfo = response.authResponse.data_access_expiration_time
+            ? null
+            : response.authResponse;
+          const wabaId = sessionInfo?.waba_id || null;
+          const phoneNumberId = sessionInfo?.phone_number_id || null;
+          api.post(`/whatsapp/embedded-signup-filial-extra/${filialId}`, { code, wabaId, phoneNumberId })
+            .then(() => { carregarFiliais(); resolve(); })
+            .catch(err => reject(err));
+        }, {
+          config_id: import.meta.env.VITE_META_APP_ID,
+          response_type: 'code',
+          override_default_response_type: true,
+          extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
+        });
+      });
+    } catch (err) {
+      setErroFilialWpp(e => ({ ...e, [filialId]: err.response?.data?.erro || err.message || 'Erro ao conectar' }));
+    } finally {
+      setConectandoExtraFilialId(null);
+    }
+  };
+
+  const handleDesconectarNumeroExtra = async (filialId, extraId) => {
+    try {
+      await api.delete(`/whatsapp/desconectar-filial-extra/${extraId}`);
       carregarFiliais();
     } catch (err) {
       setErroFilialWpp(e => ({ ...e, [filialId]: err.response?.data?.erro || 'Erro ao desconectar' }));
@@ -1201,6 +1249,30 @@ export default function Settings() {
                     </div>
                     {erroFilialWpp[f.id] && (
                       <p className="text-xs text-red-500 mt-1">{erroFilialWpp[f.id]}</p>
+                    )}
+                    {f.whatsappConectado && (
+                      <div className="mt-2 pl-5 space-y-1.5">
+                        {(f.numerosExtras || []).map(extra => (
+                          <div key={extra.id} className="flex items-center justify-between">
+                            <span className="flex items-center gap-1 text-xs text-gray-500">
+                              <Wifi className="w-3 h-3 text-green-500" />
+                              {extra.rotulo || extra.whatsappNumberId}
+                            </span>
+                            <button type="button" onClick={() => handleDesconectarNumeroExtra(f.id, extra.id)}
+                              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors">
+                              <WifiOff className="w-3 h-3" /> Desconectar
+                            </button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => handleConectarNumeroExtra(f.id)}
+                          disabled={conectandoExtraFilialId === f.id}
+                          className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#25D366] disabled:opacity-50 transition-colors">
+                          {conectandoExtraFilialId === f.id
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <Plus className="w-3 h-3" />}
+                          Conectar número adicional (ex: fixo)
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}

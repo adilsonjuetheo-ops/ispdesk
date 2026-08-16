@@ -1,14 +1,72 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { tenants, filiais } from '../db/schema.js';
+import { tenants, filiais, filialWhatsappExtra } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
 
 const router = Router();
 const GRAPH = 'https://graph.facebook.com/v19.0';
 
+// Troca o code do Embedded Signup por um token de longa duração e resolve
+// wabaId/phoneNumberId — usado tanto pro número principal do tenant/filial
+// quanto pra números adicionais de uma filial.
+async function concluirEmbeddedSignup(code, { wabaId: bodyWabaId, phoneNumberId: bodyPhoneId } = {}) {
+  const tokenResp = await fetch(
+    `${GRAPH}/oauth/access_token?client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&code=${encodeURIComponent(code)}`
+  );
+  const tokenData = await tokenResp.json();
+  if (tokenData.error) throw new Error(`Token exchange: ${tokenData.error.message}`);
+
+  const longResp = await fetch(
+    `${GRAPH}/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&fb_exchange_token=${tokenData.access_token}`
+  );
+  const longData = await longResp.json();
+  if (longData.error) throw new Error(`Long-lived token: ${longData.error.message}`);
+  const accessToken = longData.access_token;
+  const tokenExpiraEm = longData.expires_in ? new Date(Date.now() + longData.expires_in * 1000) : null;
+
+  const debugResp = await fetch(
+    `${GRAPH}/debug_token?input_token=${accessToken}&access_token=${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
+  );
+  const debugData = await debugResp.json();
+  if (debugData.error) throw new Error('Não foi possível validar o token Meta');
+
+  let wabaId = bodyWabaId || null;
+  let phoneNumberId = bodyPhoneId || null;
+  let displayPhone = null;
+
+  if (!wabaId) {
+    const wabaScope = (debugData.data?.granular_scopes || [])
+      .find(s => s.scope === 'whatsapp_business_management');
+    if (!wabaScope?.target_ids?.length) throw new Error('Nenhuma conta WhatsApp Business (WABA) encontrada no token');
+    wabaId = wabaScope.target_ids[0];
+  }
+
+  if (!phoneNumberId) {
+    const phoneResp = await fetch(
+      `${GRAPH}/${wabaId}/phone_numbers?fields=id,display_phone_number&access_token=${accessToken}`
+    );
+    const phoneData = await phoneResp.json();
+    if (phoneData.error || !phoneData.data?.length) throw new Error('Nenhum número encontrado no WABA');
+    ({ id: phoneNumberId, display_phone_number: displayPhone } = phoneData.data[0]);
+  } else {
+    const phoneResp = await fetch(`${GRAPH}/${phoneNumberId}?fields=display_phone_number&access_token=${accessToken}`);
+    const phoneData = await phoneResp.json();
+    displayPhone = phoneData.display_phone_number || phoneNumberId;
+  }
+
+  try {
+    await fetch(`${GRAPH}/${wabaId}/subscribed_apps`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {}
+
+  return { accessToken, tokenExpiraEm, wabaId, phoneNumberId, displayPhone };
+}
+
 router.post('/embedded-signup', autenticar, apenasAdmin, async (req, res) => {
-  const { code } = req.body;
+  const { code, wabaId: bodyWabaId, phoneNumberId: bodyPhoneId } = req.body;
   const tenantId = req.user.tenantId;
 
   if (!code) return res.status(400).json({ erro: 'Código de autorização não informado' });
@@ -18,77 +76,9 @@ router.post('/embedded-signup', autenticar, apenasAdmin, async (req, res) => {
   }
 
   try {
-    // 1. Trocar código por token de curta duração
-    const tokenResp = await fetch(
-      `${GRAPH}/oauth/access_token?client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&code=${encodeURIComponent(code)}`
-    );
-    const tokenData = await tokenResp.json();
-    if (tokenData.error) throw new Error(`Token exchange: ${tokenData.error.message}`);
-    const shortToken = tokenData.access_token;
+    const { accessToken, tokenExpiraEm, wabaId, phoneNumberId, displayPhone } =
+      await concluirEmbeddedSignup(code, { wabaId: bodyWabaId, phoneNumberId: bodyPhoneId });
 
-    // 2. Trocar por token de longa duração (60 dias)
-    const longResp = await fetch(
-      `${GRAPH}/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&fb_exchange_token=${shortToken}`
-    );
-    const longData = await longResp.json();
-    if (longData.error) throw new Error(`Long-lived token: ${longData.error.message}`);
-    const accessToken = longData.access_token;
-    const tokenExpiraEm = longData.expires_in
-      ? new Date(Date.now() + longData.expires_in * 1000)
-      : null;
-
-    // 3. debug_token: extrai wabaId das granular_scopes e phoneNumberId do body (evento frontend)
-    const debugResp = await fetch(
-      `${GRAPH}/debug_token?input_token=${accessToken}&access_token=${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
-    );
-    const debugData = await debugResp.json();
-    console.log('[whatsapp] debug_token granular_scopes:', JSON.stringify(debugData?.data?.granular_scopes));
-    if (debugData.error) throw new Error('Não foi possível validar o token Meta');
-
-    let wabaId = req.body.wabaId || null;
-    let phoneNumberId = req.body.phoneNumberId || null;
-    let displayPhone = null;
-
-    if (!wabaId) {
-      const wabaScope = (debugData.data?.granular_scopes || [])
-        .find(s => s.scope === 'whatsapp_business_management');
-      if (!wabaScope?.target_ids?.length) {
-        throw new Error('Nenhuma conta WhatsApp Business (WABA) encontrada no token. Certifique-se de selecionar a WABA no fluxo de autorização.');
-      }
-      wabaId = wabaScope.target_ids[0];
-    }
-
-    if (!phoneNumberId) {
-      // 4. Busca números de telefone da WABA
-      const phoneResp = await fetch(
-        `${GRAPH}/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name&access_token=${accessToken}`
-      );
-      const phoneData = await phoneResp.json();
-      if (phoneData.error || !phoneData.data?.length) {
-        throw new Error('Nenhum número de telefone encontrado no WABA. Adicione um número no Meta Business Manager.');
-      }
-      ({ id: phoneNumberId, display_phone_number: displayPhone } = phoneData.data[0]);
-    } else {
-      const phoneResp = await fetch(
-        `${GRAPH}/${phoneNumberId}?fields=display_phone_number&access_token=${accessToken}`
-      );
-      const phoneData = await phoneResp.json();
-      displayPhone = phoneData.display_phone_number || phoneNumberId;
-    }
-
-    // 7. Subscrever app no webhook do WABA
-    try {
-      const subResp = await fetch(`${GRAPH}/${wabaId}/subscribed_apps`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const subData = await subResp.json();
-      if (subData.error) console.warn('[whatsapp] subscribed_apps falhou:', subData.error.message);
-    } catch (e) {
-      console.warn('[whatsapp] subscribed_apps erro:', e.message);
-    }
-
-    // 8. Salvar no banco
     await db.update(tenants).set({
       wabaId,
       whatsappNumberId: phoneNumberId,
@@ -121,56 +111,8 @@ router.post('/embedded-signup-filial/:filialId', autenticar, apenasAdmin, async 
   if (!filial) return res.status(404).json({ erro: 'Filial não encontrada' });
 
   try {
-    const tokenResp = await fetch(
-      `${GRAPH}/oauth/access_token?client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&code=${encodeURIComponent(code)}`
-    );
-    const tokenData = await tokenResp.json();
-    if (tokenData.error) throw new Error(`Token exchange: ${tokenData.error.message}`);
-
-    const longResp = await fetch(
-      `${GRAPH}/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&fb_exchange_token=${tokenData.access_token}`
-    );
-    const longData = await longResp.json();
-    if (longData.error) throw new Error(`Long-lived token: ${longData.error.message}`);
-    const accessToken = longData.access_token;
-    const tokenExpiraEm = longData.expires_in ? new Date(Date.now() + longData.expires_in * 1000) : null;
-
-    const debugResp = await fetch(
-      `${GRAPH}/debug_token?input_token=${accessToken}&access_token=${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
-    );
-    const debugData = await debugResp.json();
-    if (debugData.error) throw new Error('Não foi possível validar o token Meta');
-
-    let wabaId = bodyWabaId || null;
-    let phoneNumberId = bodyPhoneId || null;
-    let displayPhone = null;
-
-    if (!wabaId) {
-      const wabaScope = (debugData.data?.granular_scopes || [])
-        .find(s => s.scope === 'whatsapp_business_management');
-      if (!wabaScope?.target_ids?.length) throw new Error('Nenhuma WABA encontrada no token');
-      wabaId = wabaScope.target_ids[0];
-    }
-
-    if (!phoneNumberId) {
-      const phoneResp = await fetch(
-        `${GRAPH}/${wabaId}/phone_numbers?fields=id,display_phone_number&access_token=${accessToken}`
-      );
-      const phoneData = await phoneResp.json();
-      if (phoneData.error || !phoneData.data?.length) throw new Error('Nenhum número encontrado no WABA');
-      ({ id: phoneNumberId, display_phone_number: displayPhone } = phoneData.data[0]);
-    } else {
-      const phoneResp = await fetch(`${GRAPH}/${phoneNumberId}?fields=display_phone_number&access_token=${accessToken}`);
-      const phoneData = await phoneResp.json();
-      displayPhone = phoneData.display_phone_number || phoneNumberId;
-    }
-
-    try {
-      await fetch(`${GRAPH}/${wabaId}/subscribed_apps`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-    } catch {}
+    const { accessToken, tokenExpiraEm, wabaId, phoneNumberId, displayPhone } =
+      await concluirEmbeddedSignup(code, { wabaId: bodyWabaId, phoneNumberId: bodyPhoneId });
 
     await db.update(filiais).set({
       wabaId,
@@ -202,6 +144,56 @@ router.delete('/desconectar-filial/:filialId', autenticar, apenasAdmin, async (r
     whatsappConectadoEm: null,
   }).where(eq(filiais.id, filialId));
 
+  res.json({ ok: true });
+});
+
+// Números adicionais de uma filial — uma filial pode receber por mais de um
+// número (ex: manteve o fixo antigo funcionando junto com o celular novo).
+router.post('/embedded-signup-filial-extra/:filialId', autenticar, apenasAdmin, async (req, res) => {
+  const { code, wabaId: bodyWabaId, phoneNumberId: bodyPhoneId, rotulo } = req.body;
+  const { filialId } = req.params;
+  const tenantId = req.user.tenantId;
+
+  if (!code) return res.status(400).json({ erro: 'Código de autorização não informado' });
+  if (!process.env.META_APP_ID || !process.env.META_APP_SECRET) {
+    return res.status(500).json({ erro: 'Variáveis META_APP_ID e META_APP_SECRET não configuradas' });
+  }
+
+  const [filial] = await db.select().from(filiais)
+    .where(and(eq(filiais.id, filialId), eq(filiais.tenantId, tenantId)))
+    .limit(1);
+  if (!filial) return res.status(404).json({ erro: 'Filial não encontrada' });
+
+  try {
+    const { accessToken, tokenExpiraEm, wabaId, phoneNumberId, displayPhone } =
+      await concluirEmbeddedSignup(code, { wabaId: bodyWabaId, phoneNumberId: bodyPhoneId });
+
+    const [extra] = await db.insert(filialWhatsappExtra).values({
+      filialId,
+      rotulo: rotulo || displayPhone || null,
+      wabaId,
+      whatsappNumberId: phoneNumberId,
+      whatsappToken: accessToken,
+      whatsappTokenExpiraEm: tokenExpiraEm,
+      whatsappConectadoEm: new Date(),
+    }).returning();
+
+    res.json({ ok: true, id: extra.id, wabaId, phoneNumberId, displayPhone });
+  } catch (err) {
+    console.error('[whatsapp/embedded-signup-filial-extra]', err.message);
+    res.status(400).json({ erro: err.message || 'Erro ao conectar número adicional' });
+  }
+});
+
+router.delete('/desconectar-filial-extra/:id', autenticar, apenasAdmin, async (req, res) => {
+  const [extra] = await db.select({ id: filialWhatsappExtra.id, filialId: filialWhatsappExtra.filialId })
+    .from(filialWhatsappExtra)
+    .innerJoin(filiais, eq(filiais.id, filialWhatsappExtra.filialId))
+    .where(and(eq(filialWhatsappExtra.id, req.params.id), eq(filiais.tenantId, req.user.tenantId)))
+    .limit(1);
+  if (!extra) return res.status(404).json({ erro: 'Número não encontrado' });
+
+  await db.delete(filialWhatsappExtra).where(eq(filialWhatsappExtra.id, req.params.id));
   res.json({ ok: true });
 });
 

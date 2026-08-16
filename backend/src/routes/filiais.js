@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { filiais } from '../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { filiais, filialWhatsappExtra } from '../db/schema.js';
+import { eq, and, inArray } from 'drizzle-orm';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
@@ -27,7 +27,22 @@ router.get('/', async (req, res) => {
     }).from(filiais)
       .where(eq(filiais.tenantId, tenantId))
       .orderBy(filiais.nome);
-    res.json(rows);
+
+    const ids = rows.map(f => f.id);
+    const extras = ids.length
+      ? await db.select({
+          id: filialWhatsappExtra.id,
+          filialId: filialWhatsappExtra.filialId,
+          rotulo: filialWhatsappExtra.rotulo,
+          whatsappNumberId: filialWhatsappExtra.whatsappNumberId,
+          whatsappConectadoEm: filialWhatsappExtra.whatsappConectadoEm,
+        }).from(filialWhatsappExtra).where(inArray(filialWhatsappExtra.filialId, ids))
+      : [];
+
+    res.json(rows.map(f => ({
+      ...f,
+      numerosExtras: extras.filter(e => e.filialId === f.id),
+    })));
   } catch (err) {
     res.status(500).json({ erro: err.message });
   }

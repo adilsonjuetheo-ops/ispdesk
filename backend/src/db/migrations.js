@@ -112,6 +112,20 @@ export async function runMigrations() {
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_template_pos text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_idioma text DEFAULT 'pt_BR'`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS exigir_documento boolean DEFAULT false`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS filial_whatsapp_extra (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        filial_id uuid NOT NULL REFERENCES filiais(id) ON DELETE CASCADE,
+        rotulo text,
+        whatsapp_number_id text NOT NULL UNIQUE,
+        whatsapp_token text NOT NULL,
+        whatsapp_token_expira_em timestamp,
+        waba_id text,
+        whatsapp_conectado_em timestamp DEFAULT now(),
+        criado_em timestamp DEFAULT now()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_filial_wpp_extra_filial ON filial_whatsapp_extra(filial_id)`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { tenants, clientes, conversas, mensagens, webhookLog, filiais, incidentes } from '../db/schema.js';
+import { tenants, clientes, conversas, mensagens, webhookLog, filiais, filialWhatsappExtra, incidentes } from '../db/schema.js';
 import { eq, and, ne, lt, sql as sqlRaw } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { buscarDadosCliente } from '../services/sgp.js';
@@ -116,7 +116,8 @@ router.post('/', async (req, res) => {
         const msgs = value.messages;
         if (!msgs?.length) continue;
 
-        // Resolve tenant — primeiro pelo número principal, depois por número de filial
+        // Resolve tenant — primeiro pelo número principal, depois por número de
+        // filial (principal ou adicional — uma filial pode ter mais de um número)
         let tenant = null;
         let filialEntrada = null;
 
@@ -131,13 +132,26 @@ router.post('/', async (req, res) => {
             .where(eq(filiais.whatsappNumberId, phoneNumberId))
             .limit(1);
           if (filialWpp) {
-            const [tenantDaFilial] = await db.select().from(tenants)
-              .where(and(eq(tenants.id, filialWpp.tenantId), eq(tenants.ativo, true)))
+            filialEntrada = filialWpp;
+          } else {
+            const [extra] = await db.select().from(filialWhatsappExtra)
+              .where(eq(filialWhatsappExtra.whatsappNumberId, phoneNumberId))
               .limit(1);
-            if (tenantDaFilial) {
-              tenant = tenantDaFilial;
-              filialEntrada = filialWpp;
+            if (extra) {
+              const [filialDoExtra] = await db.select().from(filiais)
+                .where(eq(filiais.id, extra.filialId))
+                .limit(1);
+              if (filialDoExtra) {
+                filialEntrada = { ...filialDoExtra, whatsappNumberId: extra.whatsappNumberId, whatsappToken: extra.whatsappToken };
+              }
             }
+          }
+          if (filialEntrada) {
+            const [tenantDaFilial] = await db.select().from(tenants)
+              .where(and(eq(tenants.id, filialEntrada.tenantId), eq(tenants.ativo, true)))
+              .limit(1);
+            if (tenantDaFilial) tenant = tenantDaFilial;
+            else filialEntrada = null;
           }
         }
         if (!tenant) continue;

@@ -60,6 +60,22 @@ export const filiais = pgTable('filiais', {
   criadoEm:              timestamp('criado_em').defaultNow(),
 });
 
+// Números de WhatsApp adicionais de uma filial — uma filial pode atender por
+// mais de um número (ex: um fixo antigo e um celular novo apontando pra
+// mesma cidade). filiais.whatsappNumberId continua sendo o número principal;
+// esta tabela guarda os extras.
+export const filialWhatsappExtra = pgTable('filial_whatsapp_extra', {
+  id:                    uuid('id').primaryKey().defaultRandom(),
+  filialId:              uuid('filial_id').notNull().references(() => filiais.id, { onDelete: 'cascade' }),
+  rotulo:                text('rotulo'), // ex: "Fixo"
+  whatsappNumberId:      text('whatsapp_number_id').notNull().unique(),
+  whatsappToken:         text('whatsapp_token').notNull(),
+  whatsappTokenExpiraEm: timestamp('whatsapp_token_expira_em'),
+  wabaId:                text('waba_id'),
+  whatsappConectadoEm:   timestamp('whatsapp_conectado_em').defaultNow(),
+  criadoEm:              timestamp('criado_em').defaultNow(),
+});
+
 export const tenantUsers = pgTable('tenant_users', {
   id:        uuid('id').primaryKey().defaultRandom(),
   tenantId:  uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
