@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import api from '../../lib/api.js';
 import UpdateBanner from '../UpdateBanner.jsx';
+import BottomTabBar from '../BottomTabBar.jsx';
 
 const AVATAR_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b',
@@ -32,6 +33,7 @@ export default function TenantLayout() {
   const [counts, setCounts] = useState({ todos: 0, mine: 0, fila: 0, porFilial: {} });
   const [online, setOnline] = useState([]);
   const [usoIa, setUsoIa] = useState(null);
+  const [chatMobileAberto, setChatMobileAberto] = useState(false);
 
   // Recarrega tenant periodicamente para detectar suspensão
   usePolling(() => {
@@ -302,10 +304,19 @@ export default function TenantLayout() {
             </p>
           </div>
         )}
-        <div className="flex-1 overflow-hidden">
-          <Outlet context={{ online, currentUser: user, onOpenSidebar: () => setSidebarOpen(true) }} />
+        <div className={`flex-1 overflow-hidden ${!chatMobileAberto ? 'pb-14 md:pb-0' : ''}`}>
+          <Outlet context={{
+            online,
+            currentUser: user,
+            onOpenSidebar: () => setSidebarOpen(true),
+            onChatMobileChange: setChatMobileAberto,
+          }} />
         </div>
       </main>
+
+      {!chatMobileAberto && (
+        <BottomTabBar isAdmin={user?.role === 'admin'} counts={counts} />
+      )}
     </div>
   );
 }

@@ -116,7 +116,7 @@ function WelcomePanel({ currentUser }) {
 }
 
 export default function Inbox() {
-  const { online = [], currentUser, onOpenSidebar } = useOutletContext() || {};
+  const { online = [], currentUser, onOpenSidebar, onChatMobileChange } = useOutletContext() || {};
   const [conversas, setConversas] = useState([]);
   const [selecionada, setSelecionada] = useState(null);
   const [slaMinutos, setSlaMinutos] = useState(0);
@@ -136,6 +136,11 @@ export default function Inbox() {
   useEffect(() => {
     setSelecionada(null);
   }, [view, filialId]);
+
+  useEffect(() => {
+    onChatMobileChange?.(!!selecionada);
+    return () => onChatMobileChange?.(false);
+  }, [selecionada, onChatMobileChange]);
 
   const carregarConversas = useCallback(async () => {
     const { data } = await api.get('/conversations');
@@ -158,7 +163,7 @@ export default function Inbox() {
   return (
     <div className="flex h-full">
       {/* Lista — ocupa tela toda no mobile quando não há conversa selecionada */}
-      <div className={`h-full ${selecionada ? 'hidden md:block' : 'flex-1 md:flex-none'}`}>
+      <div className={`h-full min-w-0 ${selecionada ? 'hidden md:block' : 'flex-1 md:flex-none'}`}>
         <ConversationList
           conversas={conversas}
           selecionada={selecionada}
