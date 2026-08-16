@@ -8,6 +8,7 @@ import {
   Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap, AlertTriangle, Star, X,
 } from 'lucide-react';
 import api from '../../lib/api.js';
+import UpdateBanner from '../UpdateBanner.jsx';
 
 const AVATAR_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b',
@@ -284,6 +285,7 @@ export default function TenantLayout() {
       </aside>
 
       <main className="flex-1 overflow-hidden flex flex-col">
+        {user?.role === 'admin' && <UpdateBanner />}
         {tenant?.statusPagamento === 'suspenso' && user?.role === 'admin' && (
           <div className="bg-red-900/80 border-b border-red-700 px-4 py-2.5 flex items-center gap-2 shrink-0">
             <AlertTriangle className="w-4 h-4 text-red-300 shrink-0" />

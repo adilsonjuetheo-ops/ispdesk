@@ -2,6 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 import { LayoutDashboard, Building2, LogOut, CreditCard } from 'lucide-react';
 import api from '../../lib/api.js';
+import UpdateBanner from '../UpdateBanner.jsx';
 
 export default function SuperAdminLayout() {
   const { user, logout } = useAuth();
@@ -60,8 +61,11 @@ export default function SuperAdminLayout() {
       </aside>
 
       {/* conteúdo */}
-      <main className="flex-1 overflow-auto">
-        <Outlet />
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <UpdateBanner />
+        <div className="flex-1 overflow-auto">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
