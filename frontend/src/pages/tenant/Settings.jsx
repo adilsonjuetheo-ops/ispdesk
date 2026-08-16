@@ -801,30 +801,29 @@ export default function Settings() {
 
   const handleConectarFilial = async (filialId) => {
     setErroFilialWpp(e => ({ ...e, [filialId]: '' }));
-    if (!import.meta.env.VITE_META_APP_ID) {
-      setErroFilialWpp(e => ({ ...e, [filialId]: 'VITE_META_APP_ID não configurado' }));
+    if (!import.meta.env.VITE_META_APP_ID || !import.meta.env.VITE_META_CONFIG_ID) {
+      setErroFilialWpp(e => ({ ...e, [filialId]: 'VITE_META_APP_ID / VITE_META_CONFIG_ID não configurados' }));
       return;
     }
     setConectandoFilialId(filialId);
     try {
       await carregarFbSdk();
       await new Promise((resolve, reject) => {
+        let sessionInfo = null;
+        window.FB.Event.subscribe('WhatsAppBusinessSignup:finish', (data) => { sessionInfo = data; });
         window.FB.login((response) => {
           if (!response.authResponse?.code) {
             reject(new Error('Login cancelado'));
             return;
           }
           const { code } = response.authResponse;
-          const sessionInfo = response.authResponse.data_access_expiration_time
-            ? null
-            : response.authResponse;
           const wabaId = sessionInfo?.waba_id || null;
           const phoneNumberId = sessionInfo?.phone_number_id || null;
           api.post(`/whatsapp/embedded-signup-filial/${filialId}`, { code, wabaId, phoneNumberId })
             .then(() => { carregarFiliais(); resolve(); })
             .catch(err => reject(err));
         }, {
-          config_id: import.meta.env.VITE_META_APP_ID,
+          config_id: import.meta.env.VITE_META_CONFIG_ID,
           response_type: 'code',
           override_default_response_type: true,
           extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
@@ -848,30 +847,29 @@ export default function Settings() {
 
   const handleConectarNumeroExtra = async (filialId) => {
     setErroFilialWpp(e => ({ ...e, [filialId]: '' }));
-    if (!import.meta.env.VITE_META_APP_ID) {
-      setErroFilialWpp(e => ({ ...e, [filialId]: 'VITE_META_APP_ID não configurado' }));
+    if (!import.meta.env.VITE_META_APP_ID || !import.meta.env.VITE_META_CONFIG_ID) {
+      setErroFilialWpp(e => ({ ...e, [filialId]: 'VITE_META_APP_ID / VITE_META_CONFIG_ID não configurados' }));
       return;
     }
     setConectandoExtraFilialId(filialId);
     try {
       await carregarFbSdk();
       await new Promise((resolve, reject) => {
+        let sessionInfo = null;
+        window.FB.Event.subscribe('WhatsAppBusinessSignup:finish', (data) => { sessionInfo = data; });
         window.FB.login((response) => {
           if (!response.authResponse?.code) {
             reject(new Error('Login cancelado'));
             return;
           }
           const { code } = response.authResponse;
-          const sessionInfo = response.authResponse.data_access_expiration_time
-            ? null
-            : response.authResponse;
           const wabaId = sessionInfo?.waba_id || null;
           const phoneNumberId = sessionInfo?.phone_number_id || null;
           api.post(`/whatsapp/embedded-signup-filial-extra/${filialId}`, { code, wabaId, phoneNumberId })
             .then(() => { carregarFiliais(); resolve(); })
             .catch(err => reject(err));
         }, {
-          config_id: import.meta.env.VITE_META_APP_ID,
+          config_id: import.meta.env.VITE_META_CONFIG_ID,
           response_type: 'code',
           override_default_response_type: true,
           extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
