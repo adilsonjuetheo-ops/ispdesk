@@ -1,4 +1,4 @@
-const CACHE = 'ispdesk-v1';
+const CACHE = 'ispdesk-v2';
 
 // ── Instalação: pré-cacheia o shell ──────────────────────────────────────────
 self.addEventListener('install', (event) => {
@@ -22,8 +22,9 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Nunca intercepta chamadas à API — sempre vai para a rede
-  if (url.pathname.startsWith('/api')) return;
+  // Nunca intercepta chamadas à API nem o version.json — sempre vai para a rede
+  // (version.json precisa ser sempre fresco pra detectar atualizações do app)
+  if (url.pathname.startsWith('/api') || url.pathname === '/version.json') return;
 
   // Navegação (HTML): network-first → fallback para cache (app offline)
   if (request.mode === 'navigate') {
