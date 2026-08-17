@@ -46,7 +46,7 @@ function DateSeparator({ date }) {
 
 function MidiaBolao({ msg, isCliente }) {
   const { conteudo, midiaUrl, conversaId } = msg;
-  const { src: midiaSrc } = useMidiaBlob(conversaId, midiaUrl);
+  const { src: midiaSrc, erro: midiaErro } = useMidiaBlob(conversaId, midiaUrl);
   const isImagem = conteudo.startsWith('[Imagem]');
   const isAudio  = conteudo.startsWith('[Áudio]');
   const isVideo  = conteudo.startsWith('[Vídeo]');
@@ -78,12 +78,15 @@ function MidiaBolao({ msg, isCliente }) {
   if (isVideo && midiaUrl) {
     return (
       <div className="rounded-2xl overflow-hidden max-w-[280px]">
-        <video
-          src={midiaSrc || undefined}
-          controls
-          preload="metadata"
-          className="w-full rounded-2xl"
-        />
+        {midiaErro ? (
+          <p className="text-xs text-red-500 p-3">Não foi possível carregar o vídeo.</p>
+        ) : !midiaSrc ? (
+          <p className="text-xs text-gray-400 p-3 flex items-center gap-1.5">
+            <Loader2 className="w-3 h-3 animate-spin" /> Carregando vídeo...
+          </p>
+        ) : (
+          <video src={midiaSrc} controls preload="metadata" className="w-full rounded-2xl" />
+        )}
       </div>
     );
   }
@@ -95,12 +98,22 @@ function MidiaBolao({ msg, isCliente }) {
           <Mic className="w-4 h-4 opacity-60 shrink-0" />
           <p className="text-xs opacity-60 font-medium">Áudio</p>
         </div>
-        <audio
-          src={midiaSrc || undefined}
-          controls
-          className="w-full h-8"
-          style={{ colorScheme: 'light' }}
-        />
+        {/* Player só depois do arquivo em mãos: montá-lo sem fonte deixa um
+            controle morto na tela, sem dizer o que houve. */}
+        {midiaErro ? (
+          <p className="text-xs text-red-500 py-1">Não foi possível carregar o áudio.</p>
+        ) : !midiaSrc ? (
+          <p className="text-xs opacity-50 py-1 flex items-center gap-1.5">
+            <Loader2 className="w-3 h-3 animate-spin" /> Carregando áudio...
+          </p>
+        ) : (
+          <audio
+            src={midiaSrc}
+            controls
+            className="w-full h-8"
+            style={{ colorScheme: 'light' }}
+          />
+        )}
         {nome && <p className="text-xs leading-relaxed mt-1.5 opacity-80">{nome}</p>}
       </div>
     );
