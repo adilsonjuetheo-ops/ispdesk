@@ -23,7 +23,14 @@ export function useMidiaBlob(conversaId, mediaId) {
     api.get(`/conversations/${conversaId}/media/${mediaId}`, { responseType: 'blob' })
       .then(r => {
         if (cancelado) return;
-        criada = URL.createObjectURL(r.data);
+        // Fixa o tipo pelo cabeçalho da resposta: sem ele o Chrome não sabe
+        // qual decodificador usar e o player fica inerte.
+        const tipo = String(r.headers?.['content-type'] || r.data?.type || '')
+          .split(';')[0].trim();
+        const blob = tipo && r.data.type !== tipo
+          ? new Blob([r.data], { type: tipo })
+          : r.data;
+        criada = URL.createObjectURL(blob);
         setSrc(criada);
       })
       .catch(() => { if (!cancelado) setErro(true); });

@@ -1,4 +1,4 @@
-const CACHE = 'ispdesk-v2';
+const CACHE = 'ispdesk-v3';
 
 // ── Instalação: pré-cacheia o shell ──────────────────────────────────────────
 self.addEventListener('install', (event) => {
@@ -31,7 +31,10 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then(res => {
-          caches.open(CACHE).then(c => c.put(request, res.clone()));
+          // Clona ANTES de devolver: dentro do then de caches.open o corpo
+          // já teria sido consumido por quem recebeu a resposta.
+          const copia = res.clone();
+          caches.open(CACHE).then(c => c.put(request, copia)).catch(() => {});
           return res;
         })
         .catch(() => caches.match('/'))
@@ -43,7 +46,10 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(request).then(cached => {
       const network = fetch(request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(request, res.clone()));
+        if (res.ok) {
+          const copia = res.clone();
+          caches.open(CACHE).then(c => c.put(request, copia)).catch(() => {});
+        }
         return res;
       });
       return cached || network;

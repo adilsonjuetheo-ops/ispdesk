@@ -47,6 +47,19 @@ function DateSeparator({ date }) {
 function MidiaBolao({ msg, isCliente }) {
   const { conteudo, midiaUrl, conversaId } = msg;
   const { src: midiaSrc, erro: midiaErro } = useMidiaBlob(conversaId, midiaUrl);
+  const [falhaPlayer, setFalhaPlayer] = useState(null);
+
+  // O <audio> falha em silêncio: sem isso, um codec não suportado fica
+  // indistinguível de um download que não veio.
+  const aoFalhar = e => {
+    const c = e.currentTarget?.error?.code;
+    setFalhaPlayer(
+      c === 4 ? 'formato não suportado por este navegador'
+      : c === 3 ? 'falha ao decodificar o arquivo'
+      : c === 2 ? 'falha de rede ao carregar'
+      : 'não foi possível reproduzir'
+    );
+  };
   const isImagem = conteudo.startsWith('[Imagem]');
   const isAudio  = conteudo.startsWith('[Áudio]');
   const isVideo  = conteudo.startsWith('[Vídeo]');
@@ -85,7 +98,10 @@ function MidiaBolao({ msg, isCliente }) {
             <Loader2 className="w-3 h-3 animate-spin" /> Carregando vídeo...
           </p>
         ) : (
-          <video src={midiaSrc} controls preload="metadata" className="w-full rounded-2xl" />
+          <>
+            <video src={midiaSrc} controls preload="metadata" onError={aoFalhar} className="w-full rounded-2xl" />
+            {falhaPlayer && <p className="text-xs text-red-500 p-2">Vídeo: {falhaPlayer}.</p>}
+          </>
         )}
       </div>
     );
@@ -107,12 +123,16 @@ function MidiaBolao({ msg, isCliente }) {
             <Loader2 className="w-3 h-3 animate-spin" /> Carregando áudio...
           </p>
         ) : (
-          <audio
-            src={midiaSrc}
-            controls
-            className="w-full h-8"
-            style={{ colorScheme: 'light' }}
-          />
+          <>
+            <audio
+              src={midiaSrc}
+              controls
+              onError={aoFalhar}
+              className="w-full h-8"
+              style={{ colorScheme: 'light' }}
+            />
+            {falhaPlayer && <p className="text-xs text-red-500 mt-1">Áudio: {falhaPlayer}.</p>}
+          </>
         )}
         {nome && <p className="text-xs leading-relaxed mt-1.5 opacity-80">{nome}</p>}
       </div>
