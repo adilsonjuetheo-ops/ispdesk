@@ -423,7 +423,8 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
     api.get('/tenants/me/horarios').then(r => setTagsCatalog(r.data?.tagsCatalog || [])).catch(() => {});
   }, [user?.tenantId]);
 
-  const podeAtuar = conversa.status !== 'encerrada';
+  // Encerrada também pode ser respondida — enviar mensagem reabre a conversa.
+  const podeAtuar = true;
   const eHumano = conversa.status === 'humano';
 
   const handleAsumir = async () => {
@@ -800,7 +801,9 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
                         ? 'Lembrete interno (só a equipe vê)...'
                         : eHumano
                           ? 'Digite uma mensagem e pressione enter para enviar...'
-                          : 'Digite para assumir e responder...'
+                          : conversa.status === 'encerrada'
+                            ? 'Digite para reabrir e responder...'
+                            : 'Digite para assumir e responder...'
                     }
                     className={clsx(
                       'w-full px-3 pt-2.5 pb-1 text-sm bg-transparent resize-none focus:outline-none placeholder-gray-400 rounded-t-xl',

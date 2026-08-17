@@ -273,11 +273,9 @@ router.post('/:id/send', async (req, res) => {
   if (!podeAcessarConversa(req, conversa)) {
     return res.status(403).json({ erro: 'Acesso negado' });
   }
-  // Responder já é assumir: o atendente não precisa clicar em Assumir antes.
+  // Responder já é assumir: o atendente não precisa clicar em Assumir antes —
+  // vale também pra conversa encerrada, que reabre ao ser respondida.
   if (conversa.status !== 'humano') {
-    if (conversa.status === 'encerrada') {
-      return res.status(400).json({ erro: 'Conversa encerrada. Reabra antes de responder.' });
-    }
     await assumirConversa(req, conversa);
     conversa = { ...conversa, status: 'humano', agenteId: req.user.id };
   }
@@ -323,11 +321,8 @@ router.post('/:id/send-media', limitarUpload, upload.single('arquivo'), async (r
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
   if (!podeAcessarConversa(req, conversa))
     return res.status(403).json({ erro: 'Acesso negado' });
-  // Enviar arquivo também assume a conversa.
+  // Enviar arquivo também assume a conversa — vale também pra encerrada, que reabre.
   if (conversa.status !== 'humano') {
-    if (conversa.status === 'encerrada') {
-      return res.status(400).json({ erro: 'Conversa encerrada. Reabra antes de responder.' });
-    }
     await assumirConversa(req, conversa);
     conversa = { ...conversa, status: 'humano', agenteId: req.user.id };
   }
@@ -353,7 +348,7 @@ router.post('/:id/send-media', limitarUpload, upload.single('arquivo'), async (r
     conversaId: id,
     origem: 'agente',
     conteudo,
-    midiaUrl: tipo === 'image' ? mediaId : null,
+    midiaUrl: (tipo === 'image' || tipo === 'audio') ? mediaId : null,
     wamid: mediaWamid,
     status: 'enviada',
     agenteNome: req.user.nome,
@@ -384,16 +379,18 @@ router.get('/:id/media/:mediaId', async (req, res) => {
 
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
   if (!tenant?.whatsappToken) return res.status(400).end();
+  const wConfig = await resolverWConfig(tenant, conversa);
+  if (!wConfig?.whatsappToken) return res.status(400).end();
 
   try {
     const metaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
-      headers: { Authorization: `Bearer ${tenant.whatsappToken}` },
+      headers: { Authorization: `Bearer ${wConfig.whatsappToken}` },
     });
     if (!metaRes.ok) return res.status(502).end();
     const { url, mime_type } = await metaRes.json();
 
     const mediaRes = await fetch(url, {
-      headers: { Authorization: `Bearer ${tenant.whatsappToken}` },
+      headers: { Authorization: `Bearer ${wConfig.whatsappToken}` },
     });
     if (!mediaRes.ok) return res.status(502).end();
 
