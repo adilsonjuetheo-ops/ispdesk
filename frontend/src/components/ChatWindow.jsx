@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import api, { urlMidia } from '../lib/api.js';
+import api from '../lib/api.js';
+import { useMidiaBlob } from '../hooks/useMidiaBlob.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { usePolling } from '../hooks/usePolling.js';
 import { useNotificationSound } from '../hooks/useNotificationSound.js';
@@ -45,6 +46,7 @@ function DateSeparator({ date }) {
 
 function MidiaBolao({ msg, isCliente }) {
   const { conteudo, midiaUrl, conversaId } = msg;
+  const { src: midiaSrc } = useMidiaBlob(conversaId, midiaUrl);
   const isImagem = conteudo.startsWith('[Imagem]');
   const isAudio  = conteudo.startsWith('[Áudio]');
   const isVideo  = conteudo.startsWith('[Vídeo]');
@@ -57,7 +59,7 @@ function MidiaBolao({ msg, isCliente }) {
     return (
       <div className="rounded-2xl overflow-hidden max-w-[280px]">
         <img
-          src={urlMidia(conversaId, midiaUrl)}
+          src={midiaSrc || undefined}
           alt="Imagem"
           className="w-full object-cover rounded-2xl"
           onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
@@ -77,8 +79,7 @@ function MidiaBolao({ msg, isCliente }) {
     return (
       <div className="rounded-2xl overflow-hidden max-w-[280px]">
         <video
-          src={urlMidia(conversaId, midiaUrl)}
-          crossOrigin="use-credentials"
+          src={midiaSrc || undefined}
           controls
           preload="metadata"
           className="w-full rounded-2xl"
@@ -95,8 +96,7 @@ function MidiaBolao({ msg, isCliente }) {
           <p className="text-xs opacity-60 font-medium">Áudio</p>
         </div>
         <audio
-          src={urlMidia(conversaId, midiaUrl)}
-          crossOrigin="use-credentials"
+          src={midiaSrc || undefined}
           controls
           className="w-full h-8"
           style={{ colorScheme: 'light' }}
