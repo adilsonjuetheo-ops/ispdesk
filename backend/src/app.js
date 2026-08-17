@@ -45,6 +45,10 @@ app.use(cors({
     callback(erro);
   },
   credentials: true,
+  // Sem isto o navegador esconde os cabeçalhos de faixa numa resposta
+  // cross-origin. O player de áudio recebe o 206 mas não enxerga o
+  // Content-Range, não sabe onde está no arquivo e não toca.
+  exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length'],
 }));
 
 app.use(express.json({

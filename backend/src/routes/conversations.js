@@ -8,6 +8,7 @@ import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.j
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { enviarNps } from '../services/nps.js';
 import { criarRateLimit } from '../middleware/security.js';
+import { audioPrecisaConverter, converterParaOggOpus } from '../services/audio.js';
 
 // O player de áudio faz várias requisições Range pra descobrir a duração
 // antes de tocar — sem isso, cada uma rebaixaria o arquivo inteiro da Meta
@@ -374,8 +375,27 @@ router.post('/:id/send-media', limitarUpload, upload.single('arquivo'), async (r
       ? 'audio'
       : 'document';
 
-  const mimeType = tipo === 'audio' ? 'audio/ogg; codecs=opus' : arquivo.mimetype;
-  const { id: mediaId } = await uploadMidia(wConfig, arquivo.buffer, mimeType, arquivo.originalname);
+  // O navegador grava no container que suportar — o Chrome só faz WebM, que o
+  // WhatsApp não reproduz. Antes o mime era forçado para Ogg sem converter o
+  // conteúdo: a Meta aceita sem conferir o container e o áudio chegava mudo no
+  // celular do cliente, com o atendente vendo "enviado".
+  let corpo = arquivo.buffer;
+  let mimeType = arquivo.mimetype;
+  if (tipo === 'audio') {
+    if (audioPrecisaConverter(arquivo.mimetype)) {
+      try {
+        corpo = await converterParaOggOpus(arquivo.buffer);
+        mimeType = 'audio/ogg; codecs=opus';
+      } catch (err) {
+        console.error('[Áudio] Falha ao converter para Ogg/Opus:', err.message);
+        return res.status(502).json({ erro: 'Não foi possível converter o áudio gravado. Tente novamente.' });
+      }
+    } else if (mimeType.split(';')[0].trim() === 'audio/ogg') {
+      mimeType = 'audio/ogg; codecs=opus';
+    }
+  }
+
+  const { id: mediaId } = await uploadMidia(wConfig, corpo, mimeType, arquivo.originalname);
   const mediaApiRes = await enviarMidia(wConfig, cliente.whatsapp, mediaId, tipo, arquivo.originalname);
   const mediaWamid = mediaApiRes?.messages?.[0]?.id || null;
 
@@ -392,7 +412,7 @@ router.post('/:id/send-media', limitarUpload, upload.single('arquivo'), async (r
   }).returning();
 
   await db.update(conversas).set({
-    ultimaMensagem: '🎤 Áudio',
+    ultimaMensagem: tipo === 'image' ? '📷 Imagem' : tipo === 'audio' ? '🎤 Áudio' : '📎 Arquivo',
     ultimaMsgEm: new Date(),
     ultimaMsgOrigem: 'agente',
     ultimaMsgNome: req.user.nome,
