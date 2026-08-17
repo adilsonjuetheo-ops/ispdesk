@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, boolean, timestamp, jsonb, integer, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, boolean, timestamp, jsonb, integer, primaryKey, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const tenants = pgTable('tenants', {
   id:                 uuid('id').primaryKey().defaultRandom(),
@@ -189,6 +189,20 @@ export const incidentes = pgTable('incidentes', {
   criadoEm:   timestamp('criado_em').defaultNow(),
   resolvidoEm: timestamp('resolvido_em'),
 });
+
+// Dedup dos lembretes de pós-vencimento: a consulta ao SGP passou a olhar uma
+// janela de dias (não mais uma data exata), então a mesma fatura em aberto
+// aparece em vários dias seguidos — sem isso, mandaria o lembrete de novo a
+// cada execução até o cliente pagar.
+export const lembreteFaturaEnviados = pgTable('lembrete_fatura_enviados', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  tituloId:  text('titulo_id').notNull(),
+  tipo:      text('tipo').notNull(), // 'pos' (pré-vencimento continua data exata, não precisa)
+  enviadoEm: timestamp('enviado_em').defaultNow(),
+}, (t) => ({
+  unico: uniqueIndex('idx_lembrete_enviado_unico').on(t.tenantId, t.tituloId, t.tipo),
+}));
 
 export const usoIa = pgTable('uso_ia', {
   tenantId:        uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),

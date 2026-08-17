@@ -1,8 +1,14 @@
 import { db } from '../db/index.js';
-import { tenants, clientes, conversas, mensagens } from '../db/schema.js';
-import { eq, and, ne } from 'drizzle-orm';
+import { tenants, clientes, conversas, mensagens, lembreteFaturaEnviados } from '../db/schema.js';
+import { eq, and, ne, inArray } from 'drizzle-orm';
 import { criarSgp } from '../services/sgp.js';
 import { enviarTemplate } from '../services/whatsapp.js';
+
+// Quantos dias pra trás da marca de "5 dias vencido" a busca ainda cobre —
+// dá uma folga pra pegar quem ficou de fora se o cron falhar num dia (SGP
+// fora do ar, deploy no meio da execução, etc.), sem arrastar dívida antiga
+// pra dentro de um lembrete que soa como "acabou de vencer".
+const JANELA_POS_VENCIMENTO_DIAS = 15;
 
 function formatarData(dataStr) {
   return new Date(`${dataStr}T00:00:00`).toLocaleDateString('pt-BR');
@@ -120,15 +126,16 @@ export async function processarProvedor(tenant) {
 
   const amanha = paraDataISO(1);
   const ha5dias = paraDataISO(-5);
+  const inicioJanelaPos = paraDataISO(-JANELA_POS_VENCIMENTO_DIAS);
 
   const falhasConsulta = [];
-  const [venceAmanha, venceu5dias] = await Promise.all([
+  const [venceAmanha, venceu5diasOuMais] = await Promise.all([
     sgp.listarTitulosPorVencimento(amanha).catch(err => {
       console.error(`[lembretes] Erro ao listar títulos (D-1) de ${tenant.nome}:`, err.message);
       falhasConsulta.push(`Consulta D-1 falhou: ${err.message}`);
       return null;
     }),
-    sgp.listarTitulosPorVencimento(ha5dias).catch(err => {
+    sgp.listarTitulosPorVencimento(inicioJanelaPos, ha5dias).catch(err => {
       console.error(`[lembretes] Erro ao listar títulos (D+5) de ${tenant.nome}:`, err.message);
       falhasConsulta.push(`Consulta D+5 falhou: ${err.message}`);
       return null;
@@ -138,23 +145,43 @@ export async function processarProvedor(tenant) {
   const resultado = {
     preEncontradas: venceAmanha?.length ?? null, // null = a consulta falhou, não "achou zero"
     preEnviadas: 0,
-    posEncontradas: venceu5dias?.length ?? null,
+    posEncontradas: venceu5diasOuMais?.length ?? null,
     posEnviadas: 0,
     falhas: [...falhasConsulta],
   };
 
   const listaVenceAmanha = venceAmanha || [];
-  const listaVenceu5dias = venceu5dias || [];
+  const listaVenceu5diasOuMais = venceu5diasOuMais || [];
+
+  // A janela pega a mesma fatura em aberto em vários dias seguidos — filtra
+  // quem já recebeu o pós-vencimento antes pra não mandar de novo.
+  const idsCandidatos = listaVenceu5diasOuMais.map(t => String(t.id));
+  const jaEnviados = idsCandidatos.length
+    ? new Set((await db.select({ tituloId: lembreteFaturaEnviados.tituloId })
+        .from(lembreteFaturaEnviados)
+        .where(and(
+          eq(lembreteFaturaEnviados.tenantId, tenant.id),
+          eq(lembreteFaturaEnviados.tipo, 'pos'),
+          inArray(lembreteFaturaEnviados.tituloId, idsCandidatos),
+        ))).map(r => r.tituloId))
+    : new Set();
+  const listaVenceu5diasNovas = listaVenceu5diasOuMais.filter(t => !jaEnviados.has(String(t.id)));
 
   for (const titulo of listaVenceAmanha) {
     const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePre, 'pré-vencimento');
     if (r.enviado) resultado.preEnviadas++;
     else resultado.falhas.push(`${titulo.clienteNome} (pré-vencimento): ${r.motivo}`);
   }
-  for (const titulo of listaVenceu5dias) {
+  for (const titulo of listaVenceu5diasNovas) {
     const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePos, 'pós-vencimento');
-    if (r.enviado) resultado.posEnviadas++;
-    else resultado.falhas.push(`${titulo.clienteNome} (pós-vencimento): ${r.motivo}`);
+    if (r.enviado) {
+      resultado.posEnviadas++;
+      await db.insert(lembreteFaturaEnviados)
+        .values({ tenantId: tenant.id, tituloId: String(titulo.id), tipo: 'pos' })
+        .onConflictDoNothing();
+    } else {
+      resultado.falhas.push(`${titulo.clienteNome} (pós-vencimento): ${r.motivo}`);
+    }
   }
 
   return resultado;

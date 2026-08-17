@@ -126,6 +126,16 @@ export async function runMigrations() {
       )
     `;
     await sql`CREATE INDEX IF NOT EXISTS idx_filial_wpp_extra_filial ON filial_whatsapp_extra(filial_id)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS lembrete_fatura_enviados (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        titulo_id text NOT NULL,
+        tipo text NOT NULL,
+        enviado_em timestamp DEFAULT now()
+      )
+    `;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_lembrete_enviado_unico ON lembrete_fatura_enviados(tenant_id, titulo_id, tipo)`;
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

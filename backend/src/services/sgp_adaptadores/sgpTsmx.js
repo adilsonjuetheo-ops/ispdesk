@@ -156,17 +156,18 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     };
   }
 
-  // Lista títulos (todos os clientes) vencendo em uma data específica ("AAAA-MM-DD"),
-  // já filtrados por status "aberto". Usado pelos lembretes automáticos de fatura.
-  async listarTitulosPorVencimento(data) {
+  // Lista títulos (todos os clientes) vencendo entre duas datas ("AAAA-MM-DD",
+  // inclusive — passe só dataInicio pra uma data exata), já filtrados por
+  // status "aberto". Usado pelos lembretes automáticos de fatura.
+  async listarTitulosPorVencimento(dataInicio, dataFim = dataInicio) {
     const limit = 250;
     let offset = 0;
     let todos = [];
 
     while (true) {
       const resp = await this.#consultarTitulos({
-        data_vencimento_inicio: data,
-        data_vencimento_fim: data,
+        data_vencimento_inicio: dataInicio,
+        data_vencimento_fim: dataFim,
         offset,
         limit,
       });
