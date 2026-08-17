@@ -490,15 +490,22 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
   const iniciarGravacao = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
-        ? 'audio/ogg;codecs=opus'
-        : 'audio/webm;codecs=opus';
-      const recorder = new MediaRecorder(stream, { mimeType });
+      // Em ordem de preferência: Ogg (Firefox) e mp4 (Safari) já servem ao
+      // WhatsApp; WebM (Chrome) o backend converte. O tipo real precisa ser
+      // preservado — rotular tudo como Ogg fazia o áudio chegar mudo.
+      const mimeType = [
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+      ].find(f => MediaRecorder.isTypeSupported?.(f)) || '';
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       chunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunksRef.current, { type: 'audio/ogg' });
+        const tipoReal = recorder.mimeType || mimeType || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: tipoReal });
         audioBlobRef.current = blob;
         setAudioPreview(URL.createObjectURL(blob));
       };
@@ -529,8 +536,11 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
     if (!audioBlobRef.current) return;
     setEnviandoArquivo(true);
     try {
+      const blob = audioBlobRef.current;
+      const base = (blob.type || '').split(';')[0].trim();
+      const ext = base === 'audio/mp4' ? 'm4a' : base === 'audio/ogg' ? 'ogg' : 'webm';
       const form = new FormData();
-      form.append('arquivo', audioBlobRef.current, 'audio.ogg');
+      form.append('arquivo', blob, `audio.${ext}`);
       await api.post(`/conversations/${conversa.id}/send-media`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
