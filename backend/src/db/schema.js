@@ -127,6 +127,11 @@ export const conversas = pgTable('conversas', {
   contratoUuid:    text('contrato_uuid'),
   contratoStatus:  text('contrato_status'), // 'pendente' | 'assinado'
   contratoEnviadoEm: timestamp('contrato_enviado_em'),
+  // phone_number_id que efetivamente recebeu essa conversa — diferente de
+  // filialId, que é só o roteamento de fila pro agente (pode vir do SGP por
+  // cidade do cliente, sem relação nenhuma com qual número recebeu a msg).
+  // Usado pra buscar mídia e responder pelo número/token corretos.
+  numeroRecebidoId: text('numero_recebido_id'),
 });
 
 export const mensagens = pgTable('mensagens', {

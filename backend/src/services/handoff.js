@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { conversas, mensagens, filiais } from '../db/schema.js';
+import { conversas, mensagens, filiais, filialWhatsappExtra } from '../db/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { enviarMensagem } from './whatsapp.js';
 
@@ -38,15 +38,27 @@ export async function realizarHandoff(tenant, conversa, cliente, motivo, wConfig
     conteudo: '[Sistema] Conversa transferida para atendente humano.',
   });
 
-  // Resolve config de WhatsApp efetiva — filial própria tem prioridade
+  // Resolve config de WhatsApp efetiva pelo número que recebeu a conversa —
+  // NÃO por filialId, que é só roteamento de fila e pode não ter relação
+  // nenhuma com qual número/WABA recebeu a mensagem (ver resolverWConfig em
+  // routes/conversations.js, mesmo problema).
   let wConfig = wConfigParam || tenant;
-  if (!wConfigParam && conversa.filialId) {
+  const numeroRecebido = conversa.numeroRecebidoId;
+  if (!wConfigParam && numeroRecebido && numeroRecebido !== tenant.whatsappNumberId) {
     const [filial] = await db.select({
       whatsappNumberId: filiais.whatsappNumberId,
       whatsappToken: filiais.whatsappToken,
-    }).from(filiais).where(eq(filiais.id, conversa.filialId)).limit(1);
-    if (filial?.whatsappToken && filial?.whatsappNumberId) {
+    }).from(filiais).where(eq(filiais.whatsappNumberId, numeroRecebido)).limit(1);
+    if (filial?.whatsappToken) {
       wConfig = { ...tenant, whatsappNumberId: filial.whatsappNumberId, whatsappToken: filial.whatsappToken };
+    } else {
+      const [extra] = await db.select({
+        whatsappNumberId: filialWhatsappExtra.whatsappNumberId,
+        whatsappToken: filialWhatsappExtra.whatsappToken,
+      }).from(filialWhatsappExtra).where(eq(filialWhatsappExtra.whatsappNumberId, numeroRecebido)).limit(1);
+      if (extra?.whatsappToken) {
+        wConfig = { ...tenant, whatsappNumberId: extra.whatsappNumberId, whatsappToken: extra.whatsappToken };
+      }
     }
   }
 

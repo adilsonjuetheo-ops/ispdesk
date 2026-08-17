@@ -334,6 +334,7 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
       clienteId: cliente.id,
       status: 'bot',
       filialId: filialEntrada?.id || null,
+      numeroRecebidoId: wConfig.whatsappNumberId || null,
     }).returning();
   }
 

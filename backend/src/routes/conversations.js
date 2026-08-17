@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { conversas, mensagens, clientes, tenantUsers, filiais, tenants } from '../db/schema.js';
+import { conversas, mensagens, clientes, tenantUsers, filiais, filialWhatsappExtra, tenants } from '../db/schema.js';
 import { eq, and, desc, ne, count, inArray } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 import multer from 'multer';
@@ -29,15 +29,32 @@ function guardarMediaCache(mediaId, buffer, mimeType) {
   cacheMedia.set(mediaId, { buffer, mimeType, expiraEm: Date.now() + CACHE_MEDIA_MS });
 }
 
+// Usa o número que efetivamente recebeu a conversa (numeroRecebidoId) — NÃO
+// filialId, que é só roteamento de fila pro agente (pode vir do SGP pela
+// cidade do cliente, sem relação com qual número/WABA recebeu a mensagem).
+// Confundir os dois faz buscar mídia e responder com o token errado sempre
+// que a fila aponta pra uma filial com WhatsApp próprio mas a mensagem, na
+// verdade, chegou pelo número principal do tenant.
 async function resolverWConfig(tenant, conversa) {
-  if (!conversa?.filialId) return tenant;
+  const numeroRecebido = conversa?.numeroRecebidoId;
+  if (!numeroRecebido || numeroRecebido === tenant.whatsappNumberId) return tenant;
+
   const [filial] = await db.select({
     whatsappNumberId: filiais.whatsappNumberId,
     whatsappToken: filiais.whatsappToken,
-  }).from(filiais).where(eq(filiais.id, conversa.filialId)).limit(1);
-  if (filial?.whatsappToken && filial?.whatsappNumberId) {
+  }).from(filiais).where(eq(filiais.whatsappNumberId, numeroRecebido)).limit(1);
+  if (filial?.whatsappToken) {
     return { ...tenant, whatsappNumberId: filial.whatsappNumberId, whatsappToken: filial.whatsappToken };
   }
+
+  const [extra] = await db.select({
+    whatsappNumberId: filialWhatsappExtra.whatsappNumberId,
+    whatsappToken: filialWhatsappExtra.whatsappToken,
+  }).from(filialWhatsappExtra).where(eq(filialWhatsappExtra.whatsappNumberId, numeroRecebido)).limit(1);
+  if (extra?.whatsappToken) {
+    return { ...tenant, whatsappNumberId: extra.whatsappNumberId, whatsappToken: extra.whatsappToken };
+  }
+
   return tenant;
 }
 
