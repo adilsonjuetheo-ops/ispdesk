@@ -122,6 +122,7 @@ export default function Inbox() {
   const [slaMinutos, setSlaMinutos] = useState(0);
   const [searchParams] = useSearchParams();
   const convIdsRef = useRef(null);
+  const novaIdRef = useRef(null);
   const tocarNotificacao = useNotificationSound();
 
   useEffect(() => {
@@ -144,6 +145,12 @@ export default function Inbox() {
 
   const carregarConversas = useCallback(async () => {
     const { data } = await api.get('/conversations');
+
+    // Conversa recém-iniciada pelo atendente: abre assim que entrar na lista
+    if (novaIdRef.current) {
+      const nova = data.find(c => c.id === novaIdRef.current);
+      if (nova) { novaIdRef.current = null; setSelecionada(nova); }
+    }
 
     if (convIdsRef.current !== null) {
       const temNova = data.some(c => !convIdsRef.current.has(c.id));
@@ -168,6 +175,7 @@ export default function Inbox() {
           conversas={conversas}
           selecionada={selecionada}
           onSelecionar={setSelecionada}
+          onConversaCriada={id => { novaIdRef.current = id; carregarConversas(); }}
           view={filialId ? 'filial' : view}
           filialId={filialId}
           online={online}

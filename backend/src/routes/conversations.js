@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { conversas, mensagens, clientes, tenantUsers, filiais, filialWhatsappExtra, tenants } from '../db/schema.js';
-import { eq, and, desc, ne, count, inArray } from 'drizzle-orm';
+import { eq, and, desc, ne, count, inArray, isNotNull } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 import multer from 'multer';
-import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.js';
+import { enviarMensagem, uploadMidia, enviarMidia, enviarTemplate } from '../services/whatsapp.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { enviarNps } from '../services/nps.js';
 import { criarRateLimit } from '../middleware/security.js';
@@ -123,6 +123,219 @@ router.use(autenticar);
 router.use((req, res, next) => {
   if (req.method !== 'GET') registrarAtividade();
   next();
+});
+
+// Normaliza o que o atendente digitou para o formato que a Meta espera:
+// 55 + DDD + número, só dígitos.
+function normalizarTelefoneBR(entrada) {
+  let d = String(entrada || '').replace(/\D/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  if (!d.startsWith('55')) d = `55${d}`;
+  // 55 + DDD(2) + 8 ou 9 dígitos
+  if (d.length < 12 || d.length > 13) return null;
+  return d;
+}
+
+// A Meta só aceita texto livre dentro de 24h desde a última mensagem DO CLIENTE.
+// Fora disso é template aprovado — por isso a janela é verificada pela última
+// mensagem de origem 'cliente', não pela atividade da conversa.
+async function janelaAberta(conversaId) {
+  if (!conversaId) return false;
+  const [ultima] = await db.select({ enviadaEm: mensagens.enviadaEm })
+    .from(mensagens)
+    .where(and(eq(mensagens.conversaId, conversaId), eq(mensagens.origem, 'cliente')))
+    .orderBy(desc(mensagens.enviadaEm))
+    .limit(1);
+  if (!ultima?.enviadaEm) return false;
+  return Date.now() - new Date(ultima.enviadaEm).getTime() < 24 * 60 * 60 * 1000;
+}
+
+// Números pelos quais o provedor pode iniciar a conversa (principal + filiais
+// com número próprio). O cliente vê o número escolhido, então a escolha importa.
+router.get('/remetentes', async (req, res) => {
+  const tenantId = req.user.tenantId;
+  if (!tenantId) return res.json([]);
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  const lista = [];
+  if (tenant?.whatsappNumberId && tenant?.whatsappToken) {
+    lista.push({ id: 'principal', filialId: null, rotulo: `${tenant.nomeFantasia || tenant.nome} (principal)` });
+  }
+  // Só filial com número próprio: as demais enviariam pelo principal de
+  // qualquer forma, e oferecê-las daria a impressão errada de escolha.
+  const comNumero = await db.select({ id: filiais.id, nome: filiais.nome, cidade: filiais.cidade })
+    .from(filiais)
+    .where(and(
+      eq(filiais.tenantId, tenantId),
+      eq(filiais.ativo, true),
+      isNotNull(filiais.whatsappNumberId),
+      isNotNull(filiais.whatsappToken),
+    ))
+    .orderBy(filiais.nome);
+  for (const f of comNumero) lista.push({ id: f.id, filialId: f.id, rotulo: `${f.nome} — ${f.cidade}` });
+
+  // Uma filial pode ter mais de um número (ex: um fixo e um celular)
+  const extras = await db.select({
+    id: filialWhatsappExtra.id,
+    filialId: filialWhatsappExtra.filialId,
+    rotulo: filialWhatsappExtra.rotulo,
+    numeroId: filialWhatsappExtra.whatsappNumberId,
+    filialNome: filiais.nome,
+  })
+    .from(filialWhatsappExtra)
+    .innerJoin(filiais, eq(filiais.id, filialWhatsappExtra.filialId))
+    .where(eq(filiais.tenantId, tenantId));
+  for (const e of extras) {
+    lista.push({
+      id: e.id,
+      filialId: e.filialId,
+      numeroId: e.numeroId,
+      rotulo: `${e.filialNome} — ${e.rotulo || 'número adicional'}`,
+    });
+  }
+
+  res.json(lista);
+});
+
+// Templates aprovados na Meta, para iniciar conversa fora da janela de 24h.
+router.get('/templates', async (req, res) => {
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, req.user.tenantId)).limit(1);
+  if (!tenant?.wabaId || !tenant?.whatsappToken) return res.json([]);
+  try {
+    const r = await fetch(
+      `https://graph.facebook.com/v19.0/${tenant.wabaId}/message_templates` +
+      `?fields=name,status,category,language,components&limit=50&access_token=${tenant.whatsappToken}`
+    );
+    const d = await r.json();
+    if (d.error) throw new Error(d.error.message);
+    const aprovados = (d.data || []).filter(t => t.status === 'APPROVED').map(t => ({
+      name: t.name,
+      language: t.language,
+      category: t.category,
+      // Quantos {{n}} o corpo espera — o atendente precisa preencher cada um
+      variaveis: (t.components || [])
+        .filter(c => c.type === 'BODY')
+        .reduce((n, c) => Math.max(n, (String(c.text || '').match(/\{\{\d+\}\}/g) || []).length), 0),
+      texto: (t.components || []).find(c => c.type === 'BODY')?.text || '',
+    }));
+    res.json(aprovados);
+  } catch (err) {
+    console.error('[templates] Falha ao listar:', err.message);
+    res.status(502).json({ erro: `Não foi possível listar os templates: ${err.message}` });
+  }
+});
+
+// Inicia conversa com um número digitado pelo atendente.
+router.post('/iniciar', async (req, res) => {
+  const { telefone, texto, template, idioma, parametros, filialId, numeroId } = req.body;
+  const tenantId = req.user.tenantId;
+  if (!tenantId) return res.status(403).json({ erro: 'Sem provedor' });
+
+  const numero = normalizarTelefoneBR(telefone);
+  if (!numero) return res.status(400).json({ erro: 'Telefone inválido. Informe DDD + número.' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  if (!tenant?.whatsappToken) return res.status(400).json({ erro: 'WhatsApp não conectado' });
+
+  // Número de origem: o adicional escolhido, senão o da filial, senão o
+  // principal do provedor.
+  let wConfig = tenant;
+  if (numeroId) {
+    const [e] = await db.select({
+      whatsappNumberId: filialWhatsappExtra.whatsappNumberId,
+      whatsappToken: filialWhatsappExtra.whatsappToken,
+    })
+      .from(filialWhatsappExtra)
+      .innerJoin(filiais, eq(filiais.id, filialWhatsappExtra.filialId))
+      .where(and(eq(filialWhatsappExtra.whatsappNumberId, numeroId), eq(filiais.tenantId, tenantId)))
+      .limit(1);
+    if (e?.whatsappToken) {
+      wConfig = { ...tenant, whatsappNumberId: e.whatsappNumberId, whatsappToken: e.whatsappToken };
+    }
+  }
+  if (wConfig === tenant && filialId) {
+    const [f] = await db.select().from(filiais)
+      .where(and(eq(filiais.id, filialId), eq(filiais.tenantId, tenantId))).limit(1);
+    if (f?.whatsappToken && f?.whatsappNumberId) {
+      wConfig = { ...tenant, whatsappNumberId: f.whatsappNumberId, whatsappToken: f.whatsappToken };
+    }
+  }
+
+  // Reaproveita cliente e conversa em aberto, para não duplicar o histórico
+  let [cliente] = await db.select().from(clientes)
+    .where(and(eq(clientes.tenantId, tenantId), eq(clientes.whatsapp, numero))).limit(1);
+  if (!cliente) {
+    [cliente] = await db.insert(clientes)
+      .values({ tenantId, whatsapp: numero, ultimoContato: new Date() })
+      .returning();
+  }
+
+  let [conversa] = await db.select().from(conversas)
+    .where(and(eq(conversas.clienteId, cliente.id), ne(conversas.status, 'encerrada')))
+    .orderBy(desc(conversas.ultimaMsgEm))
+    .limit(1);
+
+  const aberta = conversa ? await janelaAberta(conversa.id) : false;
+  if (!aberta && !template) {
+    return res.status(409).json({
+      erro: 'Fora da janela de 24h — só é possível iniciar com um template aprovado.',
+      precisaTemplate: true,
+    });
+  }
+  if (aberta && !texto?.trim()) {
+    return res.status(400).json({ erro: 'Escreva a mensagem' });
+  }
+
+  // Envia antes de gravar: se a Meta recusar, nada fica pela metade
+  let wamid = null;
+  const registro = aberta ? texto.trim() : `[Template] ${template}`;
+  try {
+    const resp = aberta
+      ? await enviarMensagem(wConfig, numero, texto.trim())
+      : await enviarTemplate(wConfig, numero, template, idioma || 'pt_BR', parametros || []);
+    wamid = resp?.messages?.[0]?.id || null;
+  } catch (err) {
+    console.error('[iniciar] Falha no envio:', err.message);
+    return res.status(502).json({ erro: `WhatsApp recusou o envio: ${err.message}` });
+  }
+
+  if (!conversa) {
+    [conversa] = await db.insert(conversas).values({
+      tenantId,
+      clienteId: cliente.id,
+      filialId: filialId || null,
+      status: 'humano',
+      agenteId: req.user.id,
+      // Fixa o número de saída: sem isso a resposta seguinte sairia pelo
+      // principal e o cliente veria dois números diferentes.
+      numeroRecebidoId: wConfig.whatsappNumberId || null,
+      iniciadaEm: new Date(),
+    }).returning();
+  } else if (conversa.status !== 'humano') {
+    await db.update(conversas)
+      .set({ status: 'humano', agenteId: req.user.id })
+      .where(eq(conversas.id, conversa.id));
+  }
+
+  await db.insert(mensagens).values({
+    conversaId: conversa.id,
+    origem: 'agente',
+    conteudo: registro,
+    wamid,
+    status: 'enviada',
+    agenteNome: req.user.nome,
+  });
+
+  await db.update(conversas).set({
+    ultimaMensagem: registro.slice(0, 200),
+    ultimaMsgEm: new Date(),
+    ultimaMsgOrigem: 'agente',
+    ultimaMsgNome: req.user.nome,
+  }).where(eq(conversas.id, conversa.id));
+
+  await db.update(clientes).set({ ultimoContato: new Date() }).where(eq(clientes.id, cliente.id));
+
+  res.json({ conversaId: conversa.id, janelaAberta: aberta });
 });
 
 // Colegas para o seletor de transferência. A rota de equipe é apenasAdmin, então

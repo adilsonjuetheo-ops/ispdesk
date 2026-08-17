@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { differenceInMinutes } from 'date-fns';
 import clsx from 'clsx';
-import { Search, Check, User, Menu, MapPin, Phone } from 'lucide-react';
+import { Search, Check, User, Menu, MapPin, Phone, PenSquare } from 'lucide-react';
+import NovaConversaModal from './NovaConversaModal.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 
 const AVATAR_COLORS = [
@@ -138,10 +139,11 @@ const SUB_TABS = [
   { key: 'historico', label: 'Histórico', href: '/inbox?view=historico' },
 ];
 
-export default function ConversationList({ conversas, selecionada, onSelecionar, view = 'todos', filialId, online = [], currentUser, slaMinutos = 0, onOpenSidebar }) {
+export default function ConversationList({ conversas, selecionada, onSelecionar, onConversaCriada, view = 'todos', filialId, online = [], currentUser, slaMinutos = 0, onOpenSidebar }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [busca, setBusca] = useState('');
+  const [novaConversa, setNovaConversa] = useState(false);
   const filtrados = filtrar(conversas, view, filialId, user?.id, busca);
 
   const slaExcedido = (c) => {
@@ -169,7 +171,16 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
             )}
             <h2 className="text-sm font-semibold text-gray-800">{VIEW_LABEL[view] || 'Conversas'}</h2>
           </div>
-          <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{filtrados.length}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{filtrados.length}</span>
+            <button
+              onClick={() => setNovaConversa(true)}
+              title="Nova conversa"
+              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+            >
+              <PenSquare className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2">
           <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
@@ -362,6 +373,13 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
             ))}
           </div>
         </div>
+      )}
+
+      {novaConversa && (
+        <NovaConversaModal
+          onClose={() => setNovaConversa(false)}
+          onCriada={id => onConversaCriada?.(id)}
+        />
       )}
     </div>
   );
