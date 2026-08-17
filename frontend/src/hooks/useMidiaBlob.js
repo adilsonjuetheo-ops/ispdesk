@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import api from '../lib/api.js';
 
+// "audio/ogg" puro deixa o Chrome em dúvida — canPlayType devolve "maybe" e,
+// num blob, ele pode desistir antes de acionar o decodificador. Com o codec
+// declarado a resposta vira "probably" e o Ogg do WhatsApp toca.
+function tipoPreciso(mime) {
+  const base = String(mime || '').split(';')[0].trim().toLowerCase();
+  return base === 'audio/ogg' ? 'audio/ogg; codecs=opus' : base;
+}
+
 // Baixa a mídia pelo axios e devolve uma blob: URL.
 //
 // As tags <img>, <audio> e <video> não conseguem mandar cabeçalho, então
@@ -15,7 +23,6 @@ export function useMidiaBlob(conversaId, mediaId) {
   useEffect(() => {
     if (!conversaId || !mediaId) return;
     let cancelado = false;
-    let criada = null;
 
     setSrc(null);
     setErro(false);
@@ -23,22 +30,19 @@ export function useMidiaBlob(conversaId, mediaId) {
     api.get(`/conversations/${conversaId}/media/${mediaId}`, { responseType: 'blob' })
       .then(r => {
         if (cancelado) return;
-        // Fixa o tipo pelo cabeçalho da resposta: sem ele o Chrome não sabe
-        // qual decodificador usar e o player fica inerte.
-        const tipo = String(r.headers?.['content-type'] || r.data?.type || '')
-          .split(';')[0].trim();
-        const blob = tipo && r.data.type !== tipo
-          ? new Blob([r.data], { type: tipo })
+        const mime = tipoPreciso(r.headers?.['content-type'] || r.data?.type);
+        const blob = mime && r.data.type !== mime
+          ? new Blob([r.data], { type: mime })
           : r.data;
-        criada = URL.createObjectURL(blob);
-        setSrc(criada);
+        setSrc(URL.createObjectURL(blob));
       })
       .catch(() => { if (!cancelado) setErro(true); });
 
-    return () => {
-      cancelado = true;
-      if (criada) URL.revokeObjectURL(criada);
-    };
+    // A URL não é revogada de propósito. Revogar na limpeza do efeito derruba a
+    // fonte debaixo do player quando o efeito reexecuta, e o <audio> relata
+    // isso como "formato não suportado" — indistinguível de codec errado. São
+    // poucos KB por áudio, liberados quando a aba fecha.
+    return () => { cancelado = true; };
   }, [conversaId, mediaId]);
 
   return { src, erro };
