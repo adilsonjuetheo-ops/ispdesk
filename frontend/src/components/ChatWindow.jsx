@@ -78,6 +78,7 @@ function MidiaBolao({ msg, isCliente }) {
       <div className="rounded-2xl overflow-hidden max-w-[280px]">
         <video
           src={urlMidia(conversaId, midiaUrl)}
+          crossOrigin="use-credentials"
           controls
           preload="metadata"
           className="w-full rounded-2xl"
@@ -95,6 +96,7 @@ function MidiaBolao({ msg, isCliente }) {
         </div>
         <audio
           src={urlMidia(conversaId, midiaUrl)}
+          crossOrigin="use-credentials"
           controls
           className="w-full h-8"
           style={{ colorScheme: 'light' }}
