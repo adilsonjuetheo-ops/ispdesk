@@ -10,7 +10,7 @@ import { enviarNps } from '../services/nps.js';
 import { buscarDadosCliente } from '../services/sgp.js';
 import { normalizarTelefoneBR } from '../services/telefone.js';
 import { criarRateLimit } from '../middleware/security.js';
-import { audioPrecisaConverter, converterParaOggOpus } from '../services/audio.js';
+import { audioPrecisaConverter, converterParaOggOpus, converterParaMp3 } from '../services/audio.js';
 
 // O player de áudio faz várias requisições Range pra descobrir a duração
 // antes de tocar — sem isso, cada uma rebaixaria o arquivo inteiro da Meta
@@ -673,9 +673,23 @@ router.get('/:id/media/:mediaId', async (req, res) => {
       });
       if (!mediaRes.ok) return res.status(502).end();
 
-      const buffer = Buffer.from(await mediaRes.arrayBuffer());
-      cache = { buffer, mimeType: mime_type || 'image/jpeg' };
-      guardarMediaCache(mediaId, buffer, cache.mimeType);
+      let buffer = Buffer.from(await mediaRes.arrayBuffer());
+      let mime = mime_type || 'image/jpeg';
+
+      // Áudio vai como MP3 para o painel. O Ogg/Opus do WhatsApp o Safari não
+      // toca, e o Chrome recusou em blob dentro do PWA. Converte uma vez e o
+      // cache serve as requisições seguintes.
+      if (mime.startsWith('audio/')) {
+        try {
+          buffer = await converterParaMp3(buffer);
+          mime = 'audio/mpeg';
+        } catch (err) {
+          console.error(`[Mídia] Falha ao converter áudio ${mediaId} para MP3:`, err.message);
+        }
+      }
+
+      cache = { buffer, mimeType: mime };
+      guardarMediaCache(mediaId, buffer, mime);
     }
 
     const { buffer, mimeType } = cache;
