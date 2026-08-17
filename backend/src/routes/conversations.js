@@ -9,6 +9,26 @@ import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { enviarNps } from '../services/nps.js';
 import { criarRateLimit } from '../middleware/security.js';
 
+// O player de áudio faz várias requisições Range pra descobrir a duração
+// antes de tocar — sem isso, cada uma rebaixaria o arquivo inteiro da Meta
+// de novo, o que é lento o bastante pra parecer que o áudio "não toca".
+const CACHE_MEDIA_MS = 5 * 60 * 1000;
+const cacheMedia = new Map(); // mediaId -> { buffer, mimeType, expiraEm }
+
+function pegarMediaCache(mediaId) {
+  const item = cacheMedia.get(mediaId);
+  if (!item) return null;
+  if (item.expiraEm < Date.now()) { cacheMedia.delete(mediaId); return null; }
+  return item;
+}
+
+function guardarMediaCache(mediaId, buffer, mimeType) {
+  if (cacheMedia.size > 200) {
+    for (const [k, v] of cacheMedia) if (v.expiraEm < Date.now()) cacheMedia.delete(k);
+  }
+  cacheMedia.set(mediaId, { buffer, mimeType, expiraEm: Date.now() + CACHE_MEDIA_MS });
+}
+
 async function resolverWConfig(tenant, conversa) {
   if (!conversa?.filialId) return tenant;
   const [filial] = await db.select({
@@ -377,25 +397,32 @@ router.get('/:id/media/:mediaId', async (req, res) => {
     .limit(1);
   if (!midiaVinculada) return res.status(404).end();
 
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
-  if (!tenant?.whatsappToken) return res.status(400).end();
-  const wConfig = await resolverWConfig(tenant, conversa);
-  if (!wConfig?.whatsappToken) return res.status(400).end();
-
   try {
-    const metaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
-      headers: { Authorization: `Bearer ${wConfig.whatsappToken}` },
-    });
-    if (!metaRes.ok) return res.status(502).end();
-    const { url, mime_type } = await metaRes.json();
+    let cache = pegarMediaCache(mediaId);
+    if (!cache) {
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+      if (!tenant?.whatsappToken) return res.status(400).end();
+      const wConfig = await resolverWConfig(tenant, conversa);
+      if (!wConfig?.whatsappToken) return res.status(400).end();
 
-    const mediaRes = await fetch(url, {
-      headers: { Authorization: `Bearer ${wConfig.whatsappToken}` },
-    });
-    if (!mediaRes.ok) return res.status(502).end();
+      const metaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
+        headers: { Authorization: `Bearer ${wConfig.whatsappToken}` },
+      });
+      if (!metaRes.ok) return res.status(502).end();
+      const { url, mime_type } = await metaRes.json();
 
-    const buffer = Buffer.from(await mediaRes.arrayBuffer());
-    res.setHeader('Content-Type', mime_type || 'image/jpeg');
+      const mediaRes = await fetch(url, {
+        headers: { Authorization: `Bearer ${wConfig.whatsappToken}` },
+      });
+      if (!mediaRes.ok) return res.status(502).end();
+
+      const buffer = Buffer.from(await mediaRes.arrayBuffer());
+      cache = { buffer, mimeType: mime_type || 'image/jpeg' };
+      guardarMediaCache(mediaId, buffer, cache.mimeType);
+    }
+
+    const { buffer, mimeType } = cache;
+    res.setHeader('Content-Type', mimeType);
     res.setHeader('Cache-Control', 'private, max-age=300');
     // Áudio do WhatsApp vem em Ogg/Opus sem duração no cabeçalho: o navegador
     // precisa de Range para descobrir o tamanho e liberar o play.
@@ -403,8 +430,17 @@ router.get('/:id/media/:mediaId', async (req, res) => {
 
     const range = /^bytes=(\d*)-(\d*)$/.exec((req.headers.range || '').trim());
     if (range) {
-      const inicio = range[1] ? parseInt(range[1], 10) : 0;
-      const fim    = range[2] ? parseInt(range[2], 10) : buffer.length - 1;
+      // bytes=-N pede os últimos N bytes (sem início) — usado por navegadores
+      // pra ler o índice de duração no fim do arquivo Ogg antes de tocar.
+      let inicio, fim;
+      if (range[1] === '') {
+        const sufixo = parseInt(range[2], 10);
+        inicio = Math.max(buffer.length - sufixo, 0);
+        fim = buffer.length - 1;
+      } else {
+        inicio = parseInt(range[1], 10);
+        fim = range[2] ? parseInt(range[2], 10) : buffer.length - 1;
+      }
       if (inicio >= buffer.length || fim >= buffer.length || inicio > fim) {
         res.setHeader('Content-Range', `bytes */${buffer.length}`);
         return res.status(416).end();
