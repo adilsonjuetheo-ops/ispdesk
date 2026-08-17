@@ -7,6 +7,7 @@ import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia, enviarTemplate } from '../services/whatsapp.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { enviarNps } from '../services/nps.js';
+import { buscarDadosCliente } from '../services/sgp.js';
 import { criarRateLimit } from '../middleware/security.js';
 import { audioPrecisaConverter, converterParaOggOpus } from '../services/audio.js';
 
@@ -265,8 +266,24 @@ router.post('/iniciar', async (req, res) => {
   let [cliente] = await db.select().from(clientes)
     .where(and(eq(clientes.tenantId, tenantId), eq(clientes.whatsapp, numero))).limit(1);
   if (!cliente) {
+    // Sem isto a conversa nasceria só com o número na tela. O mesmo
+    // enriquecimento que o webhook faz quando o cliente escreve primeiro.
+    let dados = null;
+    try {
+      dados = await buscarDadosCliente(tenant, numero);
+    } catch (err) {
+      console.error('[iniciar] Falha ao consultar o SGP:', err.message);
+    }
     [cliente] = await db.insert(clientes)
-      .values({ tenantId, whatsapp: numero, ultimoContato: new Date() })
+      .values({
+        tenantId,
+        whatsapp: numero,
+        nome: dados?.nome || null,
+        contratoId: dados?.contratoId || null,
+        statusContrato: dados?.statusContrato || null,
+        filialNome: dados?.filialNome || null,
+        ultimoContato: new Date(),
+      })
       .returning();
   }
 
