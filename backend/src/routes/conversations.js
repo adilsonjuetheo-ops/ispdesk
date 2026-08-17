@@ -190,30 +190,60 @@ router.get('/remetentes', async (req, res) => {
 
 // Templates aprovados na Meta, para iniciar conversa fora da janela de 24h.
 router.get('/templates', async (req, res) => {
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, req.user.tenantId)).limit(1);
-  if (!tenant?.wabaId || !tenant?.whatsappToken) return res.json([]);
-  try {
-    const r = await fetch(
-      `https://graph.facebook.com/v19.0/${tenant.wabaId}/message_templates` +
-      `?fields=name,status,category,language,components&limit=50&access_token=${tenant.whatsappToken}`
-    );
-    const d = await r.json();
-    if (d.error) throw new Error(d.error.message);
-    const aprovados = (d.data || []).filter(t => t.status === 'APPROVED').map(t => ({
-      name: t.name,
-      language: t.language,
-      category: t.category,
-      // Quantos {{n}} o corpo espera — o atendente precisa preencher cada um
-      variaveis: (t.components || [])
-        .filter(c => c.type === 'BODY')
-        .reduce((n, c) => Math.max(n, (String(c.text || '').match(/\{\{\d+\}\}/g) || []).length), 0),
-      texto: (t.components || []).find(c => c.type === 'BODY')?.text || '',
-    }));
-    res.json(aprovados);
-  } catch (err) {
-    console.error('[templates] Falha ao listar:', err.message);
-    res.status(502).json({ erro: `Não foi possível listar os templates: ${err.message}` });
+  const tenantId = req.user.tenantId;
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  if (!tenant?.whatsappToken) return res.json([]);
+
+  // Um provedor pode ter mais de uma WABA — a filial com número próprio tem a
+  // dela. O template criado pelo número da filial não aparece na WABA do
+  // tenant, então todas precisam ser consultadas.
+  const fontes = [];
+  if (tenant.wabaId) fontes.push({ waba: tenant.wabaId, token: tenant.whatsappToken });
+  const comWaba = await db.select({ wabaId: filiais.wabaId, token: filiais.whatsappToken })
+    .from(filiais)
+    .where(and(eq(filiais.tenantId, tenantId), eq(filiais.ativo, true), isNotNull(filiais.wabaId)));
+  for (const f of comWaba) fontes.push({ waba: f.wabaId, token: f.token || tenant.whatsappToken });
+
+  const vistas = new Set();
+  const aprovados = [];
+  const falhas = [];
+
+  for (const f of fontes) {
+    if (!f.waba || vistas.has(f.waba)) continue;
+    vistas.add(f.waba);
+    try {
+      const r = await fetch(
+        `https://graph.facebook.com/v19.0/${f.waba}/message_templates` +
+        `?fields=name,status,category,language,components&limit=50&access_token=${f.token}`
+      );
+      const d = await r.json();
+      if (d.error) throw new Error(d.error.message);
+      for (const t of d.data || []) {
+        if (t.status !== 'APPROVED') continue;
+        if (aprovados.some(a => a.name === t.name && a.language === t.language)) continue;
+        aprovados.push({
+          name: t.name,
+          language: t.language,
+          category: t.category,
+          // Quantos {{n}} o corpo espera — o atendente preenche cada um
+          variaveis: (t.components || [])
+            .filter(c => c.type === 'BODY')
+            .reduce((n, c) => Math.max(n, (String(c.text || '').match(/\{\{\d+\}\}/g) || []).length), 0),
+          texto: (t.components || []).find(c => c.type === 'BODY')?.text || '',
+        });
+      }
+    } catch (err) {
+      console.error(`[templates] Falha na WABA ${f.waba}:`, err.message);
+      falhas.push(err.message);
+    }
   }
+
+  // Só devolve erro quando nada pôde ser lido: uma WABA fora do ar não pode
+  // esconder os templates das outras.
+  if (!aprovados.length && falhas.length) {
+    return res.status(502).json({ erro: `Não foi possível listar os templates: ${falhas[0]}` });
+  }
+  res.json(aprovados);
 });
 
 // Inicia conversa com um número digitado pelo atendente.
