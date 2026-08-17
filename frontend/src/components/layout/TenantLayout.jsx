@@ -5,8 +5,7 @@ import { usePolling } from '../../hooks/usePolling.js';
 import { usePushNotifications } from '../../hooks/usePushNotifications.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
-  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap, AlertTriangle, Star, X,
-} from 'lucide-react';
+  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap, AlertTriangle, Star, X, BookUser } from 'lucide-react';
 import api from '../../lib/api.js';
 import UpdateBanner from '../UpdateBanner.jsx';
 import BottomTabBar from '../BottomTabBar.jsx';
@@ -207,6 +206,10 @@ export default function TenantLayout() {
               </div>
             </div>
           )}
+
+          <NavLink to="/contatos" className={navClass}>
+            <BookUser className="w-4 h-4" /> Contatos
+          </NavLink>
 
           {/* Admin */}
           {user?.role === 'admin' && (

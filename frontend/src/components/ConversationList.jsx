@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { differenceInMinutes } from 'date-fns';
 import clsx from 'clsx';
 import { Search, Check, User, Menu, MapPin, Phone, PenSquare } from 'lucide-react';
@@ -144,6 +144,22 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
   const navigate = useNavigate();
   const [busca, setBusca] = useState('');
   const [novaConversa, setNovaConversa] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Vindo de Contatos > Iniciar conversa: abre o modal já com o número
+  const telefoneNovo = searchParams.get('novo') || '';
+  useEffect(() => {
+    if (telefoneNovo) setNovaConversa(true);
+  }, [telefoneNovo]);
+
+  const fecharNovaConversa = () => {
+    setNovaConversa(false);
+    if (telefoneNovo) {
+      const p = new URLSearchParams(searchParams);
+      p.delete('novo');
+      setSearchParams(p, { replace: true });
+    }
+  };
   const filtrados = filtrar(conversas, view, filialId, user?.id, busca);
 
   const slaExcedido = (c) => {
@@ -377,7 +393,8 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
 
       {novaConversa && (
         <NovaConversaModal
-          onClose={() => setNovaConversa(false)}
+          telefoneInicial={telefoneNovo}
+          onClose={fecharNovaConversa}
           onCriada={id => onConversaCriada?.(id)}
         />
       )}

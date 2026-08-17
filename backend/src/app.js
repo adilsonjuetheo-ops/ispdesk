@@ -7,6 +7,7 @@ import tenantsRouter from './routes/tenants.js';
 import agentsRouter from './routes/agents.js';
 import filiaisRouter from './routes/filiais.js';
 import conversationsRouter from './routes/conversations.js';
+import contatosRouter from './routes/contatos.js';
 import webhookRouter from './routes/webhook.js';
 import relatorioRouter from './routes/relatorio.js';
 import atalhoRouter from './routes/atalhos.js';
@@ -69,6 +70,7 @@ app.use('/api/tenants/:tenantId/filiais', filiaisRouter);
 app.use('/api/tenants/:tenantId/atalhos', atalhoRouter);
 app.use('/api/tenants', tenantsRouter);
 app.use('/api/conversations', conversationsRouter);
+app.use('/api/contatos', contatosRouter);
 app.use('/api/webhook', criarRateLimit({
   janelaMs: 60_000,
   limite: 3000,

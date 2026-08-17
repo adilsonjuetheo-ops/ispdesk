@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { X, Loader2, Send, AlertTriangle } from 'lucide-react';
+import { X, Loader2, Send, AlertTriangle, Search } from 'lucide-react';
 import api from '../lib/api.js';
 
 // O WhatsApp só aceita texto livre até 24h depois da última mensagem do cliente.
 // Fora disso é template aprovado — a tela descobre em qual caso está pelo 409
 // que a rota devolve, para o atendente não precisar conhecer a regra.
-export default function NovaConversaModal({ onClose, onCriada }) {
-  const [telefone, setTelefone] = useState('');
+export default function NovaConversaModal({ onClose, onCriada, telefoneInicial = '' }) {
+  const [telefone, setTelefone] = useState(telefoneInicial);
+  const [buscaContato, setBuscaContato] = useState('');
+  const [achados, setAchados] = useState([]);
   const [texto, setTexto] = useState('');
   const [remetentes, setRemetentes] = useState([]);
   const [remetenteSel, setRemetenteSel] = useState('');
@@ -20,6 +22,17 @@ export default function NovaConversaModal({ onClose, onCriada }) {
   useEffect(() => {
     api.get('/conversations/remetentes').then(r => setRemetentes(r.data || [])).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const termo = buscaContato.trim();
+    if (termo.length < 2) { setAchados([]); return; }
+    const t = setTimeout(() => {
+      api.get('/contatos', { params: { busca: termo } })
+        .then(r => setAchados((r.data || []).slice(0, 6)))
+        .catch(() => setAchados([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [buscaContato]);
 
   const carregarTemplates = async () => {
     try {
@@ -82,6 +95,39 @@ export default function NovaConversaModal({ onClose, onCriada }) {
         </div>
 
         <form onSubmit={enviar} className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Buscar contato salvo</label>
+            <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2">
+              <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <input
+                value={buscaContato}
+                onChange={e => setBuscaContato(e.target.value)}
+                placeholder="Nome, telefone ou contrato..."
+                className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none border-0"
+              />
+            </div>
+            {achados.length > 0 && (
+              <div className="mt-1 border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+                {achados.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setTelefone(c.whatsapp);
+                      setBuscaContato('');
+                      setAchados([]);
+                      setPrecisaTemplate(false);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors"
+                  >
+                    <p className="text-sm text-gray-800">{c.nome || 'Sem nome'}</p>
+                    <p className="text-xs text-gray-400 tabular-nums">{c.whatsapp}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="block text-xs text-gray-500 mb-1">Telefone do cliente</label>
             <input

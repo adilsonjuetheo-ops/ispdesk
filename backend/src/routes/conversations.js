@@ -8,6 +8,7 @@ import { enviarMensagem, uploadMidia, enviarMidia, enviarTemplate } from '../ser
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { enviarNps } from '../services/nps.js';
 import { buscarDadosCliente } from '../services/sgp.js';
+import { normalizarTelefoneBR } from '../services/telefone.js';
 import { criarRateLimit } from '../middleware/security.js';
 import { audioPrecisaConverter, converterParaOggOpus } from '../services/audio.js';
 
@@ -125,17 +126,6 @@ router.use((req, res, next) => {
   if (req.method !== 'GET') registrarAtividade();
   next();
 });
-
-// Normaliza o que o atendente digitou para o formato que a Meta espera:
-// 55 + DDD + número, só dígitos.
-function normalizarTelefoneBR(entrada) {
-  let d = String(entrada || '').replace(/\D/g, '');
-  if (d.startsWith('00')) d = d.slice(2);
-  if (!d.startsWith('55')) d = `55${d}`;
-  // 55 + DDD(2) + 8 ou 9 dígitos
-  if (d.length < 12 || d.length > 13) return null;
-  return d;
-}
 
 // A Meta só aceita texto livre dentro de 24h desde a última mensagem DO CLIENTE.
 // Fora disso é template aprovado — por isso a janela é verificada pela última
