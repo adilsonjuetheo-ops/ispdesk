@@ -277,3 +277,68 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
 
   return { resposta: textoLimpo, devePelearHumano: false, tag, midias: midiasParaEnviar };
 }
+
+// Sugere uma resposta para o atendente revisar antes de enviar. Diferente de
+// processarMensagem: não usa ferramentas, não classifica, não transfere e nada
+// é enviado ao cliente — devolve só o texto, que o atendente edita à vontade.
+export async function sugerirResposta(tenant, conversa, historico, clienteWhatsapp) {
+  const contextoSgp = await buscarContextoSgp(tenant, clienteWhatsapp);
+  const agora = new Date().toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short',
+  });
+
+  const systemPrompt = `${tenant.systemPrompt || ''}
+
+DATA E HORA ATUAL: ${agora} (horário de Brasília).
+
+${contextoSgp}
+
+VOCÊ ESTÁ SUGERINDO UMA RESPOSTA PARA UM ATENDENTE HUMANO:
+- Escreva a mensagem pronta para ser enviada ao cliente, na primeira pessoa do provedor.
+- Devolva SOMENTE o texto da mensagem: sem saudação de sistema, sem aspas, sem explicação, sem "sugestão:".
+- Nunca escreva ACTION:HANDOFF nem TAG: — quem decide transferir é o atendente.
+- Use apenas os dados do sistema acima; não invente valor, prazo, data nem código de pagamento.
+- Se faltar informação para responder com segurança, escreva uma resposta que peça o dado que falta.
+- Tom cordial e direto, no máximo 3 parágrafos curtos.
+- Negrito do WhatsApp é com um asterisco só: *assim*.
+
+PROVEDOR: ${tenant.nome}`;
+
+  // Só o histórico recente, e mensagens de sistema fora — elas confundem quem
+  // está falando com quem.
+  const msgs = historico
+    .filter(m => !m.conteudo.startsWith('[Sistema]') && m.origem !== 'nota')
+    .slice(-12)
+    .map(m => ({
+      role: m.origem === 'cliente' ? 'user' : 'assistant',
+      content: m.conteudo,
+    }));
+
+  // A Anthropic exige alternância de papéis e início pelo usuário
+  const conversaAcumulada = msgs.reduce((acc, msg) => {
+    const ultimo = acc[acc.length - 1];
+    if (ultimo && ultimo.role === msg.role) ultimo.content += '\n' + msg.content;
+    else acc.push({ ...msg });
+    return acc;
+  }, []);
+  while (conversaAcumulada.length && conversaAcumulada[0].role !== 'user') conversaAcumulada.shift();
+
+  if (!conversaAcumulada.length) {
+    throw new Error('Não há mensagem do cliente para basear a sugestão.');
+  }
+
+  const resposta = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 700,
+    system: systemPrompt,
+    messages: conversaAcumulada,
+  });
+
+  const texto = resposta.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+
+  // Cinto e suspensório: se o modelo escorregar e devolver as marcações, elas
+  // não podem chegar ao campo de texto do atendente.
+  return paraFormatacaoWhatsapp(
+    texto.split('ACTION:HANDOFF:')[0].replace(/\nTAG:.+$/m, '').trim()
+  );
+}

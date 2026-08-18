@@ -8,7 +8,7 @@ import {
   Send, UserCheck, Bot, X, Loader2, Paperclip, FileText,
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
-  List, ListOrdered, Plus, ArrowLeft, Video,
+  List, ListOrdered, Plus, ArrowLeft, Video, Sparkles,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -388,6 +388,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
   const [texto, setTexto] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  const [sugerindo, setSugerindo] = useState(false);
   const [gravando, setGravando] = useState(false);
   const [tempoGravacao, setTempoGravacao] = useState(0);
   const [audioPreview, setAudioPreview] = useState(null);
@@ -500,6 +501,23 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
     } catch (err) {
       alert(err.response?.data?.erro || 'Erro ao enviar mensagem. Verifique o token do WhatsApp.');
     } finally { setEnviando(false); }
+  };
+
+  // Preenche o campo com uma sugestão da IA. Não envia nada: o atendente lê,
+  // edita e decide. Se já houver texto digitado, confirma antes de substituir.
+  const handleSugerir = async () => {
+    if (sugerindo) return;
+    if (texto.trim() && !confirm('Substituir o que você já escreveu pela sugestão?')) return;
+    setSugerindo(true);
+    try {
+      const { data } = await api.post(`/conversations/${conversa.id}/sugerir`);
+      setTexto(data.sugestao);
+      textareaRef.current?.focus();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Não foi possível gerar a sugestão.');
+    } finally {
+      setSugerindo(false);
+    }
   };
 
   const handleEnviarArquivo = async e => {
@@ -888,6 +906,18 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
                     <div className="flex items-center gap-1">
                       {!isNota && (
                         <>
+                          <button type="button"
+                            onClick={handleSugerir}
+                            disabled={!podeAtuar || sugerindo}
+                            title="Gerar resposta com IA"
+                            className="flex items-center gap-1 px-2 py-1.5 rounded hover:bg-blue-50 disabled:opacity-30 text-blue-600 transition-colors">
+                            {sugerindo
+                              ? <Loader2 className="w-4 h-4 animate-spin" />
+                              : <Sparkles className="w-4 h-4" />}
+                            <span className="text-xs font-medium hidden sm:inline">
+                              {sugerindo ? 'Gerando...' : 'Gerar resposta'}
+                            </span>
+                          </button>
                           <button type="button"
                             onClick={() => fileRef.current?.click()}
                             disabled={!podeAtuar || enviandoArquivo || gravando}

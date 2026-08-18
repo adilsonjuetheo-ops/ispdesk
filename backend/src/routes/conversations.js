@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { conversas, mensagens, clientes, tenantUsers, filiais, filialWhatsappExtra, tenants } from '../db/schema.js';
-import { eq, and, desc, ne, count, inArray, isNotNull } from 'drizzle-orm';
+import { eq, and, desc, ne, count, inArray, isNotNull, sql as sqlRaw } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia, enviarTemplate } from '../services/whatsapp.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { enviarNps } from '../services/nps.js';
 import { buscarDadosCliente } from '../services/sgp.js';
+import { sugerirResposta } from '../services/ai.js';
 import { normalizarTelefoneBR } from '../services/telefone.js';
 import { criarRateLimit } from '../middleware/security.js';
 import { audioPrecisaConverter, converterParaOggOpus, converterParaMp3 } from '../services/audio.js';
@@ -78,6 +79,15 @@ const upload = multer({
     }
     callback(null, true);
   },
+});
+
+// Cada sugestão é uma chamada paga ao modelo — sem teto, um clique repetido
+// vira custo.
+const limitarSugestao = criarRateLimit({
+  janelaMs: 60_000,
+  limite: 20,
+  prefixo: 'sugerir-resposta',
+  mensagem: 'Muitas sugestões seguidas. Aguarde um momento.',
 });
 
 const limitarUpload = criarRateLimit({
@@ -466,7 +476,10 @@ router.get('/', async (req, res) => {
   .leftJoin(filiais, eq(conversas.filialId, filiais.id))
   .leftJoin(tenantUsers, eq(conversas.agenteId, tenantUsers.id))
   .where(conditions.length ? and(...conditions) : undefined)
-  .orderBy(desc(conversas.iniciadaEm));
+  // Mais recente no topo: ordenar por iniciadaEm mandava conversa antiga com
+  // mensagem nova para o fim da lista. Cai para iniciadaEm quando ainda não há
+  // mensagem registrada.
+  .orderBy(sqlRaw`coalesce(${conversas.ultimaMsgEm}, ${conversas.iniciadaEm}) desc`);
 
   res.json(rows);
 });
@@ -756,6 +769,32 @@ router.get('/:id/media/:mediaId', async (req, res) => {
     res.end(buffer);
   } catch {
     res.status(502).end();
+  }
+});
+
+// Sugestão de resposta por IA para o atendente revisar. Nada é enviado ao
+// cliente: devolve só o texto, que cai no campo de mensagem para ser editado.
+router.post('/:id/sugerir', limitarSugestao, async (req, res) => {
+  const { id } = req.params;
+  const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (!podeAcessarConversa(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+  if (!tenant || !cliente) return res.status(404).json({ erro: 'Dados da conversa incompletos' });
+
+  const historico = await db.select().from(mensagens)
+    .where(eq(mensagens.conversaId, id))
+    .orderBy(mensagens.enviadaEm);
+
+  try {
+    const sugestao = await sugerirResposta(tenant, conversa, historico, cliente.whatsapp);
+    if (!sugestao) return res.status(502).json({ erro: 'A IA não retornou uma sugestão.' });
+    res.json({ sugestao });
+  } catch (err) {
+    console.error('[sugerir] Falha:', err.message);
+    res.status(502).json({ erro: err.message || 'Não foi possível gerar a sugestão.' });
   }
 });
 
