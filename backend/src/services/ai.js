@@ -3,6 +3,13 @@ import { buscarContextoSgp, getTools, executarTool } from './sgp.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Haiku atende sozinho a maior parte da conversa (consulta, 2ª via,
+// desbloqueio, dúvidas comuns) por uma fração do custo do Sonnet. Quando o
+// próprio modelo sinaliza que o caso é incomum (ACTION:ESCALATE), a mesma
+// conversa — já com qualquer tool já executada — continua no Sonnet.
+const MODELO_RAPIDO = 'claude-haiku-4-5-20251001';
+const MODELO_COMPLETO = 'claude-sonnet-4-6';
+
 // clienteWhatsapp: número do remetente vindo direto do payload do webhook
 const TAGS_VALIDAS = ['Financeiro','Sem Conexão','Lentidão','Mudança de Endereço','Cancelamento','Nova Contratação','Problema no Roteador','Segunda Via','Outros'];
 
@@ -86,6 +93,7 @@ ${blocoForaHorario}
 INSTRUÇÕES IMPORTANTES:
 - Se o cliente pedir para falar com humano: diga que vai transferir e escreva ACTION:HANDOFF:solicitado pelo cliente
 - Se não conseguir resolver o problema: escreva ACTION:HANDOFF:motivo detalhado
+- Se a situação for incomum e exigir julgamento mais cuidadoso (reclamação grave, negociação fora do script, ambiguidade real) e você não estiver seguro de como agir: não adivinhe nem transfira ainda — escreva sozinho, sem mais nada, ACTION:ESCALATE. Isso pede uma segunda opinião antes de responder ao cliente, não é o mesmo que transferir para um humano. Não use para o dia a dia — consulta, 2ª via, desbloqueio e dúvidas comuns você resolve normalmente.
 ${temSgp ? `- Use apenas os dados fornecidos pelo SGP acima. Nunca invente informações.
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
 - Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem. Só prometa o PDF do boleto se o resultado da ferramenta disser que ele será enviado — nunca anuncie um arquivo que não vai chegar.
@@ -152,66 +160,78 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
     conversaAcumulada.shift();
   }
 
-  // 6. Loop: chama Claude → executa tools → chama novamente até parar
-  let response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+  // 6. Loop: chama Claude → executa tools → chama novamente até parar. Começa
+  // no Haiku; se ele pedir ACTION:ESCALATE, a mesma conversa acumulada (com
+  // qualquer tool já executada) continua no Sonnet — sem refazer nada.
+  let modelo = MODELO_RAPIDO;
+  let jaEscalou = false;
+  const chamarModelo = () => anthropic.messages.create({
+    model: modelo,
     max_tokens: 1024,
     system: systemPrompt,
     ...(tools.length > 0 && { tools }),
     messages: conversaAcumulada,
   });
 
+  let response = await chamarModelo();
+
   const midiasParaEnviar = [];
   // Tools podem exigir transferência (ex: desbloqueio já utilizado). Guardamos o
   // motivo para garantir o handoff mesmo que o modelo não repita a marcação.
   let handoffForcado = null;
 
-  while (response.stop_reason === 'tool_use') {
-    const toolBlocks = response.content.filter(b => b.type === 'tool_use');
-    if (!toolBlocks.length) break;
+  while (true) {
+    if (response.stop_reason === 'tool_use') {
+      const toolBlocks = response.content.filter(b => b.type === 'tool_use');
+      if (!toolBlocks.length) break;
 
-    const toolResults = [];
-    for (const toolBlock of toolBlocks) {
-      let resultado;
-      if (!toolAutorizada(toolBlock.name, toolBlock.input, idsAutorizados)) {
-        console.warn(`[IA] Tool bloqueada por vínculo inválido: ${toolBlock.name}`);
-        resultado = 'Ação bloqueada: os identificadores informados não pertencem ao cliente validado nesta conversa.';
-      } else {
-        console.log(`[IA] Executando tool autorizada: ${toolBlock.name}`);
-        resultado = await executarTool(toolBlock.name, toolBlock.input, tenant);
-        if (toolBlock.name === 'buscar_por_documento') {
-          const novosIds = extrairIdsAutorizados(typeof resultado === 'object' ? resultado.texto : resultado);
-          novosIds.idsCliente.forEach(id => idsAutorizados.idsCliente.add(id));
-          novosIds.idsContrato.forEach(id => idsAutorizados.idsContrato.add(id));
+      const toolResults = [];
+      for (const toolBlock of toolBlocks) {
+        let resultado;
+        if (!toolAutorizada(toolBlock.name, toolBlock.input, idsAutorizados)) {
+          console.warn(`[IA] Tool bloqueada por vínculo inválido: ${toolBlock.name}`);
+          resultado = 'Ação bloqueada: os identificadores informados não pertencem ao cliente validado nesta conversa.';
+        } else {
+          console.log(`[IA] Executando tool autorizada: ${toolBlock.name}`);
+          resultado = await executarTool(toolBlock.name, toolBlock.input, tenant);
+          if (toolBlock.name === 'buscar_por_documento') {
+            const novosIds = extrairIdsAutorizados(typeof resultado === 'object' ? resultado.texto : resultado);
+            novosIds.idsCliente.forEach(id => idsAutorizados.idsCliente.add(id));
+            novosIds.idsContrato.forEach(id => idsAutorizados.idsContrato.add(id));
+          }
         }
+        // Tools podem retornar { texto, midia } quando há um arquivo a enviar
+        // (ex: boleto em PDF) além do texto que vai pro contexto do Claude.
+        let conteudoTool = resultado;
+        if (resultado && typeof resultado === 'object') {
+          conteudoTool = resultado.texto;
+          if (resultado.midia) midiasParaEnviar.push(resultado.midia);
+        }
+        if (typeof conteudoTool === 'string' && conteudoTool.includes('ACTION:HANDOFF:')) {
+          handoffForcado = conteudoTool.split('ACTION:HANDOFF:')[1].split('\n')[0].trim();
+        }
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolBlock.id,
+          content: conteudoTool,
+        });
       }
-      // Tools podem retornar { texto, midia } quando há um arquivo a enviar
-      // (ex: boleto em PDF) além do texto que vai pro contexto do Claude.
-      let conteudoTool = resultado;
-      if (resultado && typeof resultado === 'object') {
-        conteudoTool = resultado.texto;
-        if (resultado.midia) midiasParaEnviar.push(resultado.midia);
-      }
-      if (typeof conteudoTool === 'string' && conteudoTool.includes('ACTION:HANDOFF:')) {
-        handoffForcado = conteudoTool.split('ACTION:HANDOFF:')[1].split('\n')[0].trim();
-      }
-      toolResults.push({
-        type: 'tool_result',
-        tool_use_id: toolBlock.id,
-        content: conteudoTool,
-      });
+
+      conversaAcumulada.push({ role: 'assistant', content: response.content });
+      conversaAcumulada.push({ role: 'user', content: toolResults });
+      response = await chamarModelo();
+      continue;
     }
 
-    conversaAcumulada.push({ role: 'assistant', content: response.content });
-    conversaAcumulada.push({ role: 'user', content: toolResults });
-
-    response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: systemPrompt,
-      ...(tools.length > 0 && { tools }),
-      messages: conversaAcumulada,
-    });
+    const textoBruto = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    if (!jaEscalou && textoBruto.includes('ACTION:ESCALATE')) {
+      console.log('[IA] Escalando de Haiku para Sonnet');
+      jaEscalou = true;
+      modelo = MODELO_COMPLETO;
+      response = await chamarModelo();
+      continue;
+    }
+    break;
   }
 
   // 7. Extrai texto final (ignora blocos de tool_use residuais)
@@ -223,6 +243,9 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
   // 8. Extrai TAG automática (só presente na primeira mensagem)
   let tag = null;
   let textoLimpo = paraFormatacaoWhatsapp(texto);
+  // Defesa: só o Haiku deveria escrever isso, mas se escapar (ex: o Sonnet
+  // ecoou a instrução) não pode vazar pro cliente.
+  textoLimpo = textoLimpo.replace(/\s*ACTION:ESCALATE\s*/g, ' ').trim();
   const tagMatch = textoLimpo.match(/\nTAG:(.+)$/m);
   if (tagMatch) {
     const candidata = tagMatch[1].trim();
