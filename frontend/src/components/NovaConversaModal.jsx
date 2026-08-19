@@ -37,7 +37,11 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
   const carregarTemplates = async () => {
     try {
       const { data } = await api.get('/conversations/templates');
-      setTemplates(data || []);
+      const lista = data || [];
+      setTemplates(lista);
+      // Com um só, não há escolha a fazer: deixar o atendente clicar num card
+      // que parece informativo só trava o envio.
+      if (lista.length === 1) escolherTemplate(lista[0]);
     } catch (err) {
       setErro(err.response?.data?.erro || 'Não foi possível carregar os templates.');
     }
@@ -184,23 +188,33 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                 </p>
               ) : (
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Template</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    {templates.length > 1 ? 'Escolha o template' : 'Template'}
+                  </label>
                   <div className="space-y-1 max-h-44 overflow-y-auto">
-                    {templates.map(t => (
-                      <button
-                        key={`${t.name}-${t.language}`}
-                        type="button"
-                        onClick={() => escolherTemplate(t)}
-                        className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
-                          templateSel?.name === t.name
-                            ? 'border-blue-400 bg-blue-50'
-                            : 'border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        <p className="text-sm font-medium text-gray-800">{t.name}</p>
-                        {t.texto && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{t.texto}</p>}
-                      </button>
-                    ))}
+                    {templates.map(t => {
+                      const ativo = templateSel?.name === t.name;
+                      return (
+                        <button
+                          key={`${t.name}-${t.language}`}
+                          type="button"
+                          onClick={() => escolherTemplate(t)}
+                          className={`w-full flex items-start gap-2 text-left px-3 py-2 rounded-lg border transition-colors ${
+                            ativo ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span className={`mt-0.5 w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                            ativo ? 'border-blue-500' : 'border-gray-300'
+                          }`}>
+                            {ativo && <span className="w-2 h-2 rounded-full bg-blue-500" />}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium text-gray-800">{t.name}</span>
+                            {t.texto && <span className="block text-xs text-gray-500 mt-0.5 line-clamp-2">{t.texto}</span>}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -209,7 +223,12 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                 <div className="space-y-2">
                   {params.map((v, i) => (
                     <div key={i}>
-                      <label className="block text-xs text-gray-500 mb-1">{`Variável {{${i + 1}}}`}</label>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        {`Variável {{${i + 1}}}`}
+                        {templateSel.exemplos?.[i] && (
+                          <span className="text-gray-400"> — ex: {templateSel.exemplos[i]}</span>
+                        )}
+                      </label>
                       <input
                         value={v}
                         onChange={e => setParams(p => p.map((x, j) => (j === i ? e.target.value : x)))}

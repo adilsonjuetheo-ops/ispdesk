@@ -240,6 +240,9 @@ router.get('/templates', async (req, res) => {
             .filter(c => c.type === 'BODY')
             .reduce((n, c) => Math.max(n, (String(c.text || '').match(/\{\{\d+\}\}/g) || []).length), 0),
           texto: (t.components || []).find(c => c.type === 'BODY')?.text || '',
+          // A Meta guarda as amostras enviadas na aprovação; servem de dica
+          // do que cada variável espera.
+          exemplos: (t.components || []).find(c => c.type === 'BODY')?.example?.body_text?.[0] || [],
         });
       }
     } catch (err) {
