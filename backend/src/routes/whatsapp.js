@@ -243,36 +243,46 @@ router.post('/mover-numero', autenticar, apenasAdmin, async (req, res) => {
   }
 
   const semPrincipal = !destino.whatsappNumberId;
-  if (semPrincipal) {
-    await db.update(filiais).set({
-      wabaId: numero.wabaId,
-      whatsappNumberId: numero.whatsappNumberId,
-      whatsappToken: numero.whatsappToken,
-      whatsappTokenExpiraEm: numero.whatsappTokenExpiraEm,
-      whatsappConectadoEm: new Date(),
-    }).where(eq(filiais.id, destinoFilialId));
-  } else {
-    await db.insert(filialWhatsappExtra).values({
-      filialId: destinoFilialId,
-      rotulo: numero.rotulo || null,
-      wabaId: numero.wabaId,
-      whatsappNumberId: numero.whatsappNumberId,
-      whatsappToken: numero.whatsappToken,
-      whatsappTokenExpiraEm: numero.whatsappTokenExpiraEm,
-      whatsappConectadoEm: new Date(),
-    });
-  }
 
-  if (origemExtraId) {
-    await db.delete(filialWhatsappExtra).where(eq(filialWhatsappExtra.id, origemExtraId));
-  } else {
-    await db.update(filiais).set({
-      wabaId: null,
-      whatsappNumberId: null,
-      whatsappToken: null,
-      whatsappTokenExpiraEm: null,
-      whatsappConectadoEm: null,
-    }).where(eq(filiais.id, origemFilialId));
+  try {
+    // Limpa a origem ANTES de escrever no destino: whatsappNumberId tem
+    // índice único em ambas as tabelas, então gravar o mesmo número em duas
+    // linhas ao mesmo tempo (mesmo que só entre esses dois passos) quebra a
+    // constraint e a rota falhava com 500 sem mover nada.
+    if (origemExtraId) {
+      await db.delete(filialWhatsappExtra).where(eq(filialWhatsappExtra.id, origemExtraId));
+    } else {
+      await db.update(filiais).set({
+        wabaId: null,
+        whatsappNumberId: null,
+        whatsappToken: null,
+        whatsappTokenExpiraEm: null,
+        whatsappConectadoEm: null,
+      }).where(eq(filiais.id, origemFilialId));
+    }
+
+    if (semPrincipal) {
+      await db.update(filiais).set({
+        wabaId: numero.wabaId,
+        whatsappNumberId: numero.whatsappNumberId,
+        whatsappToken: numero.whatsappToken,
+        whatsappTokenExpiraEm: numero.whatsappTokenExpiraEm,
+        whatsappConectadoEm: new Date(),
+      }).where(eq(filiais.id, destinoFilialId));
+    } else {
+      await db.insert(filialWhatsappExtra).values({
+        filialId: destinoFilialId,
+        rotulo: numero.rotulo || null,
+        wabaId: numero.wabaId,
+        whatsappNumberId: numero.whatsappNumberId,
+        whatsappToken: numero.whatsappToken,
+        whatsappTokenExpiraEm: numero.whatsappTokenExpiraEm,
+        whatsappConectadoEm: new Date(),
+      });
+    }
+  } catch (err) {
+    console.error('[whatsapp/mover-numero]', err.message);
+    return res.status(500).json({ erro: 'Erro ao mover número. Se a origem já foi desconectada mas o destino não recebeu, reconecte manualmente.' });
   }
 
   res.json({ ok: true, entrouComo: semPrincipal ? 'principal' : 'extra' });
