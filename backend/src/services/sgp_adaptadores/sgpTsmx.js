@@ -92,11 +92,9 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     return d;
   }
 
-  #formatarContexto(c) {
+  async #formatarContexto(c) {
     const nome = c.razaoSocial || c.nome || 'não informado';
     const status = (c.contratoStatusDisplay || '').trim() || 'não informado';
-    const valorAberto = Number(c.contratoValorAberto || 0);
-    const titulos = Number(c.contratoTitulosAReceber || 0);
 
     const linhas = [
       '=== DADOS DO CLIENTE (SGP) ===',
@@ -108,10 +106,35 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
       '',
     ];
 
-    if (valorAberto > 0) {
-      linhas.push(`FINANCEIRO: Valor em aberto ${this.formatarMoeda(valorAberto)} (${titulos} título(s) no total).`);
+    // contratoValorAberto (resumo do cadastro) só reflete título VENCIDO — um
+    // título a vencer não entra nele, então um cliente com fatura pra amanhã
+    // aparecia como "sem valores em aberto". Consulta os títulos de verdade,
+    // igual o enviar_segunda_via faz, pra não dar informação inconsistente.
+    let titulos = null;
+    try {
+      const data = await this.#consultarTitulos({ contrato: c.contratoId });
+      titulos = (data?.titulos || []).filter(t => t.status === 'aberto');
+    } catch (err) {
+      console.error('[SGP TSMX] Falha ao consultar títulos:', err.message);
+    }
+
+    if (titulos === null) {
+      linhas.push('FINANCEIRO: não foi possível consultar os títulos agora (falha no sistema do provedor). NÃO afirme que o cliente está em dia.');
     } else {
-      linhas.push('FINANCEIRO: Sem valores em aberto.');
+      const hoje = new Date();
+      const vencidos = titulos.filter(t => new Date(t.dataVencimento) < hoje);
+      const aVencer  = titulos.filter(t => new Date(t.dataVencimento) >= hoje);
+
+      if (vencidos.length > 0) {
+        const valorTotal = vencidos.reduce((s, t) => s + Number(t.valorCorrigido || t.valor || 0), 0);
+        linhas.push(`FINANCEIRO: ${vencidos.length} título(s) vencido(s), total ${this.formatarMoeda(valorTotal)}.`);
+      } else {
+        linhas.push('FINANCEIRO: Sem títulos vencidos.');
+      }
+      if (aVencer.length > 0) {
+        const prox = aVencer.sort((a, b) => new Date(a.dataVencimento) - new Date(b.dataVencimento))[0];
+        linhas.push(`PRÓXIMA FATURA: ${this.formatarData(prox.dataVencimento)} | ${this.formatarMoeda(prox.valorCorrigido || prox.valor)}`);
+      }
     }
     linhas.push('');
 
