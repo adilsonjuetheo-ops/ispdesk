@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight, ArrowRightLeft } from 'lucide-react';
 
 function carregarFbSdk() {
   return new Promise((resolve) => {
@@ -751,6 +751,9 @@ export default function Settings() {
   const [conectandoFilialId, setConectandoFilialId] = useState(null);
   const [erroFilialWpp, setErroFilialWpp] = useState({});
   const [conectandoExtraFilialId, setConectandoExtraFilialId] = useState(null);
+  const [movendo, setMovendo] = useState(null); // { filialId, extraId?, rotulo }
+  const [destinoMover, setDestinoMover] = useState('');
+  const [movendoSalvando, setMovendoSalvando] = useState(false);
 
   const [formSenha, setFormSenha] = useState({ senhaAtual: '', novaSenha: '', confirmar: '' });
   const [savingSenha, setSavingSenha] = useState(false);
@@ -888,6 +891,25 @@ export default function Settings() {
       carregarFiliais();
     } catch (err) {
       setErroFilialWpp(e => ({ ...e, [filialId]: err.response?.data?.erro || 'Erro ao desconectar' }));
+    }
+  };
+
+  const handleMoverNumero = async () => {
+    if (!movendo || !destinoMover) return;
+    setMovendoSalvando(true);
+    try {
+      await api.post('/whatsapp/mover-numero', {
+        origemFilialId: movendo.extraId ? undefined : movendo.filialId,
+        origemExtraId: movendo.extraId || undefined,
+        destinoFilialId: destinoMover,
+      });
+      setMovendo(null);
+      setDestinoMover('');
+      carregarFiliais();
+    } catch (err) {
+      setErroFilialWpp(e => ({ ...e, [movendo.filialId]: err.response?.data?.erro || 'Erro ao mover número' }));
+    } finally {
+      setMovendoSalvando(false);
     }
   };
 
@@ -1225,10 +1247,16 @@ export default function Settings() {
                       </div>
                       <div className="flex items-center gap-2">
                         {f.whatsappConectado ? (
-                          <button type="button" onClick={() => handleDesconectarFilial(f.id)}
-                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors">
-                            <WifiOff className="w-3 h-3" /> Desconectar
-                          </button>
+                          <>
+                            <button type="button" onClick={() => setMovendo({ filialId: f.id, rotulo: 'número principal' })}
+                              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition-colors">
+                              <ArrowRightLeft className="w-3 h-3" /> Mover
+                            </button>
+                            <button type="button" onClick={() => handleDesconectarFilial(f.id)}
+                              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors">
+                              <WifiOff className="w-3 h-3" /> Desconectar
+                            </button>
+                          </>
                         ) : (
                           <button type="button" onClick={() => handleConectarFilial(f.id)}
                             disabled={conectandoFilialId === f.id}
@@ -1256,10 +1284,16 @@ export default function Settings() {
                               <Wifi className="w-3 h-3 text-green-500" />
                               {extra.rotulo || extra.whatsappNumberId}
                             </span>
-                            <button type="button" onClick={() => handleDesconectarNumeroExtra(f.id, extra.id)}
-                              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors">
-                              <WifiOff className="w-3 h-3" /> Desconectar
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => setMovendo({ filialId: f.id, extraId: extra.id, rotulo: extra.rotulo || extra.whatsappNumberId })}
+                                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition-colors">
+                                <ArrowRightLeft className="w-3 h-3" /> Mover
+                              </button>
+                              <button type="button" onClick={() => handleDesconectarNumeroExtra(f.id, extra.id)}
+                                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors">
+                                <WifiOff className="w-3 h-3" /> Desconectar
+                              </button>
+                            </div>
                           </div>
                         ))}
                         <button type="button" onClick={() => handleConectarNumeroExtra(f.id)}
@@ -1274,6 +1308,31 @@ export default function Settings() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {movendo && (
+              <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2.5">
+                <p className="text-xs text-indigo-800 mb-2">
+                  Mover <strong>{movendo.rotulo}</strong> para qual filial?
+                </p>
+                <div className="flex gap-2 flex-wrap items-center">
+                  <select value={destinoMover} onChange={e => setDestinoMover(e.target.value)}
+                    className="flex-1 min-w-32 border border-indigo-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <option value="">Selecione a filial de destino</option>
+                    {filiais.filter(f => f.ativo && f.id !== movendo.filialId).map(f => (
+                      <option key={f.id} value={f.id}>{f.nome} — {f.cidade}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={handleMoverNumero} disabled={!destinoMover || movendoSalvando}
+                    className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
+                    {movendoSalvando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Confirmar'}
+                  </button>
+                  <button type="button" onClick={() => { setMovendo(null); setDestinoMover(''); }}
+                    className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1.5">
+                    Cancelar
+                  </button>
+                </div>
               </div>
             )}
 

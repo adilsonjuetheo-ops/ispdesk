@@ -197,6 +197,87 @@ router.delete('/desconectar-filial-extra/:id', autenticar, apenasAdmin, async (r
   res.json({ ok: true });
 });
 
+// Move um número já conectado (principal de uma filial ou extra) para outra
+// filial — sem passar pelo Embedded Signup de novo, já que o número/token/WABA
+// continuam os mesmos, só muda qual filial é dona da conexão no nosso banco.
+// Se a filial de destino já tiver número principal, entra como extra dela.
+router.post('/mover-numero', autenticar, apenasAdmin, async (req, res) => {
+  const { origemFilialId, origemExtraId, destinoFilialId } = req.body;
+  const tenantId = req.user.tenantId;
+
+  if (!destinoFilialId || (!origemFilialId && !origemExtraId)) {
+    return res.status(400).json({ erro: 'Informe a origem e o destino' });
+  }
+
+  const [destino] = await db.select().from(filiais)
+    .where(and(eq(filiais.id, destinoFilialId), eq(filiais.tenantId, tenantId)))
+    .limit(1);
+  if (!destino) return res.status(404).json({ erro: 'Filial de destino não encontrada' });
+
+  let numero; // { wabaId, whatsappNumberId, whatsappToken, whatsappTokenExpiraEm, rotulo }
+
+  if (origemExtraId) {
+    const [extra] = await db.select({
+      rotulo: filialWhatsappExtra.rotulo,
+      wabaId: filialWhatsappExtra.wabaId,
+      whatsappNumberId: filialWhatsappExtra.whatsappNumberId,
+      whatsappToken: filialWhatsappExtra.whatsappToken,
+      whatsappTokenExpiraEm: filialWhatsappExtra.whatsappTokenExpiraEm,
+    })
+      .from(filialWhatsappExtra)
+      .innerJoin(filiais, eq(filiais.id, filialWhatsappExtra.filialId))
+      .where(and(eq(filialWhatsappExtra.id, origemExtraId), eq(filiais.tenantId, tenantId)))
+      .limit(1);
+    if (!extra) return res.status(404).json({ erro: 'Número de origem não encontrado' });
+    numero = extra;
+  } else {
+    const [origem] = await db.select().from(filiais)
+      .where(and(eq(filiais.id, origemFilialId), eq(filiais.tenantId, tenantId)))
+      .limit(1);
+    if (!origem) return res.status(404).json({ erro: 'Filial de origem não encontrada' });
+    if (!origem.whatsappNumberId || !origem.whatsappToken) {
+      return res.status(400).json({ erro: 'Filial de origem não tem WhatsApp conectado' });
+    }
+    if (origem.id === destinoFilialId) return res.status(400).json({ erro: 'Origem e destino são a mesma filial' });
+    numero = origem;
+  }
+
+  const semPrincipal = !destino.whatsappNumberId;
+  if (semPrincipal) {
+    await db.update(filiais).set({
+      wabaId: numero.wabaId,
+      whatsappNumberId: numero.whatsappNumberId,
+      whatsappToken: numero.whatsappToken,
+      whatsappTokenExpiraEm: numero.whatsappTokenExpiraEm,
+      whatsappConectadoEm: new Date(),
+    }).where(eq(filiais.id, destinoFilialId));
+  } else {
+    await db.insert(filialWhatsappExtra).values({
+      filialId: destinoFilialId,
+      rotulo: numero.rotulo || null,
+      wabaId: numero.wabaId,
+      whatsappNumberId: numero.whatsappNumberId,
+      whatsappToken: numero.whatsappToken,
+      whatsappTokenExpiraEm: numero.whatsappTokenExpiraEm,
+      whatsappConectadoEm: new Date(),
+    });
+  }
+
+  if (origemExtraId) {
+    await db.delete(filialWhatsappExtra).where(eq(filialWhatsappExtra.id, origemExtraId));
+  } else {
+    await db.update(filiais).set({
+      wabaId: null,
+      whatsappNumberId: null,
+      whatsappToken: null,
+      whatsappTokenExpiraEm: null,
+      whatsappConectadoEm: null,
+    }).where(eq(filiais.id, origemFilialId));
+  }
+
+  res.json({ ok: true, entrouComo: semPrincipal ? 'principal' : 'extra' });
+});
+
 router.post('/registrar-numero', autenticar, apenasAdmin, async (req, res) => {
   const isSuperAdmin = req.user.role === 'superadmin' || req.user.role === 'super_admin';
   const tenantId = isSuperAdmin ? (req.body.tenantId || req.user.tenantId) : req.user.tenantId;
