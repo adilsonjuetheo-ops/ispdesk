@@ -327,9 +327,15 @@ router.post('/iniciar', async (req, res) => {
 
   const aberta = conversa ? await janelaAberta(conversa.id) : false;
   if (!aberta && !template) {
+    // Devolve o que já sabemos do cliente para a tela preencher as variáveis
+    // do template sem o atendente ter que procurar.
     return res.status(409).json({
       erro: 'Fora da janela de 24h — só é possível iniciar com um template aprovado.',
       precisaTemplate: true,
+      cliente: {
+        nome: cliente.nome || null,
+        contratoId: cliente.contratoId || null,
+      },
     });
   }
   if (aberta && !texto?.trim()) {

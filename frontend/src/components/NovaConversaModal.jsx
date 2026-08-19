@@ -16,6 +16,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
   const [templateSel, setTemplateSel] = useState(null);
   const [params, setParams] = useState([]);
   const [precisaTemplate, setPrecisaTemplate] = useState(false);
+  const [dadosCliente, setDadosCliente] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -34,22 +35,32 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
     return () => clearTimeout(t);
   }, [buscaContato]);
 
-  const carregarTemplates = async () => {
+  const carregarTemplates = async (dados) => {
     try {
       const { data } = await api.get('/conversations/templates');
       const lista = data || [];
       setTemplates(lista);
       // Com um só, não há escolha a fazer: deixar o atendente clicar num card
       // que parece informativo só trava o envio.
-      if (lista.length === 1) escolherTemplate(lista[0]);
+      if (lista.length === 1) escolherTemplate(lista[0], dados);
     } catch (err) {
       setErro(err.response?.data?.erro || 'Não foi possível carregar os templates.');
     }
   };
 
-  const escolherTemplate = t => {
+  // A amostra que a Meta guardou diz o que cada posição espera: exemplo só de
+  // dígitos indica contrato, o resto indica nome. Assim o preenchimento vem do
+  // próprio template, não de um palpite sobre a ordem das variáveis.
+  const preencher = (t, dados) => Array.from({ length: t.variaveis }, (_, i) => {
+    if (!dados) return '';
+    const exemplo = String(t.exemplos?.[i] || '');
+    if (/^\d+$/.test(exemplo)) return dados.contratoId || '';
+    return dados.nome || '';
+  });
+
+  const escolherTemplate = (t, dados = dadosCliente) => {
     setTemplateSel(t);
-    setParams(Array.from({ length: t.variaveis }, () => ''));
+    setParams(preencher(t, dados));
   };
 
   const enviar = async e => {
@@ -81,7 +92,8 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
         // Primeiro contato ou janela vencida: troca o formulário para templates
         setPrecisaTemplate(true);
         setErro('');
-        await carregarTemplates();
+        setDadosCliente(resp.cliente || null);
+        await carregarTemplates(resp.cliente || null);
       } else {
         setErro(resp?.erro || 'Não foi possível iniciar a conversa.');
       }
