@@ -754,7 +754,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
       {/* área de input com tabs */}
       <div className="bg-white border-t border-gray-200">
         {/* Tabs */}
-        {eHumano && (
+        {podeAtuar && (
           <div className="flex border-b border-gray-100 px-3">
             <button className={tabClass('resposta')} onClick={() => setAba('resposta')}>Resposta</button>
             <button className={tabClass('nota')} onClick={() => setAba('nota')}>
@@ -765,7 +765,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
         )}
 
         {/* painel Atalhos */}
-        {eHumano && aba === 'atalhos' && (
+        {podeAtuar && aba === 'atalhos' && (
           <div className="max-h-56 flex flex-col">
             <div className="px-3 pt-2 pb-1">
               <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1.5">
@@ -806,7 +806,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
         )}
 
         {/* input Resposta / Lembrete */}
-        {(!eHumano || aba === 'resposta' || aba === 'nota') && (
+        {(aba === 'resposta' || aba === 'nota') && (
           <form onSubmit={handleEnviar}>
             <input ref={fileRef} type="file" className="hidden"
               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
