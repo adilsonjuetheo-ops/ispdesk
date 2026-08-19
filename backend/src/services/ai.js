@@ -97,6 +97,7 @@ INSTRUÇÕES IMPORTANTES:
 ${temSgp ? `- Use apenas os dados fornecidos pelo SGP acima. Nunca invente informações.
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
 - Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem. Só prometa o PDF do boleto se o resultado da ferramenta disser que ele será enviado — nunca anuncie um arquivo que não vai chegar.
+- Se não houver fatura vencida mas o contexto do SGP mostrar uma "PRÓXIMA FATURA" (ainda não vencida) e o cliente quiser pagar, adiantar ou pedir o código de pagamento mesmo assim: use enviar_segunda_via normalmente — a ferramenta traz a fatura em aberto mais próxima, vencida ou não. Só diga que "não há nada a pagar" quando o SGP não mostrar nenhuma fatura, nem vencida nem próxima.
 ${tenant.exigirDocumento
   ? `- Este provedor NÃO identifica clientes pelo número de WhatsApp. Na primeira demanda que exija dados do cliente, peça o CPF ou CNPJ do titular — mesmo que o cliente já tenha conversado antes.
 - Só prossiga com consultas, 2ª via ou desbloqueio depois de validar o cliente pelo CPF/CNPJ.`
