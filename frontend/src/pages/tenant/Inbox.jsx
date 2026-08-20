@@ -6,7 +6,8 @@ import { useNotificationSound } from '../../hooks/useNotificationSound.js';
 import ConversationList from '../../components/ConversationList.jsx';
 import ChatWindow from '../../components/ChatWindow.jsx';
 import ClientInfoPanel from '../../components/ClientInfoPanel.jsx';
-import { Bot, Zap, Users, BarChart2, Star, MessageCircle, ArrowRight, BookUser, ExternalLink } from 'lucide-react';
+import { Bot, Zap, Users, BarChart2, Star, MessageCircle, ArrowRight, BookUser, ExternalLink, Clock, UserCheck } from 'lucide-react';
+import { differenceInMinutes } from 'date-fns';
 
 function saudacao(nome) {
   const h = new Date().getHours();
@@ -125,7 +126,113 @@ function Rodape() {
   );
 }
 
-function WelcomePanel({ currentUser }) {
+const EM_ESPERA = ['aguardando', 'aguardando_filial'];
+
+function formatarEspera(mins) {
+  if (mins < 60) return `${mins}min`;
+  return `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, '0')}`;
+}
+
+// O painel abre com o estado da operação, não com um passo a passo de
+// instalação: quem usa isso todo dia já configurou a plataforma faz tempo.
+function resumoDaOperacao(conversas) {
+  const inicioDoDia = new Date();
+  inicioDoDia.setHours(0, 0, 0, 0);
+
+  const fila = conversas.filter(c => EM_ESPERA.includes(c.status));
+  const esperas = fila
+    .filter(c => c.iniciadaEm)
+    .map(c => differenceInMinutes(new Date(), new Date(c.iniciadaEm)));
+
+  const desdeHoje = campo => conversas.filter(
+    c => c[campo] && new Date(c[campo]) >= inicioDoDia
+  ).length;
+
+  return {
+    fila: fila.length,
+    maiorEspera: esperas.length ? Math.max(...esperas) : null,
+    emAtendimento: conversas.filter(c => c.status === 'humano').length,
+    comAssistente: conversas.filter(c => c.status === 'bot').length,
+    abertasHoje: desdeHoje('iniciadaEm'),
+    encerradasHoje: desdeHoje('encerradaEm'),
+  };
+}
+
+function Indicador({ icon: Icon, rotulo, valor, detalhe, tom, onClick }) {
+  const Tag = onClick ? 'button' : 'div';
+  return (
+    <Tag
+      onClick={onClick}
+      className={`text-left bg-white rounded-2xl border border-gray-200 px-4 py-3.5 ${
+        onClick ? 'hover:border-gray-300 hover:shadow-sm transition-all duration-150' : ''
+      }`}
+    >
+      <div className="flex items-center gap-1.5 mb-1.5 text-gray-400">
+        <Icon className="w-3.5 h-3.5 shrink-0" />
+        <span className="text-[11px] font-medium uppercase tracking-wide truncate">{rotulo}</span>
+      </div>
+      <p className={`text-2xl font-bold tabular-nums leading-none ${tom || 'text-gray-900'}`}>{valor}</p>
+      <p className="text-[11px] text-gray-400 mt-1.5 truncate">{detalhe || ' '}</p>
+    </Tag>
+  );
+}
+
+function PainelAgora({ conversas, online, slaMinutos, navigate }) {
+  const r = resumoDaOperacao(conversas);
+
+  // Mesma escala do relógio na lista de conversas, para os dois lugares não
+  // contarem a mesma urgência de formas diferentes.
+  const limite = slaMinutos || 15;
+  const tomDaFila = r.maiorEspera == null ? null
+    : r.maiorEspera >= limite ? 'text-red-600'
+    : r.maiorEspera >= limite / 2 ? 'text-amber-600'
+    : 'text-emerald-600';
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
+      <Indicador
+        icon={Clock}
+        rotulo="Na fila"
+        valor={r.fila}
+        tom={r.fila > 0 ? tomDaFila : undefined}
+        detalhe={r.maiorEspera != null ? `maior espera ${formatarEspera(r.maiorEspera)}` : 'ninguém esperando'}
+        onClick={() => navigate('/inbox?view=fila')}
+      />
+      <Indicador
+        icon={UserCheck}
+        rotulo="Em atendimento"
+        valor={r.emAtendimento}
+        detalhe={online.length ? `${online.length} da equipe online` : 'ninguém online'}
+      />
+      <Indicador
+        icon={Bot}
+        rotulo="Com o assistente"
+        valor={r.comAssistente}
+        detalhe="respondendo sozinho"
+      />
+      <Indicador
+        icon={BarChart2}
+        rotulo="Hoje"
+        valor={r.abertasHoje}
+        detalhe={`${r.encerradasHoje} encerrada${r.encerradasHoje === 1 ? '' : 's'}`}
+      />
+    </div>
+  );
+}
+
+function chamada(conversas, isAdmin) {
+  const fila = conversas.filter(c => EM_ESPERA.includes(c.status)).length;
+  if (fila > 0) {
+    return fila === 1
+      ? 'Tem 1 conversa esperando atendimento agora.'
+      : `Tem ${fila} conversas esperando atendimento agora.`;
+  }
+  return isAdmin
+    ? 'Ninguém na fila. Selecione uma conversa ou ajuste sua plataforma abaixo.'
+    : 'Ninguém na fila. Selecione uma conversa na lista ao lado.';
+}
+
+function WelcomePanel({ currentUser, conversas = [], online = [], slaMinutos = 0 }) {
   const navigate = useNavigate();
   const nome = currentUser?.nome || '';
   const isAdmin = currentUser?.role === 'admin';
@@ -137,15 +244,22 @@ function WelcomePanel({ currentUser }) {
     <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col items-center justify-start py-12 px-8">
       <div className="w-full max-w-2xl">
         {/* Logo + greeting */}
-        <div className="flex flex-col items-center text-center mb-10">
+        <div className="flex flex-col items-center text-center mb-8">
           <img src="/logoisp.png" alt="Logo" className="h-16 rounded-xl mb-6 shadow-sm" />
           <h1 className="text-2xl font-bold text-gray-900 mb-1">{saudacao(nome)}</h1>
-          <p className="text-gray-500 text-sm">
-            {isAdmin
-              ? 'Pronto para atender. Selecione uma conversa ou configure sua plataforma abaixo.'
-              : 'Pronto para atender. Selecione uma conversa na lista ao lado para começar.'}
-          </p>
+          <p className="text-gray-500 text-sm">{chamada(conversas, isAdmin)}</p>
         </div>
+
+        <PainelAgora
+          conversas={conversas}
+          online={online}
+          slaMinutos={slaMinutos}
+          navigate={navigate}
+        />
+
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          {isAdmin ? 'Configurar a plataforma' : 'Atalhos'}
+        </p>
 
         {/* Feature cards */}
         <div className="grid grid-cols-2 gap-4">
@@ -267,7 +381,12 @@ export default function Inbox() {
             </div>
           </>
         ) : (
-          <WelcomePanel currentUser={currentUser} />
+          <WelcomePanel
+            currentUser={currentUser}
+            conversas={conversas}
+            online={online}
+            slaMinutos={slaMinutos}
+          />
         )}
       </div>
     </div>
