@@ -105,8 +105,12 @@ function WaitTime({ iniciadaEm, status }) {
 
 function filtrar(conversas, view, filialId, userId, busca) {
   let lista = conversas;
-  if (filialId) lista = lista.filter(c => c.filialId === filialId);
-  else {
+  if (filialId) {
+    // Mesmo corte das outras visões e do contador da barra lateral, que já
+    // ignora encerradas. Sem ele a filial listava conversas de dias atrás e
+    // discordava do próprio badge — 3 no menu, 67 na lista.
+    lista = lista.filter(c => c.filialId === filialId && c.status !== 'encerrada');
+  } else {
     switch (view) {
       case 'fila':      lista = lista.filter(c => c.status === 'aguardando' || c.status === 'aguardando_filial'); break;
       case 'mine':      lista = lista.filter(c => c.agenteId === userId && c.status !== 'encerrada'); break;
