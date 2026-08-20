@@ -5,7 +5,7 @@ import { usePolling } from '../../hooks/usePolling.js';
 import { usePushNotifications } from '../../hooks/usePushNotifications.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
-  Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap, AlertTriangle, Star, X, BookUser } from 'lucide-react';
+  Activity, Clock, UserCheck, Archive, MapPin, Zap, AlertTriangle, Star, X, BookUser } from 'lucide-react';
 import api from '../../lib/api.js';
 import UpdateBanner from '../UpdateBanner.jsx';
 import BottomTabBar from '../BottomTabBar.jsx';
@@ -14,6 +14,15 @@ const AVATAR_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b',
   '#10b981', '#3b82f6', '#ef4444', '#14b8a6',
 ];
+
+// Tratamento único dos ícones da barra lateral. Conviviam três tamanhos ali
+// (12, 14 e 16px) vindos de trechos de código diferentes, sem que a diferença
+// quisesse dizer nada. Fica como variante de filho para o tamanho e o traço
+// serem definidos uma vez, e não repetidos em cada ícone.
+const ICONE = '[&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:stroke-[1.75] [&>svg]:transition-colors';
+// O ícone sai um tom mais claro que o rótulo: a palavra lidera, o ícone apoia.
+// Antes os dois usavam exatamente a mesma cor e competiam entre si.
+const ICONE_APAGADO = '[&>svg]:text-gray-400 hover:[&>svg]:text-gray-600';
 
 function avatarColor(nome) {
   let hash = 0;
@@ -102,13 +111,13 @@ export default function TenantLayout() {
   const subItem = (active, onClick, Icon, label, badge) => (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 w-full pl-3 pr-2 py-1.5 rounded-lg text-sm transition-colors ${
+      className={`flex items-center gap-2.5 w-full pl-3 pr-2 py-1.5 rounded-lg text-sm transition-colors ${ICONE} ${
         active
-          ? 'bg-blue-50 text-blue-700 font-medium'
-          : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+          ? 'bg-blue-50 text-blue-700 font-medium [&>svg]:text-blue-600'
+          : `text-gray-500 hover:text-gray-800 hover:bg-gray-50 ${ICONE_APAGADO}`
       }`}
     >
-      <Icon className="w-3.5 h-3.5 shrink-0" />
+      <Icon />
       <span className="flex-1 text-left truncate">{label}</span>
       {badge > 0 && (
         <span className="bg-blue-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center leading-none">
@@ -119,8 +128,10 @@ export default function TenantLayout() {
   );
 
   const navClass = ({ isActive }) =>
-    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-      isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${ICONE} ${
+      isActive
+        ? 'bg-blue-50 text-blue-700 [&>svg]:text-blue-600'
+        : `text-gray-600 hover:text-gray-900 hover:bg-gray-100 ${ICONE_APAGADO}`
     }`;
 
   const cor = tenant?.corPrimaria || '#0066CC';
@@ -176,8 +187,8 @@ export default function TenantLayout() {
         <nav className="flex-1 p-2 overflow-y-auto">
           {/* Conversas */}
           <div className="mb-2">
-            <p className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <MessageSquare className="w-3 h-3" /> Conversas
+            <p className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Conversas
             </p>
             <div className="space-y-0.5">
               {subItem(isTodos, () => navigate('/inbox'), Activity, 'Acontecendo agora', counts.todos)}
@@ -211,7 +222,7 @@ export default function TenantLayout() {
               se fosse mais uma unidade da lista acima. */}
           <div className="pt-2 mt-1 border-t border-gray-100">
             <NavLink to="/contatos" className={navClass}>
-              <BookUser className="w-4 h-4" /> Contatos
+              <BookUser /> Contatos
             </NavLink>
           </div>
 
@@ -219,22 +230,24 @@ export default function TenantLayout() {
           {user?.role === 'admin' && (
             <div className="pt-2 mt-1 border-t border-gray-100 space-y-0.5">
               <NavLink to="/relatorio" className={navClass}>
-                <BarChart2 className="w-4 h-4" /> Relatório
+                <BarChart2 /> Relatório
               </NavLink>
               <NavLink to="/nps" className={navClass}>
-                <Star className="w-4 h-4" /> NPS
+                <Star /> NPS
               </NavLink>
               <NavLink to="/agents" className={navClass}>
-                <Users className="w-4 h-4" /> Equipe
+                <Users /> Equipe
               </NavLink>
               <NavLink to="/atalhos" className={navClass}>
-                <Zap className="w-4 h-4" /> Atalhos
+                <Zap /> Atalhos
               </NavLink>
               <NavLink to="/incidentes" className={({ isActive }) =>
-                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive ? 'bg-red-50 text-red-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${ICONE} ${
+                  isActive
+                    ? 'bg-red-50 text-red-700 [&>svg]:text-red-600'
+                    : `text-gray-600 hover:text-gray-900 hover:bg-gray-100 ${ICONE_APAGADO}`
                 }`}>
-                <AlertTriangle className="w-4 h-4" />
+                <AlertTriangle />
                 <span className="flex-1">Incidentes</span>
                 {temIncidenteAtivo && (
                   <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
@@ -279,7 +292,7 @@ export default function TenantLayout() {
         <div className="p-3 border-t border-gray-200">
           {user?.role === 'admin' && (
             <NavLink to="/settings" className={navClass}>
-              <Settings className="w-4 h-4" /> Configurações
+              <Settings /> Configurações
             </NavLink>
           )}
           <div className="px-3 py-2">
@@ -287,8 +300,8 @@ export default function TenantLayout() {
             <p className="text-xs text-gray-500 truncate capitalize">{user?.role}</p>
           </div>
           <button onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-            <LogOut className="w-4 h-4" /> Sair
+            className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ${ICONE} [&>svg]:text-gray-400 hover:[&>svg]:text-red-600`}>
+            <LogOut /> Sair
           </button>
         </div>
       </aside>
