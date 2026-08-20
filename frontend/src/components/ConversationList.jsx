@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { differenceInMinutes } from 'date-fns';
 import clsx from 'clsx';
-import { Search, Check, User, Menu, MapPin, Phone, PenSquare } from 'lucide-react';
+import { Search, Check, User, Menu, MapPin, Phone, PenSquare, Clock } from 'lucide-react';
 import NovaConversaModal from './NovaConversaModal.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 
@@ -88,9 +88,21 @@ function WaitTime({ iniciadaEm, status }) {
     return () => clearInterval(id);
   }, [iniciadaEm]);
   if (!['aguardando', 'aguardando_filial'].includes(status)) return null;
-  const color = mins < 5 ? 'text-ok-600' : mins < 15 ? 'text-atencao-600' : 'text-critico-600';
-  const label = mins < 60 ? `${mins}min` : `${Math.floor(mins / 60)}h${mins % 60 ? `${mins % 60}m` : ''}`;
-  return <span className={`text-xs font-bold ${color}`}>{label}</span>;
+  // Este número convive com o horário da última mensagem, logo acima no mesmo
+  // item. Sem rótulo os dois viravam "1h" e "1h26m" soltos, sem dizer qual era
+  // qual — o chip diz o que está sendo contado.
+  const tom = mins < 5 ? 'bg-ok-50 text-ok-700'
+    : mins < 15 ? 'bg-atencao-50 text-atencao-800'
+    : 'bg-critico-50 text-critico-700';
+  const tempo = mins < 60
+    ? `${mins}min`
+    : `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, '0')}`;
+  return (
+    <span className={`inline-flex items-center gap-1 mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${tom}`}>
+      <Clock className="w-2.5 h-2.5 shrink-0" />
+      {tempo} na fila
+    </span>
+  );
 }
 
 function filtrar(conversas, view, filialId, userId, busca) {
@@ -174,8 +186,6 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
     markSeen(c.id);
     onSelecionar(c);
   };
-
-  const isPendente = c => c.status === 'aguardando' || c.status === 'aguardando_filial';
 
   return (
     <div className="flex flex-col h-full min-w-0 bg-white border-r border-gray-200 w-full md:w-[296px]">
@@ -300,11 +310,6 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                     <div className="flex-1 min-w-0 truncate">
                       <PreviewMsg c={c} />
                     </div>
-                    {isPendente(c) && (
-                      <span className="shrink-0 bg-critico-100 text-critico-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                        Pendente
-                      </span>
-                    )}
                   </div>
 
                   <WaitTime iniciadaEm={c.iniciadaEm} status={c.status} />
@@ -353,11 +358,6 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
 
                     <div className="flex items-center gap-1 text-xs text-gray-500 mt-1.5 pt-1.5 border-t border-gray-100">
                       <div className="flex-1 min-w-0 truncate"><PreviewMsg c={c} /></div>
-                      {isPendente(c) && (
-                        <span className="shrink-0 bg-critico-100 text-critico-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                          Pendente
-                        </span>
-                      )}
                     </div>
                     <WaitTime iniciadaEm={c.iniciadaEm} status={c.status} />
                   </div>

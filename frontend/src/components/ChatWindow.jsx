@@ -8,7 +8,7 @@ import {
   Send, UserCheck, Bot, X, Loader2, Paperclip, FileText,
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
-  List, ListOrdered, Plus, ArrowLeft, Video, Sparkles,
+  List, ListOrdered, Plus, ArrowLeft, Video, Sparkles, Maximize2,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -44,10 +44,31 @@ function DateSeparator({ date }) {
   );
 }
 
+function Lightbox({ src, onFechar }) {
+  useEffect(() => {
+    const aoTeclar = e => { if (e.key === 'Escape') onFechar(); };
+    document.addEventListener('keydown', aoTeclar);
+    return () => document.removeEventListener('keydown', aoTeclar);
+  }, [onFechar]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6"
+      onClick={onFechar} role="dialog" aria-modal="true">
+      <img src={src} alt="Imagem ampliada" onClick={e => e.stopPropagation()}
+        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+      <button onClick={onFechar} aria-label="Fechar"
+        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/25 transition-colors">
+        <X className="w-5 h-5" />
+      </button>
+    </div>
+  );
+}
+
 function MidiaBolao({ msg, isCliente }) {
   const { conteudo, midiaUrl, conversaId } = msg;
   const { src: midiaSrc, erro: midiaErro } = useMidiaBlob(conversaId, midiaUrl);
   const [falhaPlayer, setFalhaPlayer] = useState(null);
+  const [ampliada, setAmpliada] = useState(false);
 
   // O <audio> falha em silêncio: sem isso, um codec não suportado fica
   // indistinguível de um download que não veio.
@@ -69,30 +90,40 @@ function MidiaBolao({ msg, isCliente }) {
     : 'bg-brand-50 border border-brand-100 text-brand-800';
 
   if (isImagem && midiaUrl) {
+    // Comprovante é imagem alta e estreita. Sem teto de altura ela vira uma tira
+    // que empurra a conversa inteira para fora da tela — quem precisar do
+    // detalhe abre em tamanho cheio no lightbox.
     return (
-      <div className="rounded-2xl overflow-hidden max-w-[280px]">
-        <img
-          src={midiaSrc || undefined}
-          alt="Imagem"
-          className="w-full object-cover rounded-2xl"
-          onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-        />
-        <div style={{ display: 'none' }} className={`items-start gap-2 rounded-2xl px-3 py-2.5 text-sm ${cor}`}>
-          <ImageIcon className="w-5 h-5 shrink-0 opacity-60 mt-0.5" />
-          <div className="min-w-0">
-            <p className="text-xs opacity-60 mb-0.5 font-medium">Imagem</p>
-            <p className="text-xs leading-relaxed">{nome}</p>
+      <>
+        <button type="button" disabled={!midiaSrc} onClick={() => setAmpliada(true)}
+          className="group relative block rounded-2xl overflow-hidden max-w-[20rem] enabled:cursor-zoom-in">
+          <img
+            src={midiaSrc || undefined}
+            alt="Imagem"
+            className="w-full max-h-80 object-cover object-top rounded-2xl"
+            onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+          />
+          <span className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/45 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <Maximize2 className="w-3.5 h-3.5" />
+          </span>
+          <div style={{ display: 'none' }} className={`items-start gap-2 rounded-2xl px-3 py-2.5 text-sm ${cor}`}>
+            <ImageIcon className="w-5 h-5 shrink-0 opacity-60 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-xs opacity-60 mb-0.5 font-medium">Imagem</p>
+              <p className="text-xs leading-relaxed">{nome}</p>
+            </div>
           </div>
-        </div>
-      </div>
+        </button>
+        {ampliada && midiaSrc && <Lightbox src={midiaSrc} onFechar={() => setAmpliada(false)} />}
+      </>
     );
   }
 
   if (isVideo && midiaUrl) {
     return (
-      <div className="rounded-2xl overflow-hidden max-w-[280px]">
+      <div className="rounded-2xl overflow-hidden max-w-[20rem]">
         {midiaErro ? (
-          <p className="text-xs text-red-500 p-3">Não foi possível carregar o vídeo.</p>
+          <p className="text-xs text-critico-600 p-3">Não foi possível carregar o vídeo.</p>
         ) : !midiaSrc ? (
           <p className="text-xs text-gray-400 p-3 flex items-center gap-1.5">
             <Loader2 className="w-3 h-3 animate-spin" /> Carregando vídeo...
@@ -100,7 +131,7 @@ function MidiaBolao({ msg, isCliente }) {
         ) : (
           <>
             <video src={midiaSrc} controls preload="metadata" onError={aoFalhar} className="w-full rounded-2xl" />
-            {falhaPlayer && <p className="text-xs text-red-500 p-2">Vídeo: {falhaPlayer}.</p>}
+            {falhaPlayer && <p className="text-xs text-critico-600 p-2">Vídeo: {falhaPlayer}.</p>}
           </>
         )}
       </div>
@@ -109,7 +140,7 @@ function MidiaBolao({ msg, isCliente }) {
 
   if (isAudio && midiaUrl) {
     return (
-      <div className={`rounded-2xl px-3 py-2.5 text-sm max-w-[280px] ${cor}`}>
+      <div className={`rounded-2xl px-3 py-2.5 text-sm max-w-[20rem] ${cor}`}>
         <div className="flex items-center gap-1.5 mb-1.5">
           <Mic className="w-4 h-4 opacity-60 shrink-0" />
           <p className="text-xs opacity-60 font-medium">Áudio</p>
@@ -117,7 +148,7 @@ function MidiaBolao({ msg, isCliente }) {
         {/* Player só depois do arquivo em mãos: montá-lo sem fonte deixa um
             controle morto na tela, sem dizer o que houve. */}
         {midiaErro ? (
-          <p className="text-xs text-red-500 py-1">Não foi possível carregar o áudio.</p>
+          <p className="text-xs text-critico-600 py-1">Não foi possível carregar o áudio.</p>
         ) : !midiaSrc ? (
           <p className="text-xs opacity-50 py-1 flex items-center gap-1.5">
             <Loader2 className="w-3 h-3 animate-spin" /> Carregando áudio...
@@ -131,7 +162,7 @@ function MidiaBolao({ msg, isCliente }) {
               className="w-full h-8"
               style={{ colorScheme: 'light' }}
             />
-            {falhaPlayer && <p className="text-xs text-red-500 mt-1">Áudio: {falhaPlayer}.</p>}
+            {falhaPlayer && <p className="text-xs text-critico-600 mt-1">Áudio: {falhaPlayer}.</p>}
           </>
         )}
         {nome && <p className="text-xs leading-relaxed mt-1.5 opacity-80">{nome}</p>}
@@ -145,7 +176,7 @@ function MidiaBolao({ msg, isCliente }) {
     : isVideo  ? 'Vídeo enviado'
     : 'Documento enviado';
   return (
-    <div className={`flex items-start gap-2 rounded-2xl px-3 py-2.5 text-sm max-w-[280px] ${cor}`}>
+    <div className={`flex items-start gap-2 rounded-2xl px-3 py-2.5 text-sm max-w-[20rem] ${cor}`}>
       <Icon className="w-5 h-5 shrink-0 opacity-60 mt-0.5" />
       <div className="min-w-0">
         <p className="text-xs opacity-60 mb-0.5 font-medium">{label}</p>
@@ -209,7 +240,7 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
 
   return (
     <div className={clsx('flex mb-3', isCliente ? 'justify-start' : 'justify-end')}>
-      <div className="max-w-[70%]">
+      <div className="max-w-[85%] md:max-w-balao">
         {!isCliente && (
           <p className="text-xs mb-1 text-right">
             {isBot
@@ -355,7 +386,7 @@ function TransferModal({ conversa, onClose, onTransferred }) {
             ? 'O colega escolhido já fica como responsável, sem precisar assumir.'
             : 'A conversa passa para o colega escolhido.'}
         </p>
-        {erro && <p className="text-xs text-red-500 mb-2">{erro}</p>}
+        {erro && <p className="text-xs text-critico-600 mb-2">{erro}</p>}
         {agentes.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">Nenhum agente disponível</p>
         ) : (

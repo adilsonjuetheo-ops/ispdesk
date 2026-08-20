@@ -215,9 +215,13 @@ export default function TenantLayout() {
             </div>
           )}
 
-          <NavLink to="/contatos" className={navClass}>
-            <BookUser className="w-4 h-4" /> Contatos
-          </NavLink>
+          {/* Separado das filiais de propósito: sem a divisória o item lia como
+              se fosse mais uma unidade da lista acima. */}
+          <div className="pt-2 mt-1 border-t border-gray-100">
+            <NavLink to="/contatos" className={navClass}>
+              <BookUser className="w-4 h-4" /> Contatos
+            </NavLink>
+          </div>
 
           {/* Admin */}
           {user?.role === 'admin' && (
