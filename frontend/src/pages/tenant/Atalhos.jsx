@@ -52,7 +52,7 @@ export default function Atalhos() {
           <p className="text-sm text-gray-500 mt-0.5">Textos pré-prontos disponíveis para os atendentes no chat</p>
         </div>
         <button onClick={abrirNovo}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-brand-contraste text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
           <Plus className="w-4 h-4" /> Novo atalho
         </button>
       </div>
@@ -70,7 +70,7 @@ export default function Atalhos() {
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-medium text-gray-800 text-sm">{a.titulo}</span>
                   {a.atalho && (
-                    <span className="text-xs font-mono font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded">
+                    <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
                       {a.atalho}
                     </span>
                   )}
@@ -79,7 +79,7 @@ export default function Atalhos() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => abrirEditar(a)}
-                  className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors">
+                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                   <Pencil className="w-4 h-4" />
                 </button>
                 <button onClick={() => excluir(a.id)}
@@ -112,7 +112,7 @@ export default function Atalhos() {
                   placeholder="Ex: Formulário de cadastro"
                   value={form.titulo}
                   onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
               <div>
@@ -124,7 +124,7 @@ export default function Atalhos() {
                   placeholder="!meuatalho"
                   value={form.atalho}
                   onChange={e => setForm(f => ({ ...f, atalho: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
               <div>
@@ -134,16 +134,16 @@ export default function Atalhos() {
                   placeholder="Digite o texto que será enviado ao cliente..."
                   value={form.conteudo}
                   onChange={e => setForm(f => ({ ...f, conteudo: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 resize-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
                 />
-                <div className="mt-2 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2">
-                  <p className="text-xs font-medium text-brand-700 mb-1.5">Variáveis disponíveis:</p>
+                <div className="mt-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                  <p className="text-xs font-medium text-blue-700 mb-1.5">Variáveis disponíveis:</p>
                   <div className="flex flex-wrap gap-1.5 mb-1">
                     {['{nome}', '{empresa}', '{filial}', '{contrato}'].map(v => (
-                      <code key={v} className="text-xs bg-white border border-brand-200 text-brand-700 px-1.5 py-0.5 rounded font-mono cursor-pointer select-all">{v}</code>
+                      <code key={v} className="text-xs bg-white border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded font-mono cursor-pointer select-all">{v}</code>
                     ))}
                   </div>
-                  <p className="text-[11px] text-brand-500">Substituídas automaticamente ao usar o atalho no atendimento.</p>
+                  <p className="text-[11px] text-blue-500">Substituídas automaticamente ao usar o atalho no atendimento.</p>
                 </div>
               </div>
               {erro && <p className="text-xs text-red-600">{erro}</p>}
@@ -153,7 +153,7 @@ export default function Atalhos() {
                 Cancelar
               </button>
               <button onClick={salvar} disabled={salvando}
-                className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-brand-contraste text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                 {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Salvar
               </button>

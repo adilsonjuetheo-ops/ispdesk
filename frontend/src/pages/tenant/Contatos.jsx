@@ -86,7 +86,7 @@ export default function Contatos() {
           </p>
         </div>
         <button onClick={abrirNovo}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-brand-contraste px-4 py-2 rounded-lg text-sm font-medium">
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
           <Plus className="w-4 h-4" /> Novo contato
         </button>
       </div>
@@ -144,11 +144,11 @@ export default function Contatos() {
                       <div className="flex gap-2 justify-end">
                         <button onClick={() => navigate(`/inbox?novo=${c.whatsapp}`)}
                           title="Iniciar conversa"
-                          className="text-gray-400 hover:text-brand-600">
+                          className="text-gray-400 hover:text-blue-600">
                           <MessageSquare className="w-4 h-4" />
                         </button>
                         <button onClick={() => abrirEditar(c)} title="Editar nome"
-                          className="text-gray-400 hover:text-brand-600">
+                          className="text-gray-400 hover:text-blue-600">
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button onClick={() => excluir(c)} title="Excluir"
@@ -179,14 +179,14 @@ export default function Contatos() {
                 <label className="block text-xs text-gray-500 mb-1">Nome</label>
                 <input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
                   placeholder="Nome do cliente"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-400" />
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Telefone</label>
                 <input value={form.telefone} disabled={!!editando} inputMode="tel"
                   onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))}
                   placeholder="(33) 99999-9999"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-400" />
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400" />
                 {!editando && (
                   <p className="text-xs text-gray-400 mt-1">
                     Com DDD. Se o número já for cliente, buscamos nome e contrato no sistema.
@@ -201,7 +201,7 @@ export default function Contatos() {
                   Fechar
                 </button>
                 <button type="submit" disabled={salvando || (!editando && !form.telefone.trim())}
-                  className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-brand-contraste rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
                   {salvando && <Loader2 className="w-4 h-4 animate-spin" />}
                   Salvar
                 </button>

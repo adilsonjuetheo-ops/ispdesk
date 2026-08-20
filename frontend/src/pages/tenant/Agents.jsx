@@ -82,7 +82,7 @@ export default function Agents() {
           <p className="text-gray-500 text-sm mt-0.5">{agentes.length} funcionários cadastrados</p>
         </div>
         <button onClick={abrirNovo}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-brand-contraste px-4 py-2 rounded-lg text-sm font-medium">
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
           <Plus className="w-4 h-4" /> Novo funcionário
         </button>
       </div>
@@ -103,7 +103,7 @@ export default function Agents() {
               <tr key={ag.id} className="border-b border-gray-100 last:border-0">
                 <td className="px-5 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-semibold text-xs">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-xs">
                       {ag.nome[0].toUpperCase()}
                     </div>
                     <div>
@@ -131,7 +131,7 @@ export default function Agents() {
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex gap-2 justify-end">
-                    <button onClick={() => abrirEditar(ag)} className="text-gray-400 hover:text-brand-600">
+                    <button onClick={() => abrirEditar(ag)} className="text-gray-400 hover:text-blue-600">
                       <Pencil className="w-4 h-4" />
                     </button>
                     {ag.ativo && (
@@ -166,7 +166,7 @@ export default function Agents() {
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Papel</label>
                 <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
                   <option value="agente">Agente</option>
                   <option value="admin">Admin</option>
                 </select>
@@ -175,7 +175,7 @@ export default function Agents() {
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Filial / Cidade</label>
                   <select value={form.filialId} onChange={e => setForm(f => ({ ...f, filialId: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-400">
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
                     <option value="">Todas as filiais</option>
                     {filiais.map(f => (
                       <option key={f.id} value={f.id}>{f.nome} — {f.cidade}</option>
@@ -199,7 +199,7 @@ export default function Agents() {
                   Cancelar
                 </button>
                 <button type="submit" disabled={saving}
-                  className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-brand-contraste rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   Salvar
                 </button>
@@ -217,7 +217,7 @@ function Field({ label, value, onChange, type = 'text' }) {
     <div>
       <label className="block text-xs text-gray-500 mb-1">{label}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-400" />
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400" />
     </div>
   );
 }

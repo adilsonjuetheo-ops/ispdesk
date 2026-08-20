@@ -6,7 +6,7 @@ function Tab({ Icon, label, active, badge, onClick }) {
     <button
       onClick={onClick}
       className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 relative ${
-        active ? 'text-brand-600' : 'text-gray-400'
+        active ? 'text-blue-600' : 'text-gray-400'
       }`}
     >
       <div className="relative">

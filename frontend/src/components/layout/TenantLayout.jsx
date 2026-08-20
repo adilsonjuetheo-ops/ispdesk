@@ -7,7 +7,6 @@ import {
   LogOut, Wifi, BarChart2, Users, Settings,
   Activity, Clock, UserCheck, Archive, MapPin, MessageSquare, Zap, AlertTriangle, Star, X, BookUser } from 'lucide-react';
 import api from '../../lib/api.js';
-import { aplicarCorDaMarca } from '../../lib/marca.js';
 import UpdateBanner from '../UpdateBanner.jsx';
 import BottomTabBar from '../BottomTabBar.jsx';
 
@@ -39,13 +38,6 @@ export default function TenantLayout() {
   usePolling(() => {
     api.get('/tenants/me').then(r => setTenant(r.data)).catch(() => {});
   }, 300000);
-
-  // Pinta o painel com a cor cadastrada pelo provedor. Fica aqui e não no
-  // fetch porque a cor também precisa ser reaplicada se o admin trocá-la em
-  // Configurações.
-  useEffect(() => {
-    aplicarCorDaMarca(tenant?.corPrimaria);
-  }, [tenant?.corPrimaria]);
 
   usePolling(() => {
     api.get('/tenants/me/uso-ia').then(r => setUsoIa(r.data)).catch(() => {});
@@ -112,14 +104,14 @@ export default function TenantLayout() {
       onClick={onClick}
       className={`flex items-center gap-2 w-full pl-3 pr-2 py-1.5 rounded-lg text-sm transition-colors ${
         active
-          ? 'bg-brand-50 text-brand-700 font-medium'
+          ? 'bg-blue-50 text-blue-700 font-medium'
           : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
       }`}
     >
       <Icon className="w-3.5 h-3.5 shrink-0" />
       <span className="flex-1 text-left truncate">{label}</span>
       {badge > 0 && (
-        <span className="bg-brand-600 text-brand-contraste text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center leading-none">
+        <span className="bg-blue-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center leading-none">
           {badge}
         </span>
       )}
@@ -128,7 +120,7 @@ export default function TenantLayout() {
 
   const navClass = ({ isActive }) =>
     `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-      isActive ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+      isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
     }`;
 
   const cor = tenant?.corPrimaria || '#0066CC';
@@ -240,12 +232,12 @@ export default function TenantLayout() {
               </NavLink>
               <NavLink to="/incidentes" className={({ isActive }) =>
                 `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive ? 'bg-critico-50 text-critico-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  isActive ? 'bg-red-50 text-red-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}>
                 <AlertTriangle className="w-4 h-4" />
                 <span className="flex-1">Incidentes</span>
                 {temIncidenteAtivo && (
-                  <span className="w-2.5 h-2.5 bg-critico-500 rounded-full animate-pulse" />
+                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
                 )}
               </NavLink>
             </div>
@@ -255,8 +247,10 @@ export default function TenantLayout() {
         {usoIa && usoIa.percentual >= 80 && (
           <div className={`mx-2 mb-2 p-2.5 rounded-lg border text-xs ${
             usoIa.percentual >= 100
-              ? 'bg-critico-50 border-critico-200 text-critico-800'
-              : 'bg-atencao-50 border-atencao-200 text-atencao-800'
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : usoIa.percentual >= 90
+                ? 'bg-orange-50 border-orange-200 text-orange-800'
+                : 'bg-yellow-50 border-yellow-200 text-yellow-800'
           }`}>
             <div className="flex items-center gap-1.5 mb-1.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
@@ -267,7 +261,7 @@ export default function TenantLayout() {
             <div className="w-full bg-white/60 rounded-full h-1.5 mb-1.5">
               <div
                 className={`h-1.5 rounded-full transition-all ${
-                  usoIa.percentual >= 100 ? 'bg-critico-500' : usoIa.percentual >= 90 ? 'bg-atencao-500' : 'bg-atencao-300'
+                  usoIa.percentual >= 100 ? 'bg-red-500' : usoIa.percentual >= 90 ? 'bg-orange-500' : 'bg-yellow-500'
                 }`}
                 style={{ width: `${Math.min(usoIa.percentual, 100)}%` }}
               />
@@ -293,7 +287,7 @@ export default function TenantLayout() {
             <p className="text-xs text-gray-500 truncate capitalize">{user?.role}</p>
           </div>
           <button onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-500 hover:text-critico-600 hover:bg-critico-50 rounded-lg transition-colors">
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
             <LogOut className="w-4 h-4" /> Sair
           </button>
         </div>
@@ -302,17 +296,17 @@ export default function TenantLayout() {
       <main className="flex-1 overflow-hidden flex flex-col">
         {user?.role === 'admin' && <UpdateBanner />}
         {tenant?.statusPagamento === 'suspenso' && user?.role === 'admin' && (
-          <div className="bg-critico-900/90 border-b border-critico-700 px-4 py-2.5 flex items-center gap-2 shrink-0">
-            <AlertTriangle className="w-4 h-4 text-critico-300 shrink-0" />
-            <p className="text-critico-100 text-sm">
+          <div className="bg-red-900/80 border-b border-red-700 px-4 py-2.5 flex items-center gap-2 shrink-0">
+            <AlertTriangle className="w-4 h-4 text-red-300 shrink-0" />
+            <p className="text-red-200 text-sm">
               <strong>Conta suspensa por inadimplência.</strong> O bot de atendimento está pausado. Entre em contato com o suporte ISPDesk para regularizar.
             </p>
           </div>
         )}
         {tenant?.statusPagamento === 'pendente' && user?.role === 'admin' && (
-          <div className="bg-atencao-900/80 border-b border-atencao-700 px-4 py-2 flex items-center gap-2 shrink-0">
-            <AlertTriangle className="w-3.5 h-3.5 text-atencao-300 shrink-0" />
-            <p className="text-atencao-100 text-xs">
+          <div className="bg-amber-900/60 border-b border-amber-700 px-4 py-2 flex items-center gap-2 shrink-0">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+            <p className="text-amber-200 text-xs">
               Pagamento PIX pendente — vencimento em {tenant.proximoVencimento ? new Date(tenant.proximoVencimento).toLocaleDateString('pt-BR') : '—'}. Verifique seu WhatsApp.
             </p>
           </div>

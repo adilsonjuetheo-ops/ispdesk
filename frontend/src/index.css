@@ -2,23 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Rampa da marca. Estes são os valores de partida (#0066CC) — assim o login e
-   o primeiro paint já têm cor antes de o provedor carregar. Quando /tenants/me
-   responde, src/lib/marca.js sobrescreve tudo com a cor cadastrada. */
-:root {
-  --brand-50: 240 246 252;
-  --brand-100: 224 237 249;
-  --brand-200: 194 218 243;
-  --brand-300: 148 191 234;
-  --brand-400: 82 151 220;
-  --brand-500: 36 123 211;
-  --brand-600: 0 102 204;
-  --brand-700: 0 86 171;
-  --brand-800: 0 69 139;
-  --brand-900: 0 53 106;
-  --brand-contraste: 255 255 255;
-}
-
 * {
   box-sizing: border-box;
 }

@@ -14,7 +14,7 @@ function Avatar({ nome }) {
   const isNumero = !nome || /^\d+$/.test(nome.trim());
   if (isNumero || partes.length === 0) {
     return (
-      <div className="w-14 h-14 rounded-full bg-brand-500 flex items-center justify-center shrink-0">
+      <div className="w-14 h-14 rounded-full bg-amber-400 flex items-center justify-center shrink-0">
         <User className="w-7 h-7 text-white" />
       </div>
     );
@@ -23,7 +23,7 @@ function Avatar({ nome }) {
     ? (partes[0][0] + partes[partes.length - 1][0]).toUpperCase()
     : partes[0][0].toUpperCase();
   return (
-    <div className="w-14 h-14 rounded-full bg-brand-500 flex items-center justify-center text-brand-contraste font-bold text-lg shrink-0">
+    <div className="w-14 h-14 rounded-full bg-amber-400 flex items-center justify-center text-white font-bold text-lg shrink-0">
       {ini}
     </div>
   );
@@ -100,16 +100,16 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
   const set = (k, v) => setDados(p => ({ ...p, [k]: v }));
   const field = (label, key, opts = {}) => (
     <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}{opts.req && <span className="text-critico-500 ml-0.5">*</span>}</label>
+      <label className="block text-xs font-medium text-gray-500 mb-1">{label}{opts.req && <span className="text-red-400 ml-0.5">*</span>}</label>
       {opts.options ? (
         <select value={dados[key]} onChange={e => set(key, e.target.value)}
-          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-brand-400">
+          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
           {opts.options.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       ) : (
         <input type={opts.type || 'text'} value={dados[key]} placeholder={opts.placeholder || ''}
           onChange={e => set(key, e.target.value)}
-          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-400" />
+          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400" />
       )}
     </div>
   );
@@ -133,9 +133,9 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
       <div className="w-[420px] h-full bg-white shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-2">
-            <FileSignature className="w-4 h-4 text-brand-600" />
+            <FileSignature className="w-4 h-4 text-blue-600" />
             <span className="font-semibold text-gray-800 text-sm">Enviar Contrato</span>
-            {carregandoPrefill && <span className="text-[10px] text-brand-500 animate-pulse">Buscando dados...</span>}
+            {carregandoPrefill && <span className="text-[10px] text-blue-400 animate-pulse">Buscando dados...</span>}
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X className="w-4 h-4" /></button>
         </div>
@@ -194,13 +194,13 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
           </div>
 
           {erro && (
-            <div className="bg-critico-50 border border-critico-200 rounded-lg px-3 py-2 text-xs text-critico-700">{erro}</div>
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{erro}</div>
           )}
         </form>
 
         <div className="px-5 py-4 border-t border-gray-100 shrink-0">
           <button type="submit" onClick={enviar} disabled={enviando}
-            className="w-full bg-brand-600 hover:bg-brand-700 text-brand-contraste text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
             <FileSignature className="w-4 h-4" />
             {enviando ? 'Enviando...' : 'Enviar para Assinatura'}
           </button>
@@ -318,7 +318,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
             <button
               onClick={encerrar}
               disabled={encerrando}
-              className="w-full flex items-center justify-center gap-2 border border-gray-200 text-gray-600 hover:border-critico-300 hover:text-critico-700 hover:bg-critico-50 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-60"
+              className="w-full flex items-center justify-center gap-2 border border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-700 hover:bg-red-50 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-60"
             >
               <X className="w-4 h-4" />
               {encerrando ? 'Encerrando...' : 'Encerrar atendimento'}
@@ -327,7 +327,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
             {temAssinatura && conversa.status === 'humano' && !conversa.contratoStatus && (
               <button
                 onClick={() => setModalContrato(true)}
-                className="w-full flex items-center justify-center gap-2 bg-brand-50 hover:bg-brand-100 text-brand-700 text-sm font-medium py-2.5 rounded-lg transition-colors border border-brand-200"
+                className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium py-2.5 rounded-lg transition-colors border border-blue-200"
               >
                 <FileSignature className="w-4 h-4" />
                 Enviar Contrato
@@ -336,26 +336,26 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
 
             {conversa.contratoStatus === 'pendente' && (
               <div className="space-y-1.5">
-                <div className="flex items-center gap-2 px-3 py-2 bg-atencao-50 border border-atencao-200 rounded-lg">
-                  <Clock className="w-3.5 h-3.5 text-atencao-600 shrink-0" />
-                  <span className="text-xs text-atencao-800">Contrato aguardando assinatura</span>
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                  <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span className="text-xs text-amber-700">Contrato aguardando assinatura</span>
                 </div>
                 <button
                   onClick={reenviarLink}
                   disabled={reenviando}
-                  className="w-full flex items-center justify-center gap-1.5 text-xs text-atencao-700 hover:text-atencao-900 py-1.5 rounded-lg hover:bg-atencao-50 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-1.5 text-xs text-amber-700 hover:text-amber-900 py-1.5 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3 h-3 ${reenviando ? 'animate-spin' : ''}`} />
                   {reenviando ? 'Reenviando...' : 'Reenviar link ao cliente'}
                 </button>
-                {erroReenvio && <p className="text-[10px] text-critico-600 text-center">{erroReenvio}</p>}
+                {erroReenvio && <p className="text-[10px] text-red-600 text-center">{erroReenvio}</p>}
               </div>
             )}
 
             {conversa.contratoStatus === 'assinado' && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-ok-50 border border-ok-200 rounded-lg">
-                <CheckCircle2 className="w-3.5 h-3.5 text-ok-600 shrink-0" />
-                <span className="text-xs text-ok-800">Contrato assinado</span>
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span className="text-xs text-emerald-700">Contrato assinado</span>
               </div>
             )}
           </div>
@@ -367,9 +367,9 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
               Atendimento encerrado
             </span>
             {conversa.contratoStatus === 'assinado' && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-ok-50 border border-ok-200 rounded-lg">
-                <CheckCircle2 className="w-3.5 h-3.5 text-ok-600 shrink-0" />
-                <span className="text-xs text-ok-800">Contrato assinado</span>
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span className="text-xs text-emerald-700">Contrato assinado</span>
               </div>
             )}
           </div>
@@ -380,8 +380,8 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
       <Section title="Operador Responsável">
         {isEncerrada || agentes.length === 0 ? (
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center shrink-0">
-              <User className="w-3 h-3 text-brand-700" />
+            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+              <User className="w-3 h-3 text-blue-600" />
             </div>
             <span className="text-sm text-gray-700 truncate">
               {conversa.agenteNome || 'Não atribuído'}
@@ -394,7 +394,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
             onBlur={() => setEditandoAgente(false)}
             autoFocus
             disabled={transferindo}
-            className="w-full text-sm border border-brand-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-400 disabled:opacity-60"
+            className="w-full text-sm border border-blue-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-60"
           >
             <option value="" disabled>Selecionar agente...</option>
             {agentes.map(a => (
@@ -404,8 +404,8 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
         ) : (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center shrink-0">
-                <User className="w-3 h-3 text-brand-700" />
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                <User className="w-3 h-3 text-blue-600" />
               </div>
               <span className="text-sm text-gray-700 truncate">
                 {conversa.agenteNome || 'Não atribuído'}
@@ -414,7 +414,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
             {!isEncerrada && (
               <button
                 onClick={() => setEditandoAgente(true)}
-                className="text-[11px] font-medium text-brand-600 hover:text-brand-800 shrink-0 ml-1"
+                className="text-[11px] text-blue-500 hover:text-blue-700 shrink-0 ml-1"
               >
                 Alterar
               </button>
@@ -458,15 +458,15 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
           {conversa.clienteStatus && (
             <div className="flex items-center gap-2.5">
               <div className={`w-2 h-2 rounded-full shrink-0 ${
-                conversa.clienteStatus === 'ativo' ? 'bg-ok-500'
-                : conversa.clienteStatus === 'bloqueado' ? 'bg-critico-500'
+                conversa.clienteStatus === 'ativo' ? 'bg-emerald-500'
+                : conversa.clienteStatus === 'bloqueado' ? 'bg-red-500'
                 : 'bg-gray-400'
               }`} />
               <span className="text-sm text-gray-600 capitalize">{conversa.clienteStatus}</span>
             </div>
           )}
           {conversa.resumoIa && (
-            <div className="mt-1 text-[11px] text-gray-500 leading-relaxed bg-gray-50 rounded-lg p-2">
+            <div className="mt-1 text-[11px] text-gray-500 leading-relaxed bg-emerald-50 rounded-lg p-2">
               {conversa.resumoIa}
             </div>
           )}
@@ -479,10 +479,10 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {tags.map(tag => (
-                <span key={tag} className="inline-flex items-center gap-1 bg-brand-50 text-brand-700 text-xs px-2 py-0.5 rounded-full">
+                <span key={tag} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full">
                   {tag}
                   {!isEncerrada && (
-                    <button onClick={() => removerTag(tag)} className="hover:text-brand-900 leading-none">
+                    <button onClick={() => removerTag(tag)} className="hover:text-blue-900 leading-none">
                       <X className="w-3 h-3" />
                     </button>
                   )}
