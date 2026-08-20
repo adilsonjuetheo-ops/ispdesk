@@ -134,7 +134,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                       setAchados([]);
                       setPrecisaTemplate(false);
                     }}
-                    className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors"
+                    className="w-full text-left px-3 py-2 hover:bg-brand-50 transition-colors"
                   >
                     <p className="text-sm text-gray-800">{c.nome || 'Sem nome'}</p>
                     <p className="text-xs text-gray-400 tabular-nums">{c.whatsapp}</p>
@@ -151,7 +151,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
               onChange={e => { setTelefone(e.target.value); setPrecisaTemplate(false); setTemplateSel(null); }}
               placeholder="(33) 99999-9999"
               inputMode="tel"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-400"
             />
             <p className="text-xs text-gray-400 mt-1">Com DDD. O 55 do Brasil é adicionado sozinho.</p>
           </div>
@@ -162,7 +162,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
               <select
                 value={remetenteSel}
                 onChange={e => setRemetenteSel(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-400"
               >
                 {remetentes.map(r => (
                   <option key={r.id} value={r.id}>{r.rotulo}</option>
@@ -180,7 +180,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                 onChange={e => setTexto(e.target.value)}
                 rows={4}
                 placeholder="Escreva a mensagem..."
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-400 resize-none"
               />
             </div>
           ) : (
@@ -212,13 +212,13 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                           type="button"
                           onClick={() => escolherTemplate(t)}
                           className={`w-full flex items-start gap-2 text-left px-3 py-2 rounded-lg border transition-colors ${
-                            ativo ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                            ativo ? 'border-brand-400 bg-brand-50' : 'border-gray-200 hover:bg-gray-50'
                           }`}
                         >
                           <span className={`mt-0.5 w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
-                            ativo ? 'border-blue-500' : 'border-gray-300'
+                            ativo ? 'border-brand-500' : 'border-gray-300'
                           }`}>
-                            {ativo && <span className="w-2 h-2 rounded-full bg-blue-500" />}
+                            {ativo && <span className="w-2 h-2 rounded-full bg-brand-500" />}
                           </span>
                           <span className="min-w-0">
                             <span className="block text-sm font-medium text-gray-800">{t.name}</span>
@@ -244,7 +244,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                       <input
                         value={v}
                         onChange={e => setParams(p => p.map((x, j) => (j === i ? e.target.value : x)))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-400"
                       />
                     </div>
                   ))}
@@ -261,7 +261,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
               Cancelar
             </button>
             <button type="submit" disabled={enviando || !telefone.trim()}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
+              className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-brand-contraste rounded-lg py-2 text-sm font-medium flex items-center justify-center gap-2">
               {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Enviar
             </button>

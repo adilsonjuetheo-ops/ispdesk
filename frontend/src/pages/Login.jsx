@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import api from '../lib/api.js';
 import { Loader2 } from 'lucide-react';
+import { aplicarCorDaMarca, COR_PADRAO } from '../lib/marca.js';
 
 const features = [
   { icon: '🤖', label: 'IA que responde automaticamente' },
@@ -18,7 +19,7 @@ function ChatMockup() {
         <div className="w-8 h-8 rounded-full bg-white/25 flex items-center justify-center text-sm">👤</div>
         <div>
           <p className="text-white text-sm font-medium leading-none">Maria Silva</p>
-          <p className="text-blue-200 text-[11px] mt-0.5">digitando...</p>
+          <p className="text-brand-200 text-[11px] mt-0.5">digitando...</p>
         </div>
         <div className="ml-auto flex gap-1.5">
           <div className="w-2 h-2 rounded-full bg-white/30" />
@@ -39,8 +40,8 @@ function ChatMockup() {
 
         {/* Bot */}
         <div className="flex gap-2 items-end flex-row-reverse">
-          <div className="w-6 h-6 rounded-full bg-blue-300/40 shrink-0" />
-          <div className="bg-blue-400/40 rounded-xl rounded-br-sm px-3 py-2 text-white text-xs max-w-[75%]">
+          <div className="w-6 h-6 rounded-full bg-brand-300/40 shrink-0" />
+          <div className="bg-brand-400/40 rounded-xl rounded-br-sm px-3 py-2 text-white text-xs max-w-[75%]">
             Olá, Maria! Vou te apresentar nossas melhores opções. 😊
           </div>
         </div>
@@ -55,8 +56,8 @@ function ChatMockup() {
 
         {/* Typing */}
         <div className="flex gap-2 items-center">
-          <div className="w-6 h-6 rounded-full bg-blue-300/40 shrink-0" />
-          <div className="bg-blue-400/40 rounded-xl px-3 py-2 flex gap-1.5">
+          <div className="w-6 h-6 rounded-full bg-brand-300/40 shrink-0" />
+          <div className="bg-brand-400/40 rounded-xl px-3 py-2 flex gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce [animation-delay:0ms]" />
             <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce [animation-delay:150ms]" />
             <span className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce [animation-delay:300ms]" />
@@ -69,7 +70,7 @@ function ChatMockup() {
         <div className="flex-1 bg-white/15 rounded-lg px-3 py-1.5 text-white/50 text-xs">
           Escreva sua resposta...
         </div>
-        <div className="w-7 h-7 rounded-lg bg-blue-400/50 flex items-center justify-center text-white text-xs">➤</div>
+        <div className="w-7 h-7 rounded-lg bg-brand-400/50 flex items-center justify-center text-white text-xs">➤</div>
       </div>
     </div>
   );
@@ -82,6 +83,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // O login é do ISPDesk, não de um provedor. Sem isso a tela herdaria a cor do
+  // último provedor aberto, que continua nas custom properties depois do logout.
+  useEffect(() => { aplicarCorDaMarca(COR_PADRAO); }, []);
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -106,10 +111,10 @@ export default function Login() {
     <div className="min-h-screen flex">
 
       {/* Left panel */}
-      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 flex-col items-center justify-center p-14 relative overflow-hidden">
+      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 flex-col items-center justify-center p-14 relative overflow-hidden">
         {/* Background decoration */}
         <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-white/5" />
-        <div className="absolute -bottom-32 -left-20 w-[28rem] h-[28rem] rounded-full bg-blue-900/30" />
+        <div className="absolute -bottom-32 -left-20 w-[28rem] h-[28rem] rounded-full bg-brand-900/30" />
         <div className="absolute top-1/2 right-8 w-40 h-40 rounded-full bg-white/5" />
 
         <div className="relative z-10 w-full max-w-sm flex flex-col items-center text-center">
@@ -117,7 +122,7 @@ export default function Login() {
           <h1 className="text-3xl font-bold text-white leading-snug mb-3">
             Atendimento inteligente pelo WhatsApp
           </h1>
-          <p className="text-blue-100 text-sm leading-relaxed mb-8">
+          <p className="text-brand-100 text-sm leading-relaxed mb-8">
             IA que responde, contratos digitais e gestão de equipe — tudo em uma única plataforma.
           </p>
 
@@ -158,7 +163,7 @@ export default function Login() {
                 onChange={e => setEmail(e.target.value)}
                 required
                 placeholder="seu@email.com"
-                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-shadow"
+                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm transition-shadow"
               />
             </div>
 
@@ -170,7 +175,7 @@ export default function Login() {
                 onChange={e => setSenha(e.target.value)}
                 required
                 placeholder="••••••••"
-                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-shadow"
+                className="w-full border border-gray-300 rounded-lg px-3.5 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm transition-shadow"
               />
             </div>
 
@@ -183,7 +188,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+              className="w-full bg-brand-600 hover:bg-brand-700 active:bg-brand-800 disabled:opacity-60 text-brand-contraste font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? 'Entrando...' : 'Entrar'}

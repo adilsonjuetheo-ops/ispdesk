@@ -26,8 +26,8 @@ const CARDS = [
   },
   {
     icon: Bot,
-    bg: 'bg-blue-100',
-    color: 'text-blue-600',
+    bg: 'bg-brand-100',
+    color: 'text-brand-600',
     title: 'Assistente com IA',
     desc: 'Treine o bot para responder automaticamente 24 horas por dia.',
     href: '/settings',
@@ -95,14 +95,14 @@ function WelcomePanel({ currentUser }) {
               <button
                 key={card.title}
                 onClick={() => navigate(card.href)}
-                className="group text-left bg-white rounded-2xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all duration-150"
+                className="group text-left bg-white rounded-2xl border border-gray-200 p-5 hover:border-brand-300 hover:shadow-md transition-all duration-150"
               >
                 <div className={`w-10 h-10 rounded-xl ${card.bg} flex items-center justify-center mb-3`}>
                   <Icon className={`w-5 h-5 ${card.color}`} />
                 </div>
                 <p className="text-sm font-semibold text-gray-900 mb-1">{card.title}</p>
                 <p className="text-xs text-gray-500 leading-relaxed mb-3">{card.desc}</p>
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 group-hover:gap-2 transition-all">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 group-hover:gap-2 transition-all">
                   {card.label}
                   <ArrowRight className="w-3 h-3" />
                 </span>

@@ -66,7 +66,7 @@ function MidiaBolao({ msg, isCliente }) {
   const nome = conteudo.replace(/^\[(Imagem|Arquivo|Áudio|Vídeo)\] /, '');
   const cor = isCliente
     ? 'bg-white border border-gray-200 text-gray-700'
-    : 'bg-blue-50 border border-blue-100 text-blue-800';
+    : 'bg-brand-50 border border-brand-100 text-brand-800';
 
   if (isImagem && midiaUrl) {
     return (
@@ -168,7 +168,7 @@ function TypingIndicator() {
 }
 
 function StatusIcon({ status }) {
-  if (status === 'lida')     return <CheckCheck className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
+  if (status === 'lida')     return <CheckCheck className="w-3.5 h-3.5 text-brand-600 shrink-0" />;
   if (status === 'entregue') return <CheckCheck className="w-3.5 h-3.5 text-gray-400 shrink-0" />;
   return <Check className="w-3.5 h-3.5 text-gray-400 shrink-0" />;
 }
@@ -193,13 +193,13 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
   if (isNota) {
     return (
       <div className="flex justify-center my-2">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-2 max-w-[80%]">
+        <div className="bg-atencao-50 border border-atencao-200 rounded-xl px-4 py-2 max-w-[80%]">
           <div className="flex items-center gap-1.5 mb-1">
-            <StickyNote className="w-3 h-3 text-yellow-600" />
-            <span className="text-[10px] font-semibold text-yellow-700 uppercase tracking-wide">Nota interna</span>
+            <StickyNote className="w-3 h-3 text-atencao-600" />
+            <span className="text-[10px] font-semibold text-atencao-700 uppercase tracking-wide">Nota interna</span>
           </div>
-          <p className="text-xs text-yellow-900 whitespace-pre-wrap">{msg.conteudo}</p>
-          <p className="text-[10px] text-yellow-600 mt-1">
+          <p className="text-xs text-atencao-900 whitespace-pre-wrap">{msg.conteudo}</p>
+          <p className="text-[10px] text-atencao-700 mt-1">
             {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
           </p>
         </div>
@@ -223,8 +223,8 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
         ) : (
           <div className={clsx('rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap', {
             'bg-white border border-gray-200 text-gray-800 rounded-tl-sm': isCliente,
-            'bg-emerald-50 text-emerald-900 rounded-tr-sm border border-emerald-100': isBot,
-            'bg-blue-50 text-blue-900 rounded-tr-sm border border-blue-100': !isCliente && !isBot,
+            'bg-gray-100 text-gray-700 rounded-tr-sm border border-gray-200': isBot,
+            'bg-brand-50 text-brand-900 rounded-tr-sm border border-brand-100': !isCliente && !isBot,
           })}>
             {msg.conteudo}
           </div>
@@ -292,7 +292,7 @@ function TagsBar({ conversa, onUpdate, catalog = [], podeEditar = false }) {
       {podeEditar && disponiveis.length > 0 && (
         <div className="relative">
           <button onClick={() => setAberto(v => !v)}
-            className="inline-flex items-center gap-0.5 text-xs text-gray-400 hover:text-blue-600 px-1.5 py-0.5 rounded-full hover:bg-blue-50 transition-colors">
+            className="inline-flex items-center gap-0.5 text-xs text-gray-400 hover:text-brand-600 px-1.5 py-0.5 rounded-full hover:bg-brand-50 transition-colors">
             <Plus className="w-3 h-3" /> Tag
           </button>
           {aberto && (
@@ -362,8 +362,8 @@ function TransferModal({ conversa, onClose, onTransferred }) {
           <div className="space-y-1 max-h-72 overflow-y-auto">
             {agentes.map(a => (
               <button key={a.id} onClick={() => transferir(a.id)} disabled={loading}
-                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 disabled:opacity-50 rounded-xl transition-colors text-left">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm shrink-0">
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-brand-50 disabled:opacity-50 rounded-xl transition-colors text-left">
+                <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-sm shrink-0">
                   {(a.nome || '?')[0].toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -650,7 +650,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
   const tabClass = (t) =>
     `px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
       aba === t
-        ? 'border-blue-600 text-blue-600'
+        ? 'border-brand-600 text-brand-700'
         : 'border-transparent text-gray-500 hover:text-gray-700'
     }`;
 
@@ -682,18 +682,18 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
             )}
             {podeAtuar && !eHumano && (
               <button onClick={handleAsumir} disabled={acao}
-                className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-brand-contraste text-xs font-semibold px-3.5 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-60">
                 <UserCheck className="w-3.5 h-3.5" /> Assumir
               </button>
             )}
             {eHumano && (
               <>
                 <button onClick={handleLiberar} disabled={acao}
-                  className="flex items-center gap-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                  className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60">
                   <Bot className="w-3.5 h-3.5" /> Liberar para bot
                 </button>
                 <button onClick={handleEncerrar} disabled={acao}
-                  className="flex items-center gap-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                  className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:border-critico-300 hover:text-critico-700 hover:bg-critico-50 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60">
                   <X className="w-3.5 h-3.5" /> Encerrar
                 </button>
               </>
@@ -715,24 +715,29 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
         )}
       </div>
 
-      {/* Status banner */}
-      {conversa.status === 'aguardando' || conversa.status === 'aguardando_filial' ? (
-        <div className="bg-amber-500 text-white text-xs font-semibold text-center py-1.5 px-4 shrink-0">
-          Aguardando atendimento
-        </div>
-      ) : conversa.status === 'humano' ? (
-        <div className="bg-emerald-500 text-white text-xs font-semibold text-center py-1.5 px-4 shrink-0">
-          Em atendimento{conversa.agenteNome ? ` · ${conversa.agenteNome}` : ''}
-        </div>
-      ) : conversa.status === 'bot' ? (
-        <div className="bg-blue-500 text-white text-xs font-semibold text-center py-1.5 px-4 shrink-0">
-          Bot está respondendo
-        </div>
-      ) : conversa.status === 'encerrada' ? (
-        <div className="bg-gray-300 text-gray-600 text-xs font-semibold text-center py-1.5 px-4 shrink-0">
-          Atendimento encerrado
-        </div>
-      ) : null}
+      {/* Faixa de status — discreta de propósito. Antes era um bloco sólido
+          atravessando a largura toda, o elemento mais forte da tela para o dado
+          menos acionável dela. Agora informa sem competir com a conversa. */}
+      {(() => {
+        const espera = ['bg-atencao-50 text-atencao-800 border-atencao-200', 'bg-atencao-500', 'Aguardando atendimento'];
+        const faixa = {
+          aguardando: espera,
+          aguardando_filial: espera,
+          humano: ['bg-ok-50 text-ok-800 border-ok-200', 'bg-ok-500',
+            `Em atendimento${conversa.agenteNome ? ` · ${conversa.agenteNome}` : ''}`],
+          bot: ['bg-gray-50 text-gray-600 border-gray-200', 'bg-gray-400',
+            `${user?.nomeAssistente || 'Bot'} está respondendo`],
+          encerrada: ['bg-gray-50 text-gray-500 border-gray-200', 'bg-gray-300', 'Atendimento encerrado'],
+        }[conversa.status];
+        if (!faixa) return null;
+        const [tom, ponto, texto] = faixa;
+        return (
+          <div className={`flex items-center justify-center gap-2 border-b text-xs font-medium py-1.5 px-4 shrink-0 ${tom}`}>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ponto}`} />
+            {texto}
+          </div>
+        );
+      })()}
 
       {/* mensagens */}
       <div ref={msgAreaRef} className="flex-1 overflow-y-auto p-4">
@@ -788,10 +793,10 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
               ) : (
                 atalhosFiltrados.map(a => (
                   <button key={a.id} onClick={() => selecionarAtalho(a)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
+                    className="w-full text-left px-4 py-2.5 hover:bg-brand-50 transition-colors border-b border-gray-50 last:border-0">
                     <div className="flex items-center gap-2">
                       {a.atalho && (
-                        <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded shrink-0">
+                        <span className="text-xs font-mono font-bold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded shrink-0">
                           {a.atalho}
                         </span>
                       )}
@@ -817,29 +822,29 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
             {/* Preview áudio gravado */}
             {!isNota && audioPreview ? (
               <div className="flex items-center gap-2 px-3 py-2">
-                <div className="flex-1 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
-                  <Mic className="w-4 h-4 text-blue-500 shrink-0" />
+                <div className="flex-1 flex items-center gap-2 bg-brand-50 border border-brand-200 rounded-xl px-3 py-1.5">
+                  <Mic className="w-4 h-4 text-brand-600 shrink-0" />
                   <audio src={audioPreview} controls className="h-8 flex-1 min-w-0" style={{ colorScheme: 'light' }} />
                 </div>
                 <button type="button" onClick={descartarAudio} title="Descartar"
-                  className="text-gray-400 hover:text-red-500 p-1.5 transition-colors shrink-0">
+                  className="text-gray-400 hover:text-critico-600 p-1.5 transition-colors shrink-0">
                   <X className="w-5 h-5" />
                 </button>
                 <button type="button" onClick={confirmarAudio} disabled={enviandoArquivo}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
+                  className="bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-brand-contraste rounded-xl px-4 py-2 transition-colors shrink-0">
                   {enviandoArquivo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </div>
             ) : !isNota && gravando ? (
               <div className="flex items-center gap-2 px-3 py-2">
-                <div className="flex-1 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-                  <span className="text-sm text-red-600 font-medium">
+                <div className="flex-1 flex items-center gap-2 bg-critico-50 border border-critico-200 rounded-xl px-4 py-2">
+                  <span className="w-2 h-2 rounded-full bg-critico-500 animate-pulse shrink-0" />
+                  <span className="text-sm text-critico-700 font-medium">
                     Gravando {String(Math.floor(tempoGravacao / 60)).padStart(2, '0')}:{String(tempoGravacao % 60).padStart(2, '0')}
                   </span>
                 </div>
                 <button type="button" onClick={pararGravacao}
-                  className="bg-red-500 hover:bg-red-600 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
+                  className="bg-critico-600 hover:bg-critico-700 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
                   <Send className="w-4 h-4" />
                 </button>
               </div>
@@ -847,8 +852,8 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
               <>
                 {/* Textarea */}
                 <div className={clsx('mx-3 mt-2.5 mb-1 rounded-xl border focus-within:ring-2 transition-all', isNota
-                  ? 'bg-yellow-50 border-yellow-200 focus-within:ring-yellow-300'
-                  : 'bg-white border-gray-200 focus-within:ring-blue-300 focus-within:border-blue-300'
+                  ? 'bg-atencao-50 border-atencao-200 focus-within:ring-atencao-300'
+                  : 'bg-white border-gray-200 focus-within:ring-brand-300 focus-within:border-brand-300'
                 )}>
                   <textarea
                     ref={textareaRef}
@@ -870,7 +875,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
                     }
                     className={clsx(
                       'w-full px-3 pt-2.5 pb-1 text-sm bg-transparent resize-none focus:outline-none placeholder-gray-400 rounded-t-xl',
-                      isNota ? 'text-yellow-900' : 'text-gray-800'
+                      isNota ? 'text-atencao-900' : 'text-gray-800'
                     )}
                   />
 
@@ -910,7 +915,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
                             onClick={handleSugerir}
                             disabled={!podeAtuar || sugerindo}
                             title="Gerar resposta com IA"
-                            className="flex items-center gap-1 px-2 py-1.5 rounded hover:bg-blue-50 disabled:opacity-30 text-blue-600 transition-colors">
+                            className="flex items-center gap-1 px-2 py-1.5 rounded hover:bg-brand-50 disabled:opacity-30 text-brand-700 transition-colors">
                             {sugerindo
                               ? <Loader2 className="w-4 h-4 animate-spin" />
                               : <Sparkles className="w-4 h-4" />}
@@ -922,16 +927,16 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
                             onClick={() => fileRef.current?.click()}
                             disabled={!podeAtuar || enviandoArquivo || gravando}
                             title="Enviar arquivo"
-                            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-400 hover:text-blue-600 transition-colors">
+                            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-400 hover:text-brand-600 transition-colors">
                             {enviandoArquivo
-                              ? <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                              ? <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
                               : <Paperclip className="w-4 h-4" />}
                           </button>
                           {!texto.trim() && podeAtuar && (
                             <button type="button" onClick={iniciarGravacao}
                               disabled={enviandoArquivo}
                               title="Gravar áudio"
-                              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-400 hover:text-red-500 transition-colors">
+                              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-400 hover:text-critico-600 transition-colors">
                               <Mic className="w-4 h-4" />
                             </button>
                           )}
@@ -941,7 +946,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
                         disabled={(!podeAtuar && !isNota) || !texto.trim() || enviando}
                         className={clsx(
                           'ml-1 rounded-lg px-3 py-1.5 disabled:opacity-40 text-white transition-colors shrink-0',
-                          isNota ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'
+                          isNota ? 'bg-atencao-500 hover:bg-atencao-600' : 'bg-brand-600 hover:bg-brand-700'
                         )}>
                         {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                       </button>

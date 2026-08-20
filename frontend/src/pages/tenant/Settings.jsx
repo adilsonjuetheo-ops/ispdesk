@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
+import { aplicarCorDaMarca } from '../../lib/marca.js';
 import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight, ArrowRightLeft } from 'lucide-react';
 
 function carregarFbSdk() {
@@ -259,11 +260,11 @@ function HorariosSection() {
               <>
                 <input type="time" value={horarios[key]?.inicio || '08:00'}
                   onChange={e => setDia(key, 'inicio', e.target.value)}
-                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-400" />
                 <span className="text-gray-400 text-sm">até</span>
                 <input type="time" value={horarios[key]?.fim || '18:00'}
                   onChange={e => setDia(key, 'fim', e.target.value)}
-                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-400" />
               </>
             ) : (
               <span className="text-xs text-gray-300 italic">Sem atendente</span>
@@ -276,7 +277,7 @@ function HorariosSection() {
         <label className="block text-xs text-gray-500 mb-1">Instrução para o assistente fora do horário</label>
         <textarea value={instrucaoForaHorario} onChange={e => setInstrucaoForaHorario(e.target.value)} rows={3}
           placeholder="Ex: Fora do horário comercial, não prometa visita técnica. Oriente o cliente a reiniciar o roteador e registre o chamado para a equipe avaliar pela manhã."
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-400 resize-none" />
         <p className="text-xs text-gray-400 mt-1">
           Vale apenas quando não há atendente de plantão. O assistente já avisa sozinho que a equipe
           retorna no próximo horário — use este campo para regras específicas do provedor.
@@ -301,7 +302,7 @@ function HorariosSection() {
       )}
 
       <button type="button" onClick={salvar} disabled={saving}
-        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+        className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-brand-contraste px-5 py-2 rounded-lg text-sm font-medium transition-colors">
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         Salvar horários
       </button>
@@ -347,14 +348,14 @@ function TestarSgp() {
         <button
           type="button"
           onClick={() => { setModo('telefone'); setResultado(null); setErro(''); }}
-          className={`px-2.5 py-1 rounded-md transition-colors ${modo === 'telefone' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}
+          className={`px-2.5 py-1 rounded-md transition-colors ${modo === 'telefone' ? 'bg-brand-600 text-brand-contraste' : 'bg-gray-100 text-gray-500'}`}
         >
           Por telefone
         </button>
         <button
           type="button"
           onClick={() => { setModo('documento'); setResultado(null); setErro(''); }}
-          className={`px-2.5 py-1 rounded-md transition-colors ${modo === 'documento' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}
+          className={`px-2.5 py-1 rounded-md transition-colors ${modo === 'documento' ? 'bg-brand-600 text-brand-contraste' : 'bg-gray-100 text-gray-500'}`}
         >
           Por CPF/CNPJ
         </button>
@@ -366,13 +367,13 @@ function TestarSgp() {
           onChange={e => setValor(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && testar()}
           placeholder={modo === 'documento' ? 'CPF ou CNPJ do cliente' : 'Telefone do cliente (ex: 31999887766)'}
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
         />
         <button
           type="button"
           onClick={testar}
           disabled={carregando || !valor.trim()}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+          className="px-4 py-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-brand-contraste text-sm rounded-lg transition-colors flex items-center gap-2"
         >
           {carregando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           Testar
@@ -603,7 +604,7 @@ function TagsSection() {
         <input type="text" value={novoNome} onChange={e => setNovoNome(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && adicionar()}
           placeholder="Nome da tag (ex: Suporte técnico)"
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" />
         <button type="button" onClick={adicionar} disabled={saving || !novoNome.trim()}
           className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -938,6 +939,9 @@ export default function Settings() {
     setErro(''); setSucesso('');
     try {
       await api.put('/tenants/me', tenant);
+      // Repinta o painel na hora — o layout só relê o tenant a cada 5 min e a
+      // troca de cor primária ficaria invisível até lá.
+      aplicarCorDaMarca(tenant.corPrimaria);
       setSucesso('Configurações salvas com sucesso!');
       setTimeout(() => setSucesso(''), 4000);
     } catch (err) {
@@ -1059,7 +1063,7 @@ export default function Settings() {
               <div>
                 <label className="block text-xs text-gray-500 mb-1">UF</label>
                 <select value={tenant.uf || ''} onChange={e => set('uf', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-400">
                   <option value="">—</option>
                   {ESTADOS_BR.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
@@ -1101,7 +1105,7 @@ export default function Settings() {
               <div>
                 <label className="block text-xs text-gray-500 mb-1">SGP utilizado</label>
                 <select value={tenant.sgpTipo || ''} onChange={e => set('sgpTipo', e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-400">
                   <option value="">Nenhum (sem integração)</option>
                   <option value="atlaz">Atlaz</option>
                   <option value="ixc">IXC Soft</option>
@@ -1134,13 +1138,13 @@ export default function Settings() {
                     value={tenant.sgpApiKey || ''}
                     onChange={e => set('sgpApiKey', e.target.value)}
                     placeholder="Token de acesso à API"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-400"
                   />
                 </div>
               )}
 
               {tenant.sgpTipo === 'generico' && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700 leading-relaxed">
+                <div className="bg-brand-50 border border-brand-200 rounded-lg p-3 text-xs text-brand-700 leading-relaxed">
                   <strong>Endpoints esperados no seu sistema:</strong><br />
                   POST /consultar — body: &#123; token, whatsapp &#125;<br />
                   POST /desbloquear — body: &#123; token, id_cliente, id_contrato &#125;<br />
@@ -1219,7 +1223,7 @@ export default function Settings() {
             </p>
             <textarea rows={10} value={tenant.systemPrompt || ''}
               onChange={e => set('systemPrompt', e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-brand-400"
               placeholder="Você é o assistente virtual do provedor de internet [nome]. Sua função é ajudar os clientes com dúvidas sobre..." />
           </section>
 
@@ -1339,14 +1343,14 @@ export default function Settings() {
             <div className="flex gap-2 flex-wrap">
               <input value={formFilial.nome} onChange={e => setFormFilial(f => ({ ...f, nome: e.target.value }))}
                 placeholder="Nome da filial (ex: Araçuaí)"
-                className="flex-1 min-w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="flex-1 min-w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
                 onKeyDown={e => e.key === 'Enter' && handleAddFilial(e)} />
               <input value={formFilial.cidade} onChange={e => setFormFilial(f => ({ ...f, cidade: e.target.value }))}
                 placeholder="Cidade"
-                className="flex-1 min-w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="flex-1 min-w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
                 onKeyDown={e => e.key === 'Enter' && handleAddFilial(e)} />
               <select value={formFilial.uf} onChange={e => setFormFilial(f => ({ ...f, uf: e.target.value }))}
-                className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400">
                 <option value="">UF</option>
                 {ESTADOS_BR.map(uf => <option key={uf} value={uf}>{uf}</option>)}
               </select>
@@ -1371,7 +1375,7 @@ export default function Settings() {
               <code className="flex-1 text-xs text-gray-700 break-all select-all">{tenant.webhookVerifyToken}</code>
               <button type="button" onClick={() => copiar(tenant.webhookVerifyToken)}
                 title="Copiar"
-                className="text-gray-400 hover:text-blue-600 shrink-0 transition-colors">
+                className="text-gray-400 hover:text-brand-600 shrink-0 transition-colors">
                 {copiado ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
@@ -1384,7 +1388,7 @@ export default function Settings() {
           {['pro', 'enterprise'].includes(tenant.plano) && (
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
-              <FileSignature className="w-4 h-4 text-blue-500" /> Assinatura Digital de Contratos
+              <FileSignature className="w-4 h-4 text-brand-500" /> Assinatura Digital de Contratos
             </h2>
             <p className="text-xs text-gray-400 mb-4">
               Configure a integração com ZapSign ou D4Sign para enviar contratos para assinatura diretamente pelo atendimento.
@@ -1393,7 +1397,7 @@ export default function Settings() {
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Plataforma</label>
                 <select value={tenant.assinaturaTipo || ''} onChange={e => set('assinaturaTipo', e.target.value || null)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-400">
                   <option value="">Nenhuma (desativado)</option>
                   <option value="zapsign">ZapSign</option>
                   <option value="d4sign">D4Sign</option>
@@ -1408,7 +1412,7 @@ export default function Settings() {
                   <input type="password" value={tenant.assinaturaToken || ''}
                     onChange={e => set('assinaturaToken', e.target.value)}
                     placeholder={tenant.assinaturaTipo === 'zapsign' ? 'Bearer token do ZapSign' : 'Token de API do D4Sign'}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-400" />
                 </div>
               )}
 
@@ -1418,7 +1422,7 @@ export default function Settings() {
                   <input type="text" value={tenant.assinaturaExtra?.templateToken || ''}
                     onChange={e => set('assinaturaExtra', { ...(tenant.assinaturaExtra || {}), templateToken: e.target.value })}
                     placeholder="Token do modelo criado no ZapSign"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-400" />
                   <p className="text-[11px] text-gray-400 mt-1">Encontre em ZapSign → Modelos → seu modelo → copie o token da URL.</p>
                 </div>
               )}
@@ -1430,23 +1434,23 @@ export default function Settings() {
                     <input type="password" value={tenant.assinaturaExtra?.cryptKey || ''}
                       onChange={e => set('assinaturaExtra', { ...(tenant.assinaturaExtra || {}), cryptKey: e.target.value })}
                       placeholder="cryptKey da sua conta D4Sign"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-400" />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">UUID do Cofre D4Sign</label>
                     <input type="text" value={tenant.assinaturaExtra?.cofreUuid || ''}
                       onChange={e => set('assinaturaExtra', { ...(tenant.assinaturaExtra || {}), cofreUuid: e.target.value })}
                       placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-400" />
                   </div>
                 </>
               )}
 
               {tenant.assinaturaTipo && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700 leading-relaxed">
+                <div className="bg-brand-50 border border-brand-200 rounded-lg p-3 text-xs text-brand-700 leading-relaxed">
                   <strong>Webhook de confirmação:</strong><br />
                   Configure esta URL na plataforma para atualizar o status quando o contrato for assinado:<br />
-                  <code className="select-all break-all mt-1 block bg-blue-100 rounded px-2 py-1">
+                  <code className="select-all break-all mt-1 block bg-brand-100 rounded px-2 py-1">
                     {`${import.meta.env.VITE_API_URL || window.location.origin}/api/contracts/webhook/${tenant.assinaturaTipo}`}
                   </code>
                 </div>
@@ -1467,7 +1471,7 @@ export default function Settings() {
           )}
 
           <button type="submit" disabled={saving}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-lg font-medium text-sm transition-colors">
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-brand-contraste px-6 py-2.5 rounded-lg font-medium text-sm transition-colors">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Salvar configurações
           </button>
@@ -1525,7 +1529,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, className =
     <div className={className}>
       <label className="block text-xs text-gray-500 mb-1">{label}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-400" />
     </div>
   );
 }

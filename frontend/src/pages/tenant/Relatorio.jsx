@@ -103,7 +103,7 @@ export default function Relatorio() {
           <select
             value={mes}
             onChange={e => setMes(e.target.value)}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
           >
             {opcoesMeses().map(o => (
               <option key={o.val} value={o.val}>{o.label}</option>
@@ -113,7 +113,7 @@ export default function Relatorio() {
           <button
             onClick={baixarCSV}
             disabled={!dados || loading}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-brand-contraste px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
             Baixar relatório [CSV]
@@ -130,7 +130,7 @@ export default function Relatorio() {
 
           {/* Total destaque */}
           <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
-            <p className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-3">
+            <p className="text-xs font-semibold text-brand-600 uppercase tracking-widest mb-3">
               Atendimentos realizados
             </p>
             <p className="text-7xl font-black text-gray-900 leading-none mb-2">{dados.total.toLocaleString('pt-BR')}</p>
@@ -188,15 +188,15 @@ export default function Relatorio() {
 
           {/* Dia destaque */}
           {dados.diaMaisMovimentado && (
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-7 text-white text-center">
-              <p className="text-xs font-semibold uppercase tracking-widest text-blue-200 mb-3 flex items-center justify-center gap-1.5">
+            <div className="bg-gradient-to-r from-brand-600 to-indigo-700 rounded-2xl p-7 text-white text-center">
+              <p className="text-xs font-semibold uppercase tracking-widest text-brand-200 mb-3 flex items-center justify-center gap-1.5">
                 <CalendarDays className="w-3.5 h-3.5" /> Dia com mais atendimentos
               </p>
               <p className="text-4xl font-black mb-1">{formatarDia(dados.diaMaisMovimentado.dia)}</p>
-              <p className="text-lg font-semibold text-blue-100">
+              <p className="text-lg font-semibold text-brand-100">
                 com {dados.diaMaisMovimentado.total} atendimentos
               </p>
-              <p className="text-xs text-blue-200 mt-2">Esse foi o dia mais movimentado do mês para sua equipe</p>
+              <p className="text-xs text-brand-200 mt-2">Esse foi o dia mais movimentado do mês para sua equipe</p>
             </div>
           )}
 
@@ -210,7 +210,7 @@ export default function Relatorio() {
 
 function StatCard({ icon: Icon, label, value, sub, color }) {
   const colors = {
-    blue:   { bg: 'bg-blue-50',   text: 'text-blue-600',   val: 'text-blue-700'   },
+    blue:   { bg: 'bg-brand-50',   text: 'text-brand-600',   val: 'text-brand-700'   },
     emerald:{ bg: 'bg-emerald-50',text: 'text-emerald-600',val: 'text-emerald-700' },
     violet: { bg: 'bg-violet-50', text: 'text-violet-600', val: 'text-violet-700'  },
     amber:  { bg: 'bg-amber-50',  text: 'text-amber-600',  val: 'text-amber-700'   },
