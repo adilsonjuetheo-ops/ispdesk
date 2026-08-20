@@ -6,7 +6,7 @@ import { useNotificationSound } from '../../hooks/useNotificationSound.js';
 import ConversationList from '../../components/ConversationList.jsx';
 import ChatWindow from '../../components/ChatWindow.jsx';
 import ClientInfoPanel from '../../components/ClientInfoPanel.jsx';
-import { Bot, Zap, Users, BarChart2, Star, MessageCircle, ArrowRight } from 'lucide-react';
+import { Bot, Zap, Users, BarChart2, Star, MessageCircle, ArrowRight, BookUser, ExternalLink } from 'lucide-react';
 
 function saudacao(nome) {
   const h = new Date().getHours();
@@ -16,6 +16,15 @@ function saudacao(nome) {
 
 const CARDS = [
   {
+    icon: BookUser,
+    bg: 'bg-sky-100',
+    color: 'text-sky-600',
+    title: 'Contatos',
+    desc: 'Salve o número dos clientes e inicie uma conversa a partir da agenda.',
+    href: '/contatos',
+    label: 'Abrir agenda',
+  },
+  {
     icon: MessageCircle,
     bg: 'bg-green-100',
     color: 'text-green-600',
@@ -23,6 +32,7 @@ const CARDS = [
     desc: 'Configure seu número e token para começar a receber mensagens.',
     href: '/settings',
     label: 'Configurar',
+    admin: true,
   },
   {
     icon: Bot,
@@ -32,6 +42,7 @@ const CARDS = [
     desc: 'Treine o bot para responder automaticamente 24 horas por dia.',
     href: '/settings',
     label: 'Configurar',
+    admin: true,
   },
   {
     icon: Zap,
@@ -41,6 +52,7 @@ const CARDS = [
     desc: 'Crie mensagens prontas para agilizar o atendimento da equipe.',
     href: '/atalhos',
     label: 'Gerenciar',
+    admin: true,
   },
   {
     icon: Users,
@@ -50,6 +62,7 @@ const CARDS = [
     desc: 'Adicione agentes, defina senhas e organize por filial.',
     href: '/agents',
     label: 'Gerenciar',
+    admin: true,
   },
   {
     icon: BarChart2,
@@ -59,6 +72,7 @@ const CARDS = [
     desc: 'Acompanhe volume de atendimentos, tempo de resposta e NPS.',
     href: '/relatorio',
     label: 'Ver relatórios',
+    admin: true,
   },
   {
     icon: Star,
@@ -68,12 +82,56 @@ const CARDS = [
     desc: 'Colete avaliações automáticas ao encerrar cada atendimento.',
     href: '/nps',
     label: 'Ver avaliações',
+    admin: true,
   },
 ];
+
+// Identifica a build no rodapé. Serve para o suporte: em vez de perguntar "você
+// atualizou?", basta pedir o código que aparece na tela.
+function useBuild() {
+  const [build, setBuild] = useState('');
+  useEffect(() => {
+    fetch('/version.json')
+      .then(r => r.json())
+      .then(({ version }) => setBuild(String(version).split('-').pop() || ''))
+      .catch(() => {});
+  }, []);
+  return build;
+}
+
+function Rodape() {
+  const build = useBuild();
+  return (
+    <footer className="mt-12 pt-6 border-t border-gray-200 text-center space-y-1">
+      <p className="text-xs text-gray-400">
+        ISPDesk — atendimento por WhatsApp para provedores de internet
+      </p>
+      <p className="text-xs text-gray-400">
+        Desenvolvido por{' '}
+        <a
+          href="https://www.adilsondev.com.br"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 font-medium text-gray-500 hover:text-blue-600 transition-colors"
+        >
+          adilsondev.com.br
+          <ExternalLink className="w-3 h-3" />
+        </a>
+      </p>
+      {build && (
+        <p className="text-[10px] text-gray-300 font-mono pt-1">versão {build}</p>
+      )}
+    </footer>
+  );
+}
 
 function WelcomePanel({ currentUser }) {
   const navigate = useNavigate();
   const nome = currentUser?.nome || '';
+  const isAdmin = currentUser?.role === 'admin';
+  // As rotas de admin redirecionam quem não tem permissão. Mostrar o atalho
+  // para o atendente devolvia ele ao inbox sem explicar nada.
+  const cards = CARDS.filter(c => !c.admin || isAdmin);
 
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col items-center justify-start py-12 px-8">
@@ -83,19 +141,25 @@ function WelcomePanel({ currentUser }) {
           <img src="/logoisp.png" alt="Logo" className="h-16 rounded-xl mb-6 shadow-sm" />
           <h1 className="text-2xl font-bold text-gray-900 mb-1">{saudacao(nome)}</h1>
           <p className="text-gray-500 text-sm">
-            Pronto para atender. Selecione uma conversa ou configure sua plataforma abaixo.
+            {isAdmin
+              ? 'Pronto para atender. Selecione uma conversa ou configure sua plataforma abaixo.'
+              : 'Pronto para atender. Selecione uma conversa na lista ao lado para começar.'}
           </p>
         </div>
 
         {/* Feature cards */}
         <div className="grid grid-cols-2 gap-4">
-          {CARDS.map(card => {
+          {cards.map((card, i) => {
             const Icon = card.icon;
+            // Grade de duas colunas: com contagem ímpar o último card ficaria
+            // sozinho, quebrando o alinhamento. Ocupando a linha inteira, a
+            // sobra vira intenção.
+            const ultimoImpar = cards.length % 2 === 1 && i === cards.length - 1;
             return (
               <button
                 key={card.title}
                 onClick={() => navigate(card.href)}
-                className="group text-left bg-white rounded-2xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all duration-150"
+                className={`group text-left bg-white rounded-2xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all duration-150 ${ultimoImpar ? 'col-span-2' : ''}`}
               >
                 <div className={`w-10 h-10 rounded-xl ${card.bg} flex items-center justify-center mb-3`}>
                   <Icon className={`w-5 h-5 ${card.color}`} />
@@ -110,6 +174,8 @@ function WelcomePanel({ currentUser }) {
             );
           })}
         </div>
+
+        <Rodape />
       </div>
     </div>
   );
