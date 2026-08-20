@@ -7,6 +7,10 @@ COPY . .
 # VITE_API_URL é passado como build arg pelo Coolify
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
+# Idem SOURCE_COMMIT — sem ele a versão publicada sai como "dev", já que não há
+# git dentro desta imagem para descobrir o commit sozinho.
+ARG SOURCE_COMMIT
+ENV SOURCE_COMMIT=$SOURCE_COMMIT
 RUN npm run build
 
 # ── estágio 2: servir com Nginx ───────────────────────────────────────────────

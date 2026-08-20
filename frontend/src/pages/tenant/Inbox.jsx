@@ -7,7 +7,7 @@ import ConversationList from '../../components/ConversationList.jsx';
 import ChatWindow from '../../components/ChatWindow.jsx';
 import ClientInfoPanel from '../../components/ClientInfoPanel.jsx';
 import { Bot, Zap, Users, BarChart2, Star, MessageCircle, ArrowRight, BookUser, ExternalLink, Clock, UserCheck } from 'lucide-react';
-import { differenceInMinutes } from 'date-fns';
+import { differenceInMinutes, format } from 'date-fns';
 
 function saudacao(nome) {
   const h = new Date().getHours();
@@ -88,13 +88,15 @@ const CARDS = [
 ];
 
 // Identifica a build no rodapé. Serve para o suporte: em vez de perguntar "você
-// atualizou?", basta pedir o código que aparece na tela.
+// atualizou?", basta pedir o que aparece na tela. A data vem primeiro por ser
+// legível ao telefone e por existir sempre — o hash depende de o Coolify passar
+// SOURCE_COMMIT para dentro da imagem.
 function useBuild() {
-  const [build, setBuild] = useState('');
+  const [build, setBuild] = useState(null);
   useEffect(() => {
     fetch('/version.json')
       .then(r => r.json())
-      .then(({ version }) => setBuild(String(version).split('-').pop() || ''))
+      .then(({ commit, data }) => setBuild({ commit, data }))
       .catch(() => {});
   }, []);
   return build;
@@ -119,8 +121,11 @@ function Rodape() {
           <ExternalLink className="w-3 h-3" />
         </a>
       </p>
-      {build && (
-        <p className="text-[10px] text-gray-300 font-mono pt-1">versão {build}</p>
+      {build?.data && (
+        <p className="text-[10px] text-gray-300 font-mono pt-1">
+          versão de {format(new Date(build.data), 'dd/MM/yyyy HH:mm')}
+          {build.commit ? ` · ${build.commit}` : ''}
+        </p>
       )}
     </footer>
   );
