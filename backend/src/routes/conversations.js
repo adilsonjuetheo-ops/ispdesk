@@ -590,8 +590,12 @@ router.post('/:id/send', async (req, res) => {
     conversa = { ...conversa, status: 'humano', agenteId: req.user.id };
   }
 
-  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
-  const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+  // Tenant e cliente não dependem um do outro. Em série eram duas idas ao banco
+  // somadas antes de sequer chamar o WhatsApp.
+  const [[tenant], [cliente]] = await Promise.all([
+    db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1),
+    db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1),
+  ]);
   const wConfig = await resolverWConfig(tenant, conversa);
 
   let sentWamid = null;
@@ -603,21 +607,24 @@ router.post('/:id/send', async (req, res) => {
     return res.status(502).json({ erro: err.message });
   }
 
-  const [msg] = await db.insert(mensagens).values({
-    conversaId: id,
-    origem: 'agente',
-    conteudo: texto,
-    wamid: sentWamid,
-    status: 'enviada',
-    agenteNome: req.user.nome,
-  }).returning();
-
-  await db.update(conversas).set({
-    ultimaMensagem: texto.slice(0, 200),
-    ultimaMsgEm: new Date(),
-    ultimaMsgOrigem: 'agente',
-    ultimaMsgNome: req.user.nome,
-  }).where(eq(conversas.id, id));
+  // A gravação da mensagem e a atualização do resumo da conversa também são
+  // independentes — só a primeira precisa voltar na resposta.
+  const [[msg]] = await Promise.all([
+    db.insert(mensagens).values({
+      conversaId: id,
+      origem: 'agente',
+      conteudo: texto,
+      wamid: sentWamid,
+      status: 'enviada',
+      agenteNome: req.user.nome,
+    }).returning(),
+    db.update(conversas).set({
+      ultimaMensagem: texto.slice(0, 200),
+      ultimaMsgEm: new Date(),
+      ultimaMsgOrigem: 'agente',
+      ultimaMsgNome: req.user.nome,
+    }).where(eq(conversas.id, id)),
+  ]);
 
   res.json(msg);
 });
