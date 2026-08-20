@@ -159,7 +159,7 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
         </div>
       )}
       {erro && (
-        <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-red-600 text-sm">
+        <div className="mt-3 bg-critico-50 border border-critico-200 rounded-lg px-4 py-2.5 text-critico-600 text-sm">
           {erro}
         </div>
       )}
@@ -380,7 +380,7 @@ function TestarSgp() {
         </button>
       </div>
       {erro && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 whitespace-pre-wrap">{erro}</div>
+        <div className="bg-critico-50 border border-critico-200 rounded-lg p-3 text-xs text-critico-700 whitespace-pre-wrap">{erro}</div>
       )}
       {resultado && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap font-mono">{resultado}</div>
@@ -426,18 +426,18 @@ function TestarLembretes() {
         Testar agora (envio real)
       </button>
       {erro && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 whitespace-pre-wrap">{erro}</div>
+        <div className="bg-critico-50 border border-critico-200 rounded-lg p-3 text-xs text-critico-700 whitespace-pre-wrap">{erro}</div>
       )}
       {resultado && (
         <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 space-y-1">
           {resultado.erro ? (
-            <p className="text-red-600">{resultado.erro}</p>
+            <p className="text-critico-600">{resultado.erro}</p>
           ) : (
             <>
               <p>Pré-vencimento: {resultado.preEncontradas === null ? 'erro na consulta' : `${resultado.preEnviadas}/${resultado.preEncontradas} enviados`}</p>
               <p>Pós-vencimento: {resultado.posEncontradas === null ? 'erro na consulta' : `${resultado.posEnviadas}/${resultado.posEncontradas} enviados`}</p>
               {resultado.falhas?.length > 0 && (
-                <div className="text-red-600 mt-1">
+                <div className="text-critico-600 mt-1">
                   <p className="font-medium">Falhas:</p>
                   <ul className="list-disc list-inside">
                     {resultado.falhas.map((f, i) => <li key={i}>{f}</li>)}
@@ -518,17 +518,17 @@ function TestarLembreteCliente() {
         </button>
       </div>
       {erro && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 whitespace-pre-wrap">{erro}</div>
+        <div className="bg-critico-50 border border-critico-200 rounded-lg p-3 text-xs text-critico-700 whitespace-pre-wrap">{erro}</div>
       )}
       {resultado && (
         <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-700 space-y-1">
           {resultado.erro ? (
-            <p className="text-red-600">{resultado.erro}</p>
+            <p className="text-critico-600">{resultado.erro}</p>
           ) : (
             <>
               <p>Cliente: {resultado.cliente}</p>
               <p>Valor: R$ {resultado.valor} | Vencimento: {resultado.vencimento}</p>
-              <p className={resultado.enviado ? 'text-green-600' : 'text-red-600'}>
+              <p className={resultado.enviado ? 'text-green-600' : 'text-critico-600'}>
                 {resultado.enviado ? '✓ Enviado com sucesso' : `✗ Falha: ${resultado.motivo}`}
               </p>
             </>
@@ -578,7 +578,7 @@ function TagsSection() {
   return (
     <section className="bg-white rounded-xl border border-gray-200 p-5 mt-5">
       <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
-        <Tag className="w-4 h-4 text-indigo-500" /> Tags de Atendimento
+        <Tag className="w-4 h-4 text-brand-500" /> Tags de Atendimento
       </h2>
       <p className="text-xs text-gray-400 mb-4">
         Crie etiquetas para categorizar atendimentos. Os agentes poderão aplicá-las nas conversas abertas.
@@ -590,7 +590,7 @@ function TagsSection() {
             <div key={i} className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.cor }} />
               <span className="text-sm font-medium text-gray-700">{t.nome}</span>
-              <button type="button" onClick={() => remover(i)} className="ml-0.5 text-gray-400 hover:text-red-500 transition-colors">
+              <button type="button" onClick={() => remover(i)} className="ml-0.5 text-gray-400 hover:text-critico-500 transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -606,7 +606,7 @@ function TagsSection() {
           placeholder="Nome da tag (ex: Suporte técnico)"
           className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" />
         <button type="button" onClick={adicionar} disabled={saving || !novoNome.trim()}
-          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0">
+          className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-brand-contraste px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
           Adicionar
         </button>
@@ -687,13 +687,13 @@ function RoteamentoSection() {
                   <p className="text-xs text-gray-500 mt-0.5">
                     Palavras: <code className="bg-gray-100 px-1 rounded text-gray-700">{r.valor}</code>
                     {' → '}
-                    <span className={r.acao === 'filial' ? 'text-indigo-600' : 'text-amber-600'}>
+                    <span className={r.acao === 'filial' ? 'text-brand-600' : 'text-amber-600'}>
                       {r.acao === 'filial' ? 'Filial' : 'Agente'}: {destinoNome}
                     </span>
                   </p>
                 </div>
                 <button type="button" onClick={() => remover(r.id)}
-                  className="text-gray-300 hover:text-red-500 transition-colors shrink-0 mt-0.5">
+                  className="text-gray-300 hover:text-critico-500 transition-colors shrink-0 mt-0.5">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -1014,7 +1014,7 @@ export default function Settings() {
                     </button>
                     {tenant.logoUrl && (
                       <button type="button" onClick={handleRemoverLogo}
-                        className="flex items-center gap-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition-colors">
+                        className="flex items-center gap-1.5 text-xs bg-critico-50 hover:bg-critico-100 text-critico-600 px-3 py-1.5 rounded-lg transition-colors">
                         <X className="w-3.5 h-3.5" />
                         Remover
                       </button>
@@ -1230,7 +1230,7 @@ export default function Settings() {
           {/* filiais */}
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-indigo-500" /> Filiais / Cidades de atendimento
+              <MapPin className="w-4 h-4 text-brand-500" /> Filiais / Cidades de atendimento
             </h2>
             <p className="text-xs text-gray-400 mb-4">
               Cadastre as cidades que seu provedor atende. O bot vai perguntar ao cliente qual cidade ele é e rotear o atendimento para os agentes da filial correspondente.
@@ -1242,7 +1242,7 @@ export default function Settings() {
                   <div key={f.id} className="bg-gray-50 rounded-lg border border-gray-200 px-3 py-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <MapPin className="w-3.5 h-3.5 text-indigo-500" />
+                        <MapPin className="w-3.5 h-3.5 text-brand-500" />
                         <span className="text-sm font-medium text-gray-800">{f.nome}</span>
                         <span className="text-xs text-gray-400">{f.cidade}{f.uf ? ` — ${f.uf}` : ''}</span>
                         {f.whatsappConectado
@@ -1257,7 +1257,7 @@ export default function Settings() {
                               <ArrowRightLeft className="w-3 h-3" /> Mover
                             </button>
                             <button type="button" onClick={() => handleDesconectarFilial(f.id)}
-                              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors">
+                              className="flex items-center gap-1 text-xs text-critico-500 hover:text-critico-700 transition-colors">
                               <WifiOff className="w-3 h-3" /> Desconectar
                             </button>
                           </>
@@ -1272,13 +1272,13 @@ export default function Settings() {
                           </button>
                         )}
                         <button type="button" onClick={() => handleRemoverFilial(f.id)}
-                          className="text-gray-400 hover:text-red-500 transition-colors">
+                          className="text-gray-400 hover:text-critico-500 transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
                     {erroFilialWpp[f.id] && (
-                      <p className="text-xs text-red-500 mt-1">{erroFilialWpp[f.id]}</p>
+                      <p className="text-xs text-critico-500 mt-1">{erroFilialWpp[f.id]}</p>
                     )}
                     {f.whatsappConectado && (
                       <div className="mt-2 pl-5 space-y-1.5">
@@ -1294,7 +1294,7 @@ export default function Settings() {
                                 <ArrowRightLeft className="w-3 h-3" /> Mover
                               </button>
                               <button type="button" onClick={() => handleDesconectarNumeroExtra(f.id, extra.id)}
-                                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors">
+                                className="flex items-center gap-1 text-xs text-critico-500 hover:text-critico-700 transition-colors">
                                 <WifiOff className="w-3 h-3" /> Desconectar
                               </button>
                             </div>
@@ -1316,20 +1316,20 @@ export default function Settings() {
             )}
 
             {movendo && (
-              <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2.5">
-                <p className="text-xs text-indigo-800 mb-2">
+              <div className="mb-4 bg-brand-50 border border-brand-200 rounded-lg px-3 py-2.5">
+                <p className="text-xs text-brand-800 mb-2">
                   Mover <strong>{movendo.rotulo}</strong> para qual filial?
                 </p>
                 <div className="flex gap-2 flex-wrap items-center">
                   <select value={destinoMover} onChange={e => setDestinoMover(e.target.value)}
-                    className="flex-1 min-w-32 border border-indigo-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    className="flex-1 min-w-32 border border-brand-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-300">
                     <option value="">Selecione a filial de destino</option>
                     {filiais.filter(f => f.ativo && f.id !== movendo.filialId).map(f => (
                       <option key={f.id} value={f.id}>{f.nome} — {f.cidade}</option>
                     ))}
                   </select>
                   <button type="button" onClick={handleMoverNumero} disabled={!destinoMover || movendoSalvando}
-                    className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium">
+                    className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-brand-contraste px-3 py-1.5 rounded-lg text-xs font-medium">
                     {movendoSalvando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Confirmar'}
                   </button>
                   <button type="button" onClick={() => { setMovendo(null); setDestinoMover(''); }}
@@ -1355,13 +1355,13 @@ export default function Settings() {
                 {ESTADOS_BR.map(uf => <option key={uf} value={uf}>{uf}</option>)}
               </select>
               <button type="button" onClick={handleAddFilial} disabled={savingFilial || !formFilial.nome || !formFilial.cidade}
-                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-sm font-medium">
+                className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-brand-contraste px-3 py-2 rounded-lg text-sm font-medium">
                 {savingFilial ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 Adicionar
               </button>
             </div>
             {erroFilial && (
-              <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erroFilial}</p>
+              <p className="mt-2 text-xs text-critico-600 bg-critico-50 border border-critico-200 rounded-lg px-3 py-2">{erroFilial}</p>
             )}
           </section>
 
@@ -1465,7 +1465,7 @@ export default function Settings() {
             </div>
           )}
           {erro && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-red-600 text-sm">
+            <div className="bg-critico-50 border border-critico-200 rounded-lg px-4 py-3 text-critico-600 text-sm">
               {erro}
             </div>
           )}
@@ -1506,7 +1506,7 @@ export default function Settings() {
               </div>
             )}
             {erroSenha && (
-              <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-red-600 text-sm">
+              <div className="mt-3 bg-critico-50 border border-critico-200 rounded-lg px-4 py-2.5 text-critico-600 text-sm">
                 {erroSenha}
               </div>
             )}
