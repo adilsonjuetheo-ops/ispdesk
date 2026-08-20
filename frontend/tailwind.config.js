@@ -39,6 +39,10 @@ export default {
         critico,
         // Verde do WhatsApp — é cor de terceiro, não da marca nem de estado.
         whatsapp: '#25D366',
+        // Identidade do assistente no balão. É verde, mas não quer dizer
+        // "sucesso": fica fora da escala de estado justamente para ninguém ler
+        // como tal. Nomeado porque a alternativa neutra deixou o texto apagado.
+        assistente: { 50: '#ecfdf5', 100: '#d1fae5', 900: '#064e3b' },
       },
       // Largura confortável de leitura para o balão de mensagem. O valor antigo
       // era 280px fixo, um número de celular que sobrava metade da tela no desktop.

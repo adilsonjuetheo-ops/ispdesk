@@ -254,7 +254,7 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
         ) : (
           <div className={clsx('rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap', {
             'bg-white border border-gray-200 text-gray-800 rounded-tl-sm': isCliente,
-            'bg-gray-100 text-gray-700 rounded-tr-sm border border-gray-200': isBot,
+            'bg-assistente-50 text-assistente-900 rounded-tr-sm border border-assistente-100': isBot,
             'bg-brand-50 text-brand-900 rounded-tr-sm border border-brand-100': !isCliente && !isBot,
           })}>
             {msg.conteudo}
