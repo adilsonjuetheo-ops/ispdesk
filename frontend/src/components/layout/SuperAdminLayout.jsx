@@ -18,7 +18,7 @@ export default function SuperAdminLayout() {
     `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
       isActive
         ? 'bg-indigo-600 text-white'
-        : 'text-gray-400 hover:text-white hover:bg-gray-800'
+        : 'text-gray-500 hover:text-white hover:bg-gray-800'
     }`;
 
   return (
@@ -52,7 +52,7 @@ export default function SuperAdminLayout() {
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded-lg transition-colors"
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-500 hover:text-red-400 hover:bg-gray-800 rounded-lg transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sair

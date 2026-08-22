@@ -107,7 +107,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-gray-200">
           <h3 className="font-semibold text-gray-800">Nova conversa</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
 
         <form onSubmit={enviar} className="p-5 space-y-4">
@@ -137,7 +137,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                     className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors"
                   >
                     <p className="text-sm text-gray-800">{c.nome || 'Sem nome'}</p>
-                    <p className="text-xs text-gray-400 tabular-nums">{c.whatsapp}</p>
+                    <p className="text-xs text-gray-500 tabular-nums">{c.whatsapp}</p>
                   </button>
                 ))}
               </div>
@@ -153,7 +153,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
               inputMode="tel"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-            <p className="text-xs text-gray-400 mt-1">Com DDD. O 55 do Brasil é adicionado sozinho.</p>
+            <p className="text-xs text-gray-500 mt-1">Com DDD. O 55 do Brasil é adicionado sozinho.</p>
           </div>
 
           {remetentes.length > 1 && (
@@ -168,7 +168,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                   <option key={r.id} value={r.id}>{r.rotulo}</option>
                 ))}
               </select>
-              <p className="text-xs text-gray-400 mt-1">É o número que aparece para o cliente.</p>
+              <p className="text-xs text-gray-500 mt-1">É o número que aparece para o cliente.</p>
             </div>
           )}
 
@@ -238,7 +238,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                       <label className="block text-xs text-gray-500 mb-1">
                         {`Variável {{${i + 1}}}`}
                         {templateSel.exemplos?.[i] && (
-                          <span className="text-gray-400"> — ex: {templateSel.exemplos[i]}</span>
+                          <span className="text-gray-500"> — ex: {templateSel.exemplos[i]}</span>
                         )}
                       </label>
                       <input

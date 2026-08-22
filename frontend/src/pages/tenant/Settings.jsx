@@ -103,12 +103,12 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
   return (
     <section className="bg-white rounded-xl border border-gray-200 p-5">
       <h2 className="font-semibold text-gray-700 mb-1">WhatsApp Business</h2>
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs text-gray-500 mb-4">
         Conecte sua conta WhatsApp Business diretamente via Meta. O processo leva menos de 2 minutos.
       </p>
 
       {carregando ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
           <Loader2 className="w-4 h-4 animate-spin" /> Verificando conexão...
         </div>
       ) : status?.conectado ? (
@@ -167,7 +167,7 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
         <button
           type="button"
           onClick={onToggleManual}
-          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-600 transition-colors"
         >
           {mostrarManual ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           Configuração manual (avançado)
@@ -241,7 +241,7 @@ function HorariosSection() {
       <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
         <Clock className="w-4 h-4 text-gray-400" /> Horário de atendimento humano
       </h2>
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs text-gray-500 mb-4">
         Marque os dias e horários em que há atendente de plantão. Fora deles o assistente continua
         atendendo sozinho e, ao transferir, avisa o cliente de quando a equipe retorna.
       </p>
@@ -253,14 +253,14 @@ function HorariosSection() {
               <input type="checkbox" checked={horarios[key]?.ativo || false}
                 onChange={e => setDia(key, 'ativo', e.target.checked)}
                 className="rounded" />
-              <span className={`text-sm ${horarios[key]?.ativo ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>{label}</span>
+              <span className={`text-sm ${horarios[key]?.ativo ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>{label}</span>
             </label>
             {horarios[key]?.ativo ? (
               <>
                 <input type="time" value={horarios[key]?.inicio || '08:00'}
                   onChange={e => setDia(key, 'inicio', e.target.value)}
                   className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                <span className="text-gray-400 text-sm">até</span>
+                <span className="text-gray-500 text-sm">até</span>
                 <input type="time" value={horarios[key]?.fim || '18:00'}
                   onChange={e => setDia(key, 'fim', e.target.value)}
                   className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400" />
@@ -277,7 +277,7 @@ function HorariosSection() {
         <textarea value={instrucaoForaHorario} onChange={e => setInstrucaoForaHorario(e.target.value)} rows={3}
           placeholder="Ex: Fora do horário comercial, não prometa visita técnica. Oriente o cliente a reiniciar o roteador e registre o chamado para a equipe avaliar pela manhã."
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none" />
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-gray-500 mt-1">
           Vale apenas quando não há atendente de plantão. O assistente já avisa sozinho que a equipe
           retorna no próximo horário — use este campo para regras específicas do provedor.
         </p>
@@ -290,7 +290,7 @@ function HorariosSection() {
           <input type="number" min="0" max="1440" value={slaMinutos}
             onChange={e => setSlaMinutos(e.target.value)}
             className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400" />
-          <span className="text-xs text-gray-400">minutos — conversas aguardando além desse tempo ficam com alerta vermelho</span>
+          <span className="text-xs text-gray-500">minutos — conversas aguardando além desse tempo ficam com alerta vermelho</span>
         </div>
       </div>
 
@@ -579,7 +579,7 @@ function TagsSection() {
       <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
         <Tag className="w-4 h-4 text-indigo-500" /> Tags de Atendimento
       </h2>
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs text-gray-500 mb-4">
         Crie etiquetas para categorizar atendimentos. Os agentes poderão aplicá-las nas conversas abertas.
       </p>
 
@@ -589,7 +589,7 @@ function TagsSection() {
             <div key={i} className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.cor }} />
               <span className="text-sm font-medium text-gray-700">{t.nome}</span>
-              <button type="button" onClick={() => remover(i)} className="ml-0.5 text-gray-400 hover:text-red-500 transition-colors">
+              <button type="button" onClick={() => remover(i)} className="ml-0.5 text-gray-500 hover:text-red-500 transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -663,7 +663,7 @@ function RoteamentoSection() {
       <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
         <GitBranch className="w-4 h-4 text-purple-500" /> Roteamento Automático
       </h2>
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs text-gray-500 mb-4">
         Crie regras para direcionar atendimentos a filiais ou agentes específicos com base em palavras-chave na mensagem do cliente. A primeira regra que casar vence.
       </p>
 
@@ -971,7 +971,7 @@ export default function Settings() {
     }
   };
 
-  if (loading) return <div className="p-8 text-gray-400">Carregando...</div>;
+  if (loading) return <div className="p-8 text-gray-500">Carregando...</div>;
   if (!tenant) return null;
 
   return (
@@ -1001,7 +1001,7 @@ export default function Settings() {
                   )}
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-gray-400 mb-2">PNG, JPG ou SVG — máximo 2 MB.<br />Recomendado: fundo transparente, 200×200px.</p>
+                  <p className="text-xs text-gray-500 mb-2">PNG, JPG ou SVG — máximo 2 MB.<br />Recomendado: fundo transparente, 200×200px.</p>
                   <div className="flex gap-2 flex-wrap">
                     <button type="button" onClick={() => fileRef.current?.click()}
                       className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition-colors">
@@ -1081,7 +1081,7 @@ export default function Settings() {
           {mostrarManualWpp && (
             <section className="bg-white rounded-xl border border-gray-200 p-5">
               <h2 className="font-semibold text-gray-700 mb-1">WhatsApp — Configuração Manual</h2>
-              <p className="text-xs text-gray-400 mb-4">
+              <p className="text-xs text-gray-500 mb-4">
                 Use apenas se não utilizar o fluxo de conexão automática acima.
               </p>
               <div className="space-y-3">
@@ -1094,7 +1094,7 @@ export default function Settings() {
           {/* integração SGP */}
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-700 mb-1">Sistema de Gestão (SGP)</h2>
-            <p className="text-xs text-gray-400 mb-4">
+            <p className="text-xs text-gray-500 mb-4">
               O assistente consulta o SGP em tempo real para exibir dados do cliente, faturas e executar ações como desbloqueio e 2ª via.
             </p>
             <div className="space-y-3">
@@ -1159,7 +1159,7 @@ export default function Settings() {
                   />
                   <span>
                     Exigir CPF/CNPJ para identificar o cliente
-                    <span className="block text-xs text-gray-400">
+                    <span className="block text-xs text-gray-500">
                       O assistente ignora o número do WhatsApp e sempre pede o documento do titular antes de
                       consultar dados, enviar 2ª via ou desbloquear.
                     </span>
@@ -1172,7 +1172,7 @@ export default function Settings() {
               {tenant.sgpTipo === 'tsmx' && (
                 <div className="mt-4 border-t border-gray-100 pt-4">
                   <h3 className="text-sm font-medium text-gray-700 mb-1">Lembretes automáticos de fatura</h3>
-                  <p className="text-xs text-gray-400 mb-3">
+                  <p className="text-xs text-gray-500 mb-3">
                     Envia um template do WhatsApp 1 dia antes do vencimento e outro 5 dias depois do vencimento.
                     Requer templates já aprovados pela Meta (categoria "Utilidade") no WhatsApp Manager do provedor.
                   </p>
@@ -1214,7 +1214,7 @@ export default function Settings() {
           {/* assistente ia */}
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-700 mb-3">Assistente IA — System Prompt</h2>
-            <p className="text-xs text-gray-400 mb-3">
+            <p className="text-xs text-gray-500 mb-3">
               Instrua o assistente sobre como atender seus clientes: serviços oferecidos, área de cobertura, horário de atendimento, procedimentos comuns, etc.
             </p>
             <textarea rows={10} value={tenant.systemPrompt || ''}
@@ -1228,7 +1228,7 @@ export default function Settings() {
             <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
               <MapPin className="w-4 h-4 text-indigo-500" /> Filiais / Cidades de atendimento
             </h2>
-            <p className="text-xs text-gray-400 mb-4">
+            <p className="text-xs text-gray-500 mb-4">
               Cadastre as cidades que seu provedor atende. O bot vai perguntar ao cliente qual cidade ele é e rotear o atendimento para os agentes da filial correspondente.
             </p>
 
@@ -1240,7 +1240,7 @@ export default function Settings() {
                       <div className="flex items-center gap-2">
                         <MapPin className="w-3.5 h-3.5 text-indigo-500" />
                         <span className="text-sm font-medium text-gray-800">{f.nome}</span>
-                        <span className="text-xs text-gray-400">{f.cidade}{f.uf ? ` — ${f.uf}` : ''}</span>
+                        <span className="text-xs text-gray-500">{f.cidade}{f.uf ? ` — ${f.uf}` : ''}</span>
                         {f.whatsappConectado
                           ? <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 border border-green-200 rounded-full px-2 py-0.5"><Wifi className="w-3 h-3" /> WhatsApp</span>
                           : null}
@@ -1268,7 +1268,7 @@ export default function Settings() {
                           </button>
                         )}
                         <button type="button" onClick={() => handleRemoverFilial(f.id)}
-                          className="text-gray-400 hover:text-red-500 transition-colors">
+                          className="text-gray-500 hover:text-red-500 transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -1298,7 +1298,7 @@ export default function Settings() {
                         ))}
                         <button type="button" onClick={() => handleConectarNumeroExtra(f.id)}
                           disabled={conectandoExtraFilialId === f.id}
-                          className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#25D366] disabled:opacity-50 transition-colors">
+                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#25D366] disabled:opacity-50 transition-colors">
                           {conectandoExtraFilialId === f.id
                             ? <Loader2 className="w-3 h-3 animate-spin" />
                             : <Plus className="w-3 h-3" />}
@@ -1364,18 +1364,18 @@ export default function Settings() {
           {/* webhook token */}
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-700 mb-1">Token do Webhook</h2>
-            <p className="text-xs text-gray-400 mb-3">
+            <p className="text-xs text-gray-500 mb-3">
               Use este valor no campo "Verify Token" ao configurar o webhook no Meta for Developers.
             </p>
             <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
               <code className="flex-1 text-xs text-gray-700 break-all select-all">{tenant.webhookVerifyToken}</code>
               <button type="button" onClick={() => copiar(tenant.webhookVerifyToken)}
                 title="Copiar"
-                className="text-gray-400 hover:text-blue-600 shrink-0 transition-colors">
+                className="text-gray-500 hover:text-blue-600 shrink-0 transition-colors">
                 {copiado ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-gray-500 mt-2">
               URL do webhook: <code className="bg-gray-100 px-1 rounded">https://seu-dominio.com/api/webhook</code>
             </p>
           </section>
@@ -1386,7 +1386,7 @@ export default function Settings() {
             <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
               <FileSignature className="w-4 h-4 text-blue-500" /> Assinatura Digital de Contratos
             </h2>
-            <p className="text-xs text-gray-400 mb-4">
+            <p className="text-xs text-gray-500 mb-4">
               Configure a integração com ZapSign ou D4Sign para enviar contratos para assinatura diretamente pelo atendimento.
             </p>
             <div className="space-y-3">
@@ -1419,7 +1419,7 @@ export default function Settings() {
                     onChange={e => set('assinaturaExtra', { ...(tenant.assinaturaExtra || {}), templateToken: e.target.value })}
                     placeholder="Token do modelo criado no ZapSign"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                  <p className="text-[11px] text-gray-400 mt-1">Encontre em ZapSign → Modelos → seu modelo → copie o token da URL.</p>
+                  <p className="text-[11px] text-gray-500 mt-1">Encontre em ZapSign → Modelos → seu modelo → copie o token da URL.</p>
                 </div>
               )}
 
@@ -1483,7 +1483,7 @@ export default function Settings() {
             <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
               <Lock className="w-4 h-4 text-gray-400" /> Alterar minha senha
             </h2>
-            <p className="text-xs text-gray-400 mb-4">
+            <p className="text-xs text-gray-500 mb-4">
               Para sua segurança, informe a senha atual antes de definir uma nova.
             </p>
             <div className="space-y-3 max-w-sm">

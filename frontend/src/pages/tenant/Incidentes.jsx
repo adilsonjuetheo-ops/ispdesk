@@ -53,7 +53,7 @@ export default function Incidentes() {
   const ativos = lista.filter(i => i.status === 'ativo');
   const resolvidos = lista.filter(i => i.status === 'resolvido');
 
-  if (loading) return <div className="p-8 text-gray-400 text-sm">Carregando...</div>;
+  if (loading) return <div className="p-8 text-gray-500 text-sm">Carregando...</div>;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -147,7 +147,7 @@ export default function Incidentes() {
                       )}
                       {inc.mensagemBot && (
                         <div className="bg-white border border-red-200 rounded-lg p-2.5 mb-2">
-                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Mensagem enviada aos clientes</p>
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Mensagem enviada aos clientes</p>
                           <p className="text-xs text-gray-700 whitespace-pre-wrap">{inc.mensagemBot}</p>
                         </div>
                       )}
@@ -176,14 +176,14 @@ export default function Incidentes() {
         {/* Histórico */}
         {resolvidos.length > 0 && (
           <div>
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Histórico</h2>
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Histórico</h2>
             <div className="space-y-2">
               {resolvidos.slice(0, 20).map(inc => (
                 <div key={inc.id} className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-lg px-4 py-3">
                   <Check className="w-4 h-4 text-green-500 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-700 font-medium truncate">{inc.titulo}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-500">
                       {tempoRelativo(inc.criadoEm)}
                       {inc.resolvidoEm && ` → resolvido ${tempoRelativo(inc.resolvidoEm)}`}
                     </p>

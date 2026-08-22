@@ -177,7 +177,7 @@ export default function TenantLayout() {
       `}>
         {/* Botão fechar — mobile only */}
         <button onClick={() => setSidebarOpen(false)}
-          className="absolute top-3 right-3 md:hidden p-1 text-gray-400 hover:text-gray-700 transition-colors">
+          className="absolute top-3 right-3 md:hidden p-1 text-gray-500 hover:text-gray-700 transition-colors">
           <X className="w-5 h-5" />
         </button>
 
@@ -191,7 +191,7 @@ export default function TenantLayout() {
                 <p className="text-sm font-bold text-gray-800 truncate leading-tight">
                   {tenant.nomeFantasia || tenant.nome}
                 </p>
-                <p className="text-xs text-gray-400 truncate">Painel de atendimento</p>
+                <p className="text-xs text-gray-500 truncate">Painel de atendimento</p>
               </div>
             </div>
           ) : (
@@ -203,7 +203,7 @@ export default function TenantLayout() {
                 <p className="text-sm font-bold text-gray-800 truncate leading-tight">
                   {tenant?.nomeFantasia || tenant?.nome}
                 </p>
-                <p className="text-xs text-gray-400">Painel de atendimento</p>
+                <p className="text-xs text-gray-500">Painel de atendimento</p>
               </div>
             </div>
           )}
@@ -213,7 +213,7 @@ export default function TenantLayout() {
           {/* Conversas */}
           <div className="mb-2">
             {!colapsado && (
-              <p className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Conversas
               </p>
             )}
@@ -229,7 +229,7 @@ export default function TenantLayout() {
           {filiais.length > 0 && (
             <div className="mb-2">
               {!colapsado && (
-                <p className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Filiais
                 </p>
               )}
@@ -346,7 +346,7 @@ export default function TenantLayout() {
           )}
           <button onClick={handleLogout}
             title={colapsado ? 'Sair' : undefined}
-            className={`flex items-center gap-2.5 w-full py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ${ICONE} [&>svg]:text-gray-400 hover:[&>svg]:text-red-600 ${
+            className={`flex items-center gap-2.5 w-full py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ${ICONE} [&>svg]:text-gray-500 hover:[&>svg]:text-red-600 ${
               colapsado ? 'justify-center px-0' : 'px-3'
             }`}>
             <LogOut /> {!colapsado && 'Sair'}

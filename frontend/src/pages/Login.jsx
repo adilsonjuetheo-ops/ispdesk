@@ -190,7 +190,7 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="text-center text-gray-400 text-xs mt-10">
+          <p className="text-center text-gray-500 text-xs mt-10">
             © {new Date().getFullYear()} — Todos os direitos reservados
           </p>
         </div>

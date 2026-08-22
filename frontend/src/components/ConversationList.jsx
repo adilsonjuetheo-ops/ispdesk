@@ -141,7 +141,7 @@ function filtrar(conversas, view, filialId, userId, busca) {
 function PreviewMsg({ c }) {
   const { ultimaMensagem, ultimaMsgOrigem, ultimaMsgNome } = c;
   if (!ultimaMensagem) {
-    return <span className="text-gray-400 italic">Sem mensagens</span>;
+    return <span className="text-gray-500 italic">Sem mensagens</span>;
   }
   if (ultimaMsgOrigem === 'agente' && ultimaMsgNome) {
     return (
@@ -153,7 +153,7 @@ function PreviewMsg({ c }) {
     );
   }
   if (ultimaMsgOrigem === 'bot') {
-    return <span className="truncate text-gray-400">{ultimaMensagem}</span>;
+    return <span className="truncate text-gray-500">{ultimaMensagem}</span>;
   }
   return <span className="truncate">{ultimaMensagem}</span>;
 }
@@ -212,7 +212,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
             <h2 className="text-sm font-semibold text-gray-800">{VIEW_LABEL[view] || 'Conversas'}</h2>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{filtrados.length}</span>
+            <span className="text-xs text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">{filtrados.length}</span>
             <button
               onClick={() => setNovaConversa(true)}
               title="Nova conversa"
@@ -254,7 +254,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
 
       <div className="flex-1 overflow-y-auto bg-gray-50 md:bg-white">
         {filtrados.length === 0 && (
-          <div className="p-8 text-center text-gray-400 text-sm">Nenhuma conversa</div>
+          <div className="p-8 text-center text-gray-500 text-sm">Nenhuma conversa</div>
         )}
         {filtrados.map(c => {
           const naoLida = hasUnread(c);
@@ -314,7 +314,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                         {t}
                       </span>
                     ))}
-                    <span className="ml-auto text-xs text-gray-400 shrink-0">{tempoCompacto(tempoRef)}</span>
+                    <span className="ml-auto text-xs text-gray-500 shrink-0">{tempoCompacto(tempoRef)}</span>
                   </div>
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -326,7 +326,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                   <WaitTime iniciadaEm={c.iniciadaEm} status={c.status} />
 
                   {(c.agenteNome || c.filialNome) && (
-                    <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+                    <p className="text-[10px] text-gray-500 mt-0.5 truncate">
                       {[c.agenteNome, c.filialNome].filter(Boolean).join(' › ')}
                     </p>
                   )}
@@ -347,7 +347,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                           {t}
                         </span>
                       ))}
-                      <span className="ml-auto text-xs text-gray-400 shrink-0">{tempoCompacto(tempoRef)}</span>
+                      <span className="ml-auto text-xs text-gray-500 shrink-0">{tempoCompacto(tempoRef)}</span>
                     </div>
 
                     <p className={clsx('text-xs font-medium mt-0.5', statusAberto ? 'text-emerald-600' : 'text-gray-400')}>
@@ -382,7 +382,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
       {/* Presença: Online agora */}
       {online.length > 0 && (
         <div className="px-3 py-2 border-t border-gray-100 bg-white">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Online agora</p>
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Online agora</p>
           <div className="flex flex-wrap gap-1.5">
             {online.map(u => (
               <div key={u.id} className="relative group">

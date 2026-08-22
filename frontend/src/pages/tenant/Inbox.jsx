@@ -120,10 +120,10 @@ function Rodape() {
   const build = useBuild();
   return (
     <footer className="mt-12 pt-6 border-t border-gray-200 text-center space-y-1">
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-500">
         ISPDesk — atendimento por WhatsApp para provedores de internet
       </p>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-500">
         Desenvolvido por{' '}
         <a
           href="https://www.adilsondev.com.br"
@@ -186,12 +186,12 @@ function Indicador({ icon: Icon, rotulo, valor, detalhe, tom, onClick }) {
         onClick ? 'hover:border-gray-300 hover:shadow-sm transition-all duration-150' : ''
       }`}
     >
-      <div className="flex items-center gap-1.5 mb-1.5 text-gray-400">
+      <div className="flex items-center gap-1.5 mb-1.5 text-gray-500">
         <Icon className="w-3.5 h-3.5 shrink-0" />
         <span className="text-[11px] font-medium uppercase tracking-wide truncate">{rotulo}</span>
       </div>
       <p className={`text-2xl font-bold tabular-nums leading-none ${tom || 'text-gray-900'}`}>{valor}</p>
-      <p className="text-[11px] text-gray-400 mt-1.5 truncate">{detalhe || ' '}</p>
+      <p className="text-[11px] text-gray-500 mt-1.5 truncate">{detalhe || ' '}</p>
     </Tag>
   );
 }
@@ -276,7 +276,7 @@ function WelcomePanel({ currentUser, conversas = [], online = [], slaMinutos = 0
           navigate={navigate}
         />
 
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">
+        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-3">
           {isAdmin ? 'Configurar a plataforma' : 'Atalhos'}
         </p>
 

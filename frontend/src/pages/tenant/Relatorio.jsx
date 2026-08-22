@@ -89,7 +89,7 @@ export default function Relatorio() {
         {/* Cabeçalho */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" /> Resumo mensal
             </p>
             <h1 className="text-2xl font-bold text-gray-800">
@@ -123,7 +123,7 @@ export default function Relatorio() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-gray-400">
+          <div className="flex items-center justify-center py-20 text-gray-500">
             <Loader2 className="w-6 h-6 animate-spin mr-2" /> Carregando...
           </div>
         ) : dados ? (
@@ -175,15 +175,15 @@ export default function Relatorio() {
               <div className="bg-white border border-gray-200 rounded-2xl p-5">
                 <div className="flex items-center gap-1.5 mb-3">
                   <Tag className="w-3.5 h-3.5 text-gray-400" />
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Principal motivo</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Principal motivo</p>
                 </div>
                 <p className="text-xl font-bold text-gray-800 leading-tight">
                   {dados.motivoPrincipal
                     ? `"${dados.motivoPrincipal}"`
-                    : <span className="text-gray-400 text-sm font-normal">Nenhum handoff registrado</span>
+                    : <span className="text-gray-500 text-sm font-normal">Nenhum handoff registrado</span>
                   }
                 </p>
-                <p className="text-xs text-gray-400 mt-1">O assunto mais frequente nos atendimentos</p>
+                <p className="text-xs text-gray-500 mt-1">O assunto mais frequente nos atendimentos</p>
               </div>
             </div>
 
@@ -203,7 +203,7 @@ export default function Relatorio() {
 
           </div>
         ) : (
-          <div className="text-center text-gray-400 py-20">Erro ao carregar relatório</div>
+          <div className="text-center text-gray-500 py-20">Erro ao carregar relatório</div>
         )}
       </div>
     </div>
@@ -224,9 +224,9 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
       <div className={`w-8 h-8 ${c.bg} rounded-xl flex items-center justify-center mb-3`}>
         <Icon className={`w-4 h-4 ${c.text}`} />
       </div>
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">{label}</p>
       <p className={`text-3xl font-black ${c.val} leading-none`}>{value}</p>
-      <p className="text-xs text-gray-400 mt-1">{sub}</p>
+      <p className="text-xs text-gray-500 mt-1">{sub}</p>
     </div>
   );
 }

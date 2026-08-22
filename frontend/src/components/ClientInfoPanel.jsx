@@ -57,7 +57,7 @@ function Section({ title, children, defaultOpen = true }) {
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
       >
-        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{title}</span>
+        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{title}</span>
         <ChevronDown className={`w-4 h-4 text-gray-300 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && <div className="px-4 pb-3">{children}</div>}
@@ -157,7 +157,7 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
             <span className="font-semibold text-gray-800 text-sm">Enviar Contrato</span>
             {carregandoPrefill && <span className="text-[10px] text-blue-400 animate-pulse">Buscando dados...</span>}
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-400"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-500"><X className="w-4 h-4" /></button>
         </div>
 
         <form onSubmit={enviar} className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
@@ -336,7 +336,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
               {nomeExibido || conversa.clienteWhatsapp}
             </p>
             {nomeExibido && (
-              <p className="text-xs text-gray-400 truncate mt-0.5">{conversa.clienteWhatsapp}</p>
+              <p className="text-xs text-gray-500 truncate mt-0.5">{conversa.clienteWhatsapp}</p>
             )}
           </div>
         </div>
@@ -382,7 +382,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
 
         {isEncerrada && (
           <div className="space-y-2">
-            <span className="w-full flex items-center justify-center text-xs text-gray-400 py-1.5 bg-gray-50 rounded-lg">
+            <span className="w-full flex items-center justify-center text-xs text-gray-500 py-1.5 bg-gray-50 rounded-lg">
               Atendimento encerrado
             </span>
             {conversa.contratoStatus === 'assinado' && (
@@ -536,7 +536,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
             </div>
           )}
           {!isEncerrada && (
-            <form onSubmit={adicionarTag} className="flex items-center gap-1.5 text-gray-400">
+            <form onSubmit={adicionarTag} className="flex items-center gap-1.5 text-gray-500">
               <Plus className="w-3.5 h-3.5 shrink-0" />
               <input
                 value={tagInput}

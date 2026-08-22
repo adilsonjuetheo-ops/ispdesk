@@ -72,7 +72,7 @@ export default function Agents() {
 
   const filialNome = id => filiais.find(f => f.id === id)?.nome;
 
-  if (loading) return <div className="p-8 text-gray-400">Carregando...</div>;
+  if (loading) return <div className="p-8 text-gray-500">Carregando...</div>;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -91,7 +91,7 @@ export default function Agents() {
         <div className="bg-white rounded-xl border border-gray-200">
           <table className="w-full">
             <thead>
-              <tr className="text-gray-400 text-xs uppercase border-b border-gray-200">
+              <tr className="text-gray-500 text-xs uppercase border-b border-gray-200">
                 <th className="text-left px-5 py-3">Funcionário</th>
                 <th className="text-left px-5 py-3">Filial</th>
                 <th className="text-left px-5 py-3">Papel</th>
@@ -109,7 +109,7 @@ export default function Agents() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-800">{ag.nome}</p>
-                        <p className="text-xs text-gray-400">{ag.email}</p>
+                        <p className="text-xs text-gray-500">{ag.email}</p>
                       </div>
                     </div>
                   </td>
@@ -119,7 +119,7 @@ export default function Agents() {
                         <MapPin className="w-3 h-3" />{filialNome(ag.filialId) || '—'}
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-400">Todas</span>
+                      <span className="text-xs text-gray-500">Todas</span>
                     )}
                   </td>
                   <td className="px-5 py-3">
@@ -132,11 +132,11 @@ export default function Agents() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex gap-2 justify-end">
-                      <button onClick={() => abrirEditar(ag)} className="text-gray-400 hover:text-blue-600">
+                      <button onClick={() => abrirEditar(ag)} className="text-gray-500 hover:text-blue-600">
                         <Pencil className="w-4 h-4" />
                       </button>
                       {ag.ativo && (
-                        <button onClick={() => handleDesativar(ag)} className="text-gray-400 hover:text-red-500">
+                        <button onClick={() => handleDesativar(ag)} className="text-gray-500 hover:text-red-500">
                           <UserX className="w-4 h-4" />
                         </button>
                       )}
@@ -153,7 +153,7 @@ export default function Agents() {
             <div className="bg-white rounded-2xl w-full max-w-sm border border-gray-200 shadow-xl">
               <div className="flex items-center justify-between p-5 border-b border-gray-200">
                 <h2 className="font-semibold text-gray-800">{editando ? 'Editar funcionário' : 'Novo funcionário'}</h2>
-                <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-700">
+                <button onClick={() => setModal(false)} className="text-gray-500 hover:text-gray-700">
                   <X className="w-5 h-5" />
                 </button>
               </div>

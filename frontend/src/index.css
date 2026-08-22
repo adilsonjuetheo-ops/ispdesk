@@ -10,10 +10,37 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Companheiro do antialiased: sem ele o texto sai mais encorpado no macOS
+     que no Windows, e o mesmo painel parece dois produtos diferentes. */
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Números que se empilham em coluna — horário, contador, valor — alinham pela
+   casa quando o algarismo tem largura fixa. Sem isso "11:09" e "19:44" ficam
+   com larguras diferentes e a coluna dança. */
+time,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Foco visível para quem navega por teclado. Antes o anel dependia de cada
+   botão lembrar de declarar o seu, e a maioria não lembrava — dava para
+   percorrer a tela inteira sem enxergar onde se estava. Só no :focus-visible,
+   então o clique de mouse continua sem anel. */
+:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: #dbeafe;
+  color: #1e3a8a;
 }
 
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -21,4 +48,20 @@ body {
 ::-webkit-scrollbar-thumb {
   background: #d1d5db;
   border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Quem configurou o sistema para reduzir animação costuma ter motivo — enjoo,
+   sensibilidade vestibular. O painel tem transição em quase todo botão. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

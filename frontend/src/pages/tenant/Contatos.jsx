@@ -104,16 +104,16 @@ export default function Contatos() {
 
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {loading ? (
-            <p className="p-8 text-gray-400 text-sm">Carregando...</p>
+            <p className="p-8 text-gray-500 text-sm">Carregando...</p>
           ) : contatos.length === 0 ? (
-            <p className="p-8 text-gray-400 text-sm text-center">
+            <p className="p-8 text-gray-500 text-sm text-center">
               {busca ? 'Nenhum contato encontrado.' : 'Nenhum contato ainda.'}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="text-gray-400 text-xs uppercase border-b border-gray-200">
+                  <tr className="text-gray-500 text-xs uppercase border-b border-gray-200">
                     <th className="text-left px-5 py-3">Contato</th>
                     <th className="text-left px-5 py-3">Contrato</th>
                     <th className="px-5 py-3"></th>
@@ -124,7 +124,7 @@ export default function Contatos() {
                     <tr key={c.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                       <td className="px-5 py-3">
                         <p className="text-sm font-medium text-gray-800">{c.nome || 'Sem nome'}</p>
-                        <p className="text-xs text-gray-400 tabular-nums">{formatarTelefone(c.whatsapp)}</p>
+                        <p className="text-xs text-gray-500 tabular-nums">{formatarTelefone(c.whatsapp)}</p>
                       </td>
                       <td className="px-5 py-3">
                         {c.contratoId ? (
@@ -139,21 +139,21 @@ export default function Contatos() {
                             )}
                           </div>
                         ) : <span className="text-xs text-gray-300">—</span>}
-                        {c.filialNome && <p className="text-xs text-gray-400 mt-0.5">{c.filialNome}</p>}
+                        {c.filialNome && <p className="text-xs text-gray-500 mt-0.5">{c.filialNome}</p>}
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex gap-2 justify-end">
                           <button onClick={() => navigate(`/inbox?novo=${c.whatsapp}`)}
                             title="Iniciar conversa"
-                            className="text-gray-400 hover:text-blue-600">
+                            className="text-gray-500 hover:text-blue-600">
                             <MessageSquare className="w-4 h-4" />
                           </button>
                           <button onClick={() => abrirEditar(c)} title="Editar nome"
-                            className="text-gray-400 hover:text-blue-600">
+                            className="text-gray-500 hover:text-blue-600">
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button onClick={() => excluir(c)} title="Excluir"
-                            className="text-gray-400 hover:text-red-500">
+                            className="text-gray-500 hover:text-red-500">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -171,7 +171,7 @@ export default function Contatos() {
             <div className="bg-white rounded-2xl w-full max-w-sm border border-gray-200 shadow-xl">
               <div className="flex items-center justify-between p-5 border-b border-gray-200">
                 <h2 className="font-semibold text-gray-800">{editando ? 'Editar contato' : 'Novo contato'}</h2>
-                <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-700">
+                <button onClick={() => setModal(false)} className="text-gray-500 hover:text-gray-700">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -187,9 +187,9 @@ export default function Contatos() {
                   <input value={form.telefone} disabled={!!editando} inputMode="tel"
                     onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))}
                     placeholder="(33) 99999-9999"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400" />
                   {!editando && (
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       Com DDD. Se o número já for cliente, buscamos nome e contrato no sistema.
                     </p>
                   )}

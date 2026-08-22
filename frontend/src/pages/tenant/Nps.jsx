@@ -10,7 +10,7 @@ function ScoreGauge({ score }) {
     <div className="flex flex-col items-center">
       <span className={`text-6xl font-bold ${cor}`}>{score}</span>
       <span className="text-sm text-gray-500 mt-1">{label}</span>
-      <span className="text-xs text-gray-400 mt-0.5">NPS Score</span>
+      <span className="text-xs text-gray-500 mt-0.5">NPS Score</span>
     </div>
   );
 }
@@ -62,7 +62,7 @@ export default function Nps() {
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 font-medium">Nenhuma avaliação recebida ainda.</p>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-gray-500 mt-1">
               O NPS é enviado automaticamente quando um agente encerra uma conversa.
             </p>
           </div>
@@ -135,7 +135,7 @@ export default function Nps() {
                     />
                   )}
                 </div>
-                <div className="flex justify-between text-xs text-gray-400 mt-1.5">
+                <div className="flex justify-between text-xs text-gray-500 mt-1.5">
                   <span className="text-green-600">{Math.round((dados.promotores / dados.total) * 100)}% promotores</span>
                   <span className="text-red-600">{Math.round((dados.detratores / dados.total) * 100)}% detratores</span>
                 </div>
@@ -157,7 +157,7 @@ export default function Nps() {
                       <p className="text-sm font-medium text-gray-800 truncate">
                         {r.clienteNome || r.clienteWhatsapp}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-gray-500">
                         {r.respondidoEm
                           ? new Date(r.respondidoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
                           : '—'}
