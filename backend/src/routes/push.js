@@ -7,11 +7,15 @@ import { autenticar } from '../middleware/auth.js';
 
 const router = Router();
 
-webpush.setVapidDetails(
-  'mailto:' + (process.env.VAPID_EMAIL || 'admin@ispdesk.com.br'),
-  process.env.VAPID_PUBLIC_KEY || '',
-  process.env.VAPID_PRIVATE_KEY || '',
-);
+// Mesma armadilha do services/pushNotification.js: com chave vazia isso lança na
+// importação e derruba o app.js inteiro na subida.
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:' + (process.env.VAPID_EMAIL || 'admin@ispdesk.com.br'),
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  );
+}
 
 // Retorna a chave pública VAPID para o frontend usar no subscribe
 router.get('/vapid-public-key', (req, res) => {

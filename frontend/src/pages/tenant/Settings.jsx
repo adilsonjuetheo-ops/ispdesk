@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight, ArrowRightLeft } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Stethoscope, CircleCheck, TriangleAlert, CircleX, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight, ArrowRightLeft } from 'lucide-react';
 
 function carregarFbSdk() {
   return new Promise((resolve) => {
@@ -732,6 +732,75 @@ function RoteamentoSection() {
   );
 }
 
+const ESTADO = {
+  ok:     { Icone: CircleCheck,   cor: 'text-emerald-600', fundo: 'bg-emerald-50 border-emerald-200' },
+  alerta: { Icone: TriangleAlert, cor: 'text-amber-600',   fundo: 'bg-amber-50 border-amber-200' },
+  falha:  { Icone: CircleX,       cor: 'text-red-600',     fundo: 'bg-red-50 border-red-200' },
+};
+
+// Verificação sob demanda: nada roda sozinho em segundo plano, então não há
+// como bater no sistema do provedor sem alguém ter pedido.
+function Diagnostico() {
+  const [rodando, setRodando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [erro, setErro] = useState('');
+
+  const verificar = async () => {
+    setRodando(true); setErro(''); setResultado(null);
+    try {
+      const { data } = await api.get('/tenants/me/diagnostico');
+      setResultado(data);
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Não foi possível concluir a verificação.');
+    } finally {
+      setRodando(false);
+    }
+  };
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-5">
+      <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+        <Stethoscope className="w-4 h-4 text-gray-400" /> Verificação de funcionamento
+      </h2>
+      <p className="text-xs text-gray-500 mb-4">
+        Testa o número do WhatsApp, a integração com o seu sistema e o recebimento
+        de mensagens. Só consulta — não envia nada para ninguém.
+      </p>
+
+      <button type="button" onClick={verificar} disabled={rodando}
+        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60">
+        {rodando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Stethoscope className="w-4 h-4" />}
+        {rodando ? 'Verificando...' : 'Verificar agora'}
+      </button>
+
+      {erro && <p className="text-sm text-red-600 mt-3">{erro}</p>}
+
+      {resultado && (
+        <div className="mt-4 space-y-2">
+          {resultado.itens.map(item => {
+            const { Icone, cor, fundo } = ESTADO[item.estado] || ESTADO.alerta;
+            return (
+              <div key={item.titulo} className={`flex items-start gap-2.5 border rounded-lg px-3 py-2.5 ${fundo}`}>
+                <Icone className={`w-4 h-4 shrink-0 mt-0.5 ${cor}`} />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{item.titulo}</p>
+                  <p className="text-sm text-gray-600 leading-relaxed">{item.detalhe}</p>
+                  {item.comoResolver && item.estado !== 'ok' && (
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">{item.comoResolver}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          <p className="text-xs text-gray-400 pt-1">
+            Verificado em {new Date(resultado.verificadoEm).toLocaleString('pt-BR')}
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function Settings() {
   const { user } = useAuth();
   const [tenant, setTenant] = useState(null);
@@ -980,6 +1049,8 @@ export default function Settings() {
         <h1 className="text-xl font-bold text-gray-800 mb-8">Configurações do Provedor</h1>
 
         <form onSubmit={handleSalvar} className="space-y-5">
+
+          <Diagnostico />
 
           {/* logo + identidade */}
           <section className="bg-white rounded-xl border border-gray-200 p-5">

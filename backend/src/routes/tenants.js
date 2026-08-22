@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { getLimite, getUso, getMes } from '../services/limites.js';
 import { buscarContextoSgp, buscarContextoPorDocumentoSgp } from '../services/sgp.js';
 import { processarProvedor as processarLembretesProvedor, testarClienteEspecifico } from '../jobs/lembreteFaturas.js';
+import { diagnosticar } from '../services/diagnostico.js';
 
 const router = Router();
 
@@ -58,6 +59,20 @@ router.get('/me/uso-ia', autenticar, async (req, res) => {
   const limite = getLimite(tenant?.plano);
   const percentual = Math.floor((contagem / limite) * 100);
   res.json({ contagem, limite, percentual, mes: getMes() });
+});
+
+// Verificação de saúde sob demanda. Fica antes do `router.use(apenasSuper)` lá
+// embaixo, senão o admin do provedor levaria 403 — o mesmo tropeço que já houve
+// com os atalhos.
+router.get('/me/diagnostico', autenticar, async (req, res) => {
+  if (!req.user.tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+  if (req.user.role !== 'admin') return res.status(403).json({ erro: 'Apenas administradores' });
+  try {
+    res.json(await diagnosticar(req.user.tenantId));
+  } catch (err) {
+    console.error('[diagnostico] Falha:', err.message);
+    res.status(500).json({ erro: 'Não foi possível concluir a verificação.' });
+  }
 });
 
 // rota de edição própria: admin pode editar seu tenant

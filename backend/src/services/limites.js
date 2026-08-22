@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { enviarMensagem } from './whatsapp.js';
+import { enviarPushParaTenant } from './pushNotification.js';
 
 const LIMITES = { basic: 3000, pro: 10000 };
 
@@ -43,7 +44,7 @@ export async function incrementarUso(tenant) {
   // Verifica thresholds em ordem; envia apenas o primeiro novo que for atingido
   for (const threshold of [80, 90, 100]) {
     if (percentual >= threshold && !alertasEnviados.includes(threshold)) {
-      await enviarAlertaWhatsApp(tenant, threshold, contagem, limite, mes);
+      await avisarProvedor(tenant, threshold, contagem, limite, mes);
       alertasEnviados.push(threshold);
       await sql`
         UPDATE uso_ia
@@ -57,7 +58,24 @@ export async function incrementarUso(tenant) {
   return { contagem, limite, percentual, bloqueado: contagem > limite };
 }
 
-async function enviarAlertaWhatsApp(tenant, threshold, contagem, limite, mes) {
+async function avisarProvedor(tenant, threshold, contagem, limite, mes) {
+  const contagemBruta = contagem.toLocaleString('pt-BR');
+  const limiteBruto = limite.toLocaleString('pt-BR');
+
+  // Push primeiro, e sem depender de nada estar configurado. O aviso por
+  // WhatsApp abaixo vai como mensagem livre, e mensagem livre só é entregue
+  // dentro da janela de 24h contada a partir de uma mensagem que a PESSOA tenha
+  // mandado para o número do provedor — o dono não conversa com o próprio
+  // número comercial, então na prática ele nunca chegava. O push não tem essa
+  // restrição e não custa nada.
+  enviarPushParaTenant(tenant.id, {
+    title: threshold >= 100 ? 'ISPDesk — limite de IA atingido' : 'ISPDesk — uso de IA',
+    body: threshold >= 100
+      ? `Franquia do mês esgotada (${contagemBruta}/${limiteBruto}). O bot está pausado.`
+      : `Franquia do mês em ${threshold}% (${contagemBruta}/${limiteBruto}).`,
+    tag: `uso-ia-${mes}`,
+  }).catch(err => console.error('[limites] Falha no push de uso:', err.message));
+
   if (!tenant.whatsappContato || !tenant.whatsappNumberId || !tenant.whatsappToken) return;
 
   // Normaliza número (remove tudo que não for dígito)
@@ -102,6 +120,6 @@ async function enviarAlertaWhatsApp(tenant, threshold, contagem, limite, mes) {
   try {
     await enviarMensagem(tenant, numero, msg);
   } catch (err) {
-    console.error('[limites] Falha ao enviar alerta WhatsApp:', err.message);
+    console.error('[limites] Falha ao enviar alerta por WhatsApp:', err.message);
   }
 }
