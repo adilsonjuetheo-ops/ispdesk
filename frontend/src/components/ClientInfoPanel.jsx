@@ -233,7 +233,6 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
 export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] }) {
   const { user } = useAuth();
   const [tagInput, setTagInput] = useState('');
-  const [encerrando, setEncerrando] = useState(false);
   const [modalContrato, setModalContrato] = useState(false);
   const [agentes, setAgentes] = useState([]);
   const [editandoAgente, setEditandoAgente] = useState(false);
@@ -307,19 +306,6 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
     ? conversa.clienteNome
     : null;
 
-  async function encerrar() {
-    if (!confirm('Encerrar este atendimento?')) return;
-    setEncerrando(true);
-    try {
-      await api.post(`/conversations/${conversa.id}/close`);
-      onAtualizar?.();
-    } catch (err) {
-      alert('Erro ao encerrar: ' + err.message);
-    } finally {
-      setEncerrando(false);
-    }
-  }
-
   async function adicionarTag(e) {
     e.preventDefault();
     const tag = tagInput.trim();
@@ -357,15 +343,6 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
 
         {!isEncerrada && (
           <div className="space-y-2">
-            <button
-              onClick={encerrar}
-              disabled={encerrando}
-              className="w-full flex items-center justify-center gap-2 border border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-700 hover:bg-red-50 text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-60"
-            >
-              <X className="w-4 h-4" />
-              {encerrando ? 'Encerrando...' : 'Encerrar atendimento'}
-            </button>
-
             {temAssinatura && conversa.status === 'humano' && !conversa.contratoStatus && (
               <button
                 onClick={() => setModalContrato(true)}

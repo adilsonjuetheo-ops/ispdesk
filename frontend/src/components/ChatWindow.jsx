@@ -9,6 +9,7 @@ import {
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
   List, ListOrdered, Plus, ArrowLeft, Video, Sparkles, Maximize2, Clock,
+  MoreHorizontal, PanelRight,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -416,11 +417,12 @@ function TransferModal({ conversa, onClose, onTransferred }) {
   );
 }
 
-export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
+export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAberto, onTogglePainel }) {
   const { user } = useAuth();
   const [msgs, setMsgs] = useState([]);
   const [texto, setTexto] = useState('');
   const [pendentes, setPendentes] = useState([]);
+  const [menuAberto, setMenuAberto] = useState(false);
   const filaEnvioRef = useRef(Promise.resolve());
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const [sugerindo, setSugerindo] = useState(false);
@@ -513,6 +515,10 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
   };
 
   const handleEncerrar = async () => {
+    // Encerrar dispara a pesquisa de satisfação para o cliente. Reabrir a
+    // conversa depois não desfaz a mensagem que já saiu — daí a confirmação.
+    if (!confirm('Encerrar este atendimento? O cliente receberá a pesquisa de satisfação.')) return;
+    setMenuAberto(false);
     setAcao(true);
     try { await api.post(`/conversations/${conversa.id}/close`); onAtualizar(); carregarMsgs(); }
     catch (err) { alert(err.response?.data?.erro || 'Não foi possível encerrar a conversa.'); }
@@ -734,13 +740,9 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
               <p className="text-xs text-gray-400 truncate">{conversa.clienteWhatsapp}{conversa.clienteFilial ? ` · ${conversa.clienteFilial}` : ''}</p>
             </div>
           </div>
-          <div className="flex gap-2 items-center">
-            {podeAtuar && (
-              <button onClick={() => setShowTransfer(true)}
-                className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-                <ArrowRightLeft className="w-3.5 h-3.5" /> {eHumano ? 'Transferir' : 'Atribuir'}
-              </button>
-            )}
+          {/* Uma ação primária por estado; as raras vão para o menu. Antes eram
+              quatro botões de peso parecido disputando o mesmo canto. */}
+          <div className="flex gap-2 items-center shrink-0">
             {podeAtuar && !eHumano && (
               <button onClick={handleAsumir} disabled={acao}
                 className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-60">
@@ -748,16 +750,51 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar }) {
               </button>
             )}
             {eHumano && (
-              <>
-                <button onClick={handleLiberar} disabled={acao}
-                  className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60">
-                  <Bot className="w-3.5 h-3.5" /> Liberar para bot
+              <button onClick={handleEncerrar} disabled={acao}
+                className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-700 hover:bg-red-50 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60">
+                <X className="w-3.5 h-3.5" /> Encerrar
+              </button>
+            )}
+
+            {podeAtuar && (
+              <div className="relative">
+                <button onClick={() => setMenuAberto(v => !v)} title="Mais ações"
+                  aria-label="Mais ações" aria-expanded={menuAberto}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                  <MoreHorizontal className="w-4 h-4" />
                 </button>
-                <button onClick={handleEncerrar} disabled={acao}
-                  className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-700 hover:bg-red-50 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60">
-                  <X className="w-3.5 h-3.5" /> Encerrar
-                </button>
-              </>
+                {menuAberto && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setMenuAberto(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-white rounded-xl shadow-lg border border-gray-200 py-1">
+                      <button onClick={() => { setMenuAberto(false); setShowTransfer(true); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        <ArrowRightLeft className="w-4 h-4 text-gray-400" />
+                        {eHumano ? 'Transferir conversa' : 'Atribuir a alguém'}
+                      </button>
+                      {eHumano && (
+                        <button onClick={() => { setMenuAberto(false); handleLiberar(); }} disabled={acao}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                          <Bot className="w-4 h-4 text-gray-400" /> Liberar para o bot
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {onTogglePainel && (
+              <button onClick={onTogglePainel}
+                title={painelAberto ? 'Ocultar dados do cliente' : 'Mostrar dados do cliente'}
+                aria-label={painelAberto ? 'Ocultar dados do cliente' : 'Mostrar dados do cliente'}
+                className={`hidden md:block p-1.5 rounded-lg transition-colors ${
+                  painelAberto
+                    ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                    : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+                }`}>
+                <PanelRight className="w-4 h-4" />
+              </button>
             )}
           </div>
         </div>

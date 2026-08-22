@@ -5,7 +5,8 @@ import { usePolling } from '../../hooks/usePolling.js';
 import { usePushNotifications } from '../../hooks/usePushNotifications.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
-  Activity, Clock, UserCheck, Archive, MapPin, Zap, AlertTriangle, Star, X, BookUser } from 'lucide-react';
+  Activity, Clock, UserCheck, Archive, MapPin, Zap, AlertTriangle, Star, X, BookUser,
+  PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import api from '../../lib/api.js';
 import UpdateBanner from '../UpdateBanner.jsx';
 import BottomTabBar from '../BottomTabBar.jsx';
@@ -14,6 +15,13 @@ const AVATAR_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b',
   '#10b981', '#3b82f6', '#ef4444', '#14b8a6',
 ];
+
+// Preferência de layout do operador, guardada no navegador: é ajuste de tela,
+// não dado de conta.
+const PREF_MENU = 'ispdesk_menu_recolhido';
+function lerMenuRecolhido() {
+  try { return localStorage.getItem(PREF_MENU) === '1'; } catch { return false; }
+}
 
 // Tratamento único dos ícones da barra lateral. Conviviam três tamanhos ali
 // (12, 14 e 16px) vindos de trechos de código diferentes, sem que a diferença
@@ -35,6 +43,7 @@ export default function TenantLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [recolhido, setRecolhido] = useState(lerMenuRecolhido);
   const [temIncidenteAtivo, setTemIncidenteAtivo] = useState(false);
   const [tenant, setTenant] = useState(null);
   const [filiais, setFiliais] = useState([]);
@@ -108,27 +117,43 @@ export default function TenantLayout() {
   const isTodos = isInbox && !currentView && !currentFilial;
   const isFilialActive = id => isInbox && currentFilial === id;
 
+  // No celular a barra é uma gaveta que abre por cima; recolher ali não faz
+  // sentido, então o modo ícone só vale quando ela está fixa no desktop.
+  const colapsado = recolhido && !sidebarOpen;
+
+  const alternarRecolhido = () => setRecolhido(v => {
+    try { localStorage.setItem(PREF_MENU, v ? '0' : '1'); } catch { /* modo privado */ }
+    return !v;
+  });
+
   const subItem = (active, onClick, Icon, label, badge) => (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2.5 w-full pl-3 pr-2 py-1.5 rounded-lg text-sm transition-colors ${ICONE} ${
+      title={colapsado ? label : undefined}
+      className={`relative flex items-center gap-2.5 w-full py-1.5 rounded-lg text-sm transition-colors ${ICONE} ${
+        colapsado ? 'justify-center px-0' : 'pl-3 pr-2'
+      } ${
         active
           ? 'bg-blue-50 text-blue-700 font-medium [&>svg]:text-blue-600'
           : `text-gray-500 hover:text-gray-800 hover:bg-gray-50 ${ICONE_APAGADO}`
       }`}
     >
       <Icon />
-      <span className="flex-1 text-left truncate">{label}</span>
-      {badge > 0 && (
+      {!colapsado && <span className="flex-1 text-left truncate">{label}</span>}
+      {badge > 0 && (colapsado ? (
+        <span className="absolute top-0.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full" />
+      ) : (
         <span className="bg-blue-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center leading-none">
           {badge}
         </span>
-      )}
+      ))}
     </button>
   );
 
   const navClass = ({ isActive }) =>
-    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${ICONE} ${
+    `flex items-center gap-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${ICONE} ${
+      colapsado ? 'justify-center px-0' : 'px-3'
+    } ${
       isActive
         ? 'bg-blue-50 text-blue-700 [&>svg]:text-blue-600'
         : `text-gray-600 hover:text-gray-900 hover:bg-gray-100 ${ICONE_APAGADO}`
@@ -146,8 +171,8 @@ export default function TenantLayout() {
 
       <aside className={`
         fixed md:static inset-y-0 left-0 z-30 h-full
-        w-72 md:w-56 bg-white border-r border-gray-200 flex flex-col select-none
-        transition-transform duration-200 ease-in-out
+        w-72 ${colapsado ? 'md:w-14' : 'md:w-56'} bg-white border-r border-gray-200 flex flex-col select-none
+        transition-all duration-200 ease-in-out
         ${sidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full md:translate-x-0'}
       `}>
         {/* Botão fechar — mobile only */}
@@ -157,12 +182,12 @@ export default function TenantLayout() {
         </button>
 
         {/* logo / nome do provedor */}
-        <div className="p-4 border-b border-gray-200">
+        <div className={`border-b border-gray-200 ${colapsado ? 'p-2' : 'p-4'}`}>
           {tenant?.logoUrl ? (
             <div className="flex items-center gap-2">
               <img src={tenant.logoUrl} alt={tenant.nome}
                 className="h-9 w-9 object-contain rounded-lg border border-gray-100 bg-gray-50 p-0.5" />
-              <div className="min-w-0">
+              <div className={`min-w-0 ${colapsado ? 'hidden' : ''}`}>
                 <p className="text-sm font-bold text-gray-800 truncate leading-tight">
                   {tenant.nomeFantasia || tenant.nome}
                 </p>
@@ -174,7 +199,7 @@ export default function TenantLayout() {
               <div className="rounded-lg p-1.5 shrink-0" style={{ backgroundColor: cor }}>
                 <Wifi className="w-4 h-4 text-white" />
               </div>
-              <div className="min-w-0">
+              <div className={`min-w-0 ${colapsado ? 'hidden' : ''}`}>
                 <p className="text-sm font-bold text-gray-800 truncate leading-tight">
                   {tenant?.nomeFantasia || tenant?.nome}
                 </p>
@@ -187,9 +212,11 @@ export default function TenantLayout() {
         <nav className="flex-1 p-2 overflow-y-auto">
           {/* Conversas */}
           <div className="mb-2">
-            <p className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              Conversas
-            </p>
+            {!colapsado && (
+              <p className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Conversas
+              </p>
+            )}
             <div className="space-y-0.5">
               {subItem(isTodos, () => navigate('/inbox'), Activity, 'Acontecendo agora', counts.todos)}
               {subItem(isView('fila'), () => navigate('/inbox?view=fila'), Clock, 'Fila', counts.fila)}
@@ -201,9 +228,11 @@ export default function TenantLayout() {
           {/* Filiais */}
           {filiais.length > 0 && (
             <div className="mb-2">
-              <p className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                Filiais
-              </p>
+              {!colapsado && (
+                <p className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Filiais
+                </p>
+              )}
               <div className="space-y-0.5">
                 {filiais.filter(f => f.ativo).map(f =>
                   subItem(
@@ -221,34 +250,36 @@ export default function TenantLayout() {
           {/* Separado das filiais de propósito: sem a divisória o item lia como
               se fosse mais uma unidade da lista acima. */}
           <div className="pt-2 mt-1 border-t border-gray-100">
-            <NavLink to="/contatos" className={navClass}>
-              <BookUser /> Contatos
+            <NavLink to="/contatos" className={navClass} title={colapsado ? 'Contatos' : undefined}>
+              <BookUser /> {!colapsado && 'Contatos'}
             </NavLink>
           </div>
 
           {/* Admin */}
           {user?.role === 'admin' && (
             <div className="pt-2 mt-1 border-t border-gray-100 space-y-0.5">
-              <NavLink to="/relatorio" className={navClass}>
-                <BarChart2 /> Relatório
+              <NavLink to="/relatorio" className={navClass} title={colapsado ? 'Relatório' : undefined}>
+                <BarChart2 /> {!colapsado && 'Relatório'}
               </NavLink>
-              <NavLink to="/nps" className={navClass}>
-                <Star /> NPS
+              <NavLink to="/nps" className={navClass} title={colapsado ? 'NPS' : undefined}>
+                <Star /> {!colapsado && 'NPS'}
               </NavLink>
-              <NavLink to="/agents" className={navClass}>
-                <Users /> Equipe
+              <NavLink to="/agents" className={navClass} title={colapsado ? 'Equipe' : undefined}>
+                <Users /> {!colapsado && 'Equipe'}
               </NavLink>
-              <NavLink to="/atalhos" className={navClass}>
-                <Zap /> Atalhos
+              <NavLink to="/atalhos" className={navClass} title={colapsado ? 'Atalhos' : undefined}>
+                <Zap /> {!colapsado && 'Atalhos'}
               </NavLink>
-              <NavLink to="/incidentes" className={({ isActive }) =>
-                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${ICONE} ${
+              <NavLink to="/incidentes" title={colapsado ? 'Incidentes' : undefined} className={({ isActive }) =>
+                `flex items-center gap-2.5 py-2 rounded-lg text-sm font-medium transition-colors ${ICONE} ${
+                  colapsado ? 'justify-center px-0' : 'px-3'
+                } ${
                   isActive
                     ? 'bg-red-50 text-red-700 [&>svg]:text-red-600'
                     : `text-gray-600 hover:text-gray-900 hover:bg-gray-100 ${ICONE_APAGADO}`
                 }`}>
                 <AlertTriangle />
-                <span className="flex-1">Incidentes</span>
+                {!colapsado && <span className="flex-1">Incidentes</span>}
                 {temIncidenteAtivo && (
                   <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
                 )}
@@ -257,7 +288,7 @@ export default function TenantLayout() {
           )}
         </nav>
 
-        {usoIa && usoIa.percentual >= 80 && (
+        {usoIa && usoIa.percentual >= 80 && !colapsado && (
           <div className={`mx-2 mb-2 p-2.5 rounded-lg border text-xs ${
             usoIa.percentual >= 100
               ? 'bg-red-50 border-red-200 text-red-800'
@@ -289,19 +320,36 @@ export default function TenantLayout() {
           </div>
         )}
 
-        <div className="p-3 border-t border-gray-200">
+        <div className={`border-t border-gray-200 ${colapsado ? 'p-2' : 'p-3'}`}>
+          {/* Recolher é preferência de tela, não navegação — por isso mora aqui
+              embaixo, junto com sair e configurações, e não no meio dos itens. */}
+          <button onClick={alternarRecolhido}
+            title={colapsado ? 'Expandir menu' : 'Recolher menu'}
+            aria-label={colapsado ? 'Expandir menu' : 'Recolher menu'}
+            className={`hidden md:flex items-center gap-2.5 w-full py-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors ${ICONE} ${ICONE_APAGADO} ${
+              colapsado ? 'justify-center px-0' : 'px-3'
+            }`}>
+            {colapsado ? <PanelLeftOpen /> : <PanelLeftClose />}
+            {!colapsado && 'Recolher menu'}
+          </button>
+
           {user?.role === 'admin' && (
-            <NavLink to="/settings" className={navClass}>
-              <Settings /> Configurações
+            <NavLink to="/settings" className={navClass} title={colapsado ? 'Configurações' : undefined}>
+              <Settings /> {!colapsado && 'Configurações'}
             </NavLink>
           )}
-          <div className="px-3 py-2">
-            <p className="text-xs font-medium text-gray-800 truncate">{user?.nome}</p>
-            <p className="text-xs text-gray-500 truncate capitalize">{user?.role}</p>
-          </div>
+          {!colapsado && (
+            <div className="px-3 py-2">
+              <p className="text-xs font-medium text-gray-800 truncate">{user?.nome}</p>
+              <p className="text-xs text-gray-500 truncate capitalize">{user?.role}</p>
+            </div>
+          )}
           <button onClick={handleLogout}
-            className={`flex items-center gap-2.5 w-full px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ${ICONE} [&>svg]:text-gray-400 hover:[&>svg]:text-red-600`}>
-            <LogOut /> Sair
+            title={colapsado ? 'Sair' : undefined}
+            className={`flex items-center gap-2.5 w-full py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ${ICONE} [&>svg]:text-gray-400 hover:[&>svg]:text-red-600 ${
+              colapsado ? 'justify-center px-0' : 'px-3'
+            }`}>
+            <LogOut /> {!colapsado && 'Sair'}
           </button>
         </div>
       </aside>

@@ -23,6 +23,16 @@ function avatarColor(nome) {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
+// "MARCOS VIEIRA DA SILVA SANTOS" não cabe na coluna e vira "MARCOS VIEI...",
+// que não identifica ninguém. Primeiro e último nome cabem e identificam.
+function nomeCurto(nome) {
+  const partes = String(nome || '').trim().split(/\s+/).filter(Boolean);
+  if (partes.length <= 2) return nome;
+  const conectivos = new Set(['da', 'de', 'do', 'das', 'dos', 'e']);
+  const ultimo = [...partes].reverse().find(p => !conectivos.has(p.toLowerCase())) || partes[partes.length - 1];
+  return `${partes[0]} ${ultimo}`;
+}
+
 function iniciais(nome) {
   const partes = (nome || '?').split(' ').filter(Boolean);
   if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
@@ -250,9 +260,8 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
           const naoLida = hasUnread(c);
           const ativa = selecionada?.id === c.id;
           const tags = Array.isArray(c.tags) ? c.tags : [];
-          const nomeExib = c.clienteNome && c.clienteNome !== c.clienteWhatsapp
-            ? c.clienteNome
-            : c.clienteWhatsapp;
+          const temNome = c.clienteNome && c.clienteNome !== c.clienteWhatsapp;
+          const nomeExib = temNome ? nomeCurto(c.clienteNome) : c.clienteWhatsapp;
           const tempoRef = c.ultimaMsgEm || c.iniciadaEm;
 
           const statusAberto = c.status !== 'encerrada';
@@ -260,7 +269,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
             <div className="relative shrink-0 mt-0.5">
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                style={{ backgroundColor: avatarColor(nomeExib) }}
+                style={{ backgroundColor: avatarColor(c.clienteNome || c.clienteWhatsapp) }}
               >
                 {c.clienteNome && c.clienteNome !== c.clienteWhatsapp
                   ? iniciais(c.clienteNome)
@@ -297,7 +306,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 mb-0.5">
-                    <p className={clsx('text-sm truncate flex-1 min-w-0', naoLida ? 'font-bold text-gray-900' : 'font-semibold text-gray-800')}>
+                    <p title={c.clienteNome || undefined} className={clsx('text-sm truncate flex-1 min-w-0', naoLida ? 'font-bold text-gray-900' : 'font-semibold text-gray-800')}>
                       {nomeExib}
                     </p>
                     {tags.slice(0, 1).map(t => (
@@ -330,7 +339,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                   {avatarNode}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <p className={clsx('text-sm truncate flex-1 min-w-0', naoLida ? 'font-bold text-gray-900' : 'font-semibold text-gray-800')}>
+                      <p title={c.clienteNome || undefined} className={clsx('text-sm truncate flex-1 min-w-0', naoLida ? 'font-bold text-gray-900' : 'font-semibold text-gray-800')}>
                         {nomeExib}
                       </p>
                       {tags.slice(0, 1).map(t => (

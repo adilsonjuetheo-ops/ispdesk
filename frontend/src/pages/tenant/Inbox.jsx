@@ -9,6 +9,20 @@ import ClientInfoPanel from '../../components/ClientInfoPanel.jsx';
 import { Bot, Zap, Users, BarChart2, Star, MessageCircle, ArrowRight, BookUser, ExternalLink, Clock, UserCheck } from 'lucide-react';
 import { differenceInMinutes, format } from 'date-fns';
 
+// Preferência de layout do operador. Fica no navegador de propósito: é ajuste
+// de tela, não dado de conta — quem usa dois computadores costuma querer
+// arranjos diferentes em cada um.
+const PREF = 'ispdesk_painel_cliente';
+function lerPreferencia(chave, padrao) {
+  try {
+    const v = localStorage.getItem(chave);
+    return v === null ? padrao : v === '1';
+  } catch { return padrao; }
+}
+function gravarPreferencia(chave, valor) {
+  try { localStorage.setItem(chave, valor ? '1' : '0'); } catch { /* modo privado */ }
+}
+
 function saudacao(nome) {
   const h = new Date().getHours();
   const periodo = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
@@ -305,6 +319,7 @@ export default function Inbox() {
   const [conversas, setConversas] = useState([]);
   const [selecionada, setSelecionada] = useState(null);
   const [slaMinutos, setSlaMinutos] = useState(0);
+  const [painelAberto, setPainelAberto] = useState(() => lerPreferencia(PREF, true));
   const [searchParams] = useSearchParams();
   const convIdsRef = useRef(null);
   const novaIdRef = useRef(null);
@@ -379,11 +394,15 @@ export default function Inbox() {
                 conversa={selecionada}
                 onAtualizar={carregarConversas}
                 onVoltar={() => setSelecionada(null)}
+                painelAberto={painelAberto}
+                onTogglePainel={() => setPainelAberto(v => { gravarPreferencia(PREF, !v); return !v; })}
               />
             </div>
-            <div className="hidden md:block">
-              <ClientInfoPanel conversa={selecionada} onAtualizar={carregarConversas} conversas={conversas} />
-            </div>
+            {painelAberto && (
+              <div className="hidden md:block">
+                <ClientInfoPanel conversa={selecionada} onAtualizar={carregarConversas} conversas={conversas} />
+              </div>
+            )}
           </>
         ) : (
           <WelcomePanel
