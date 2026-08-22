@@ -382,7 +382,7 @@ export default function Inbox() {
               />
             </div>
             <div className="hidden md:block">
-              <ClientInfoPanel conversa={selecionada} onAtualizar={carregarConversas} />
+              <ClientInfoPanel conversa={selecionada} onAtualizar={carregarConversas} conversas={conversas} />
             </div>
           </>
         ) : (

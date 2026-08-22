@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Fingerprint, ChevronDown, User, X, Plus, MapPin, FileSignature, CheckCircle2, Clock, Copy, RefreshCw, Check } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Fingerprint, ChevronDown, User, X, Plus, MapPin, FileSignature, CheckCircle2, Clock, Copy, RefreshCw, Check, ArrowRightLeft, History, Sparkles } from 'lucide-react';
+import { formatDistanceToNowStrict, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import api from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
 
@@ -27,6 +29,24 @@ function Avatar({ nome }) {
       {ini}
     </div>
   );
+}
+
+const desde = data => {
+  if (!data) return null;
+  try { return formatDistanceToNowStrict(new Date(data), { locale: ptBR }); } catch { return null; }
+};
+
+// As etiquetas gravadas pelo bot chegam ora como lista, ora como texto JSON —
+// a coluna guarda as duas formas. Aqui só se lê, então aceita as duas.
+function primeiraTag(tags) {
+  if (Array.isArray(tags)) return tags[0] || null;
+  if (typeof tags === 'string') {
+    try {
+      const parsed = JSON.parse(tags);
+      return Array.isArray(parsed) ? parsed[0] || null : null;
+    } catch { return null; }
+  }
+  return null;
 }
 
 function Section({ title, children, defaultOpen = true }) {
@@ -210,7 +230,7 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
   );
 }
 
-export default function ClientInfoPanel({ conversa, onAtualizar }) {
+export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] }) {
   const { user } = useAuth();
   const [tagInput, setTagInput] = useState('');
   const [encerrando, setEncerrando] = useState(false);
@@ -221,6 +241,28 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
   const [reenviando, setReenviando] = useState(false);
   const [erroReenvio, setErroReenvio] = useState('');
   const temAssinatura = ['pro', 'enterprise'].includes(user?.plano);
+
+  // Sai da lista que o Inbox já tem em mãos — nenhuma consulta nova. Saber que
+  // é o quarto contato do mês, e sobre o quê, muda como a atendente responde.
+  const historico = useMemo(() => {
+    if (!conversa.clienteId) return null;
+    const anteriores = conversas.filter(
+      c => c.clienteId === conversa.clienteId && c.id !== conversa.id
+    );
+    if (!anteriores.length) return { total: 0 };
+
+    const quando = c => new Date(c.ultimaMsgEm || c.iniciadaEm).getTime();
+    const ultima = anteriores.reduce((a, c) => (quando(c) > quando(a) ? c : a));
+
+    const contagem = {};
+    for (const c of anteriores) {
+      const tag = primeiraTag(c.tags);
+      if (tag && tag !== 'Outros') contagem[tag] = (contagem[tag] || 0) + 1;
+    }
+    const [assunto, vezes] = Object.entries(contagem).sort((x, y) => y[1] - x[1])[0] || [];
+
+    return { total: anteriores.length, ultima, assunto, vezes };
+  }, [conversas, conversa.clienteId, conversa.id]);
 
   useEffect(() => {
     const tid = user?.tenantId;
@@ -376,6 +418,29 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
         )}
       </div>
 
+      {/* Por que a conversa chegou até aqui. O bot grava um motivo detalhado em
+          toda transferência e ele não aparecia em lugar nenhum — quem assumia
+          tinha que ler a conversa inteira para descobrir. */}
+      {conversa.motivoHandoff && (
+        <Section title="Motivo da transferência">
+          <div className="flex items-start gap-2.5">
+            <ArrowRightLeft className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-gray-700 leading-relaxed">{conversa.motivoHandoff}</p>
+          </div>
+        </Section>
+      )}
+
+      {/* Resumo da IA — tinha virado um retângulo verde perdido dentro de
+          "Informações principais", onde ninguém procura por ele. */}
+      {conversa.resumoIa && (
+        <Section title="Resumo da conversa">
+          <div className="flex items-start gap-2.5">
+            <Sparkles className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-gray-600 leading-relaxed">{conversa.resumoIa}</p>
+          </div>
+        </Section>
+      )}
+
       {/* Operador Responsável */}
       <Section title="Operador Responsável">
         {isEncerrada || agentes.length === 0 ? (
@@ -455,6 +520,14 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
               <span className="text-sm text-gray-600 truncate">{conversa.clienteFilial}</span>
             </div>
           )}
+          {conversa.iniciadaEm && desde(conversa.iniciadaEm) && (
+            <div className="flex items-center gap-2.5">
+              <Clock className="w-4 h-4 text-gray-400 shrink-0" />
+              <span className="text-sm text-gray-600">
+                aberta há {desde(conversa.iniciadaEm)}
+              </span>
+            </div>
+          )}
           {conversa.clienteStatus && (
             <div className="flex items-center gap-2.5">
               <div className={`w-2 h-2 rounded-full shrink-0 ${
@@ -463,11 +536,6 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
                 : 'bg-gray-400'
               }`} />
               <span className="text-sm text-gray-600 capitalize">{conversa.clienteStatus}</span>
-            </div>
-          )}
-          {conversa.resumoIa && (
-            <div className="mt-1 text-[11px] text-gray-500 leading-relaxed bg-emerald-50 rounded-lg p-2">
-              {conversa.resumoIa}
             </div>
           )}
         </div>
@@ -503,6 +571,43 @@ export default function ClientInfoPanel({ conversa, onAtualizar }) {
           )}
         </div>
       </Section>
+
+      {/* Histórico do cliente */}
+      {historico && (
+        <Section title="Histórico do cliente">
+          {historico.total === 0 ? (
+            <div className="flex items-center gap-2.5">
+              <History className="w-4 h-4 text-gray-400 shrink-0" />
+              <span className="text-sm text-gray-600">Primeiro contato</span>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2.5">
+                <History className="w-4 h-4 text-gray-400 shrink-0" />
+                <span className="text-sm text-gray-600">
+                  {historico.total === 1
+                    ? '1 atendimento anterior'
+                    : `${historico.total} atendimentos anteriores`}
+                </span>
+              </div>
+              {historico.ultima && (
+                <p className="text-xs text-gray-500 pl-[26px] leading-relaxed">
+                  Último há {desde(historico.ultima.ultimaMsgEm || historico.ultima.iniciadaEm)}
+                  {historico.ultima.iniciadaEm
+                    ? ` · ${format(new Date(historico.ultima.ultimaMsgEm || historico.ultima.iniciadaEm), 'dd/MM/yyyy')}`
+                    : ''}
+                </p>
+              )}
+              {historico.assunto && (
+                <p className="text-xs text-gray-500 pl-[26px] leading-relaxed">
+                  Assunto mais frequente: <span className="text-gray-700 font-medium">{historico.assunto}</span>
+                  {historico.vezes > 1 ? ` (${historico.vezes}×)` : ''}
+                </p>
+              )}
+            </div>
+          )}
+        </Section>
+      )}
 
       {modalContrato && (
         <ContratoModal
