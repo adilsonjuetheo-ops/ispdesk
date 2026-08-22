@@ -9,7 +9,7 @@ import {
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
   List, ListOrdered, Plus, ArrowLeft, Video, Sparkles, Maximize2, Clock,
-  MoreHorizontal, PanelRight,
+  MoreHorizontal, PanelRight, Play, Pause,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -41,6 +41,147 @@ function DateSeparator({ date }) {
         {label}
       </span>
       <div className="flex-1 h-px bg-gray-200" />
+    </div>
+  );
+}
+
+// Um contexto de áudio para o app inteiro: o navegador limita quantos podem
+// existir ao mesmo tempo, e uma conversa longa tem dezenas de áudios.
+let ctxAudio = null;
+function contextoAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!ctxAudio) ctxAudio = new AC();
+  return ctxAudio;
+}
+
+const BARRAS = 40;
+
+// Reduz a onda a poucas barras pegando o PICO de cada fatia. Média deixaria
+// tudo achatado e parecido; o pico preserva o desenho da fala. Amostra de 8 em
+// 8 porque o traço não muda e o custo cai junto.
+function extrairPicos(buffer) {
+  const dados = buffer.getChannelData(0);
+  const porBarra = Math.floor(dados.length / BARRAS) || 1;
+  const picos = [];
+  for (let i = 0; i < BARRAS; i++) {
+    const inicio = i * porBarra;
+    let pico = 0;
+    for (let j = 0; j < porBarra; j += 8) {
+      const v = Math.abs(dados[inicio + j] || 0);
+      if (v > pico) pico = v;
+    }
+    picos.push(pico);
+  }
+  const maior = Math.max(...picos, 0.01);
+  return picos.map(p => p / maior);
+}
+
+const mmss = seg => {
+  if (!Number.isFinite(seg) || seg < 0) return '--:--';
+  const m = Math.floor(seg / 60);
+  const s = Math.floor(seg % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
+
+// Player próprio no lugar do <audio controls>: o controle nativo muda de cara em
+// cada navegador e não cabe no balão. As barras usam currentColor, então herdam
+// a cor do texto do balão e nada de cor nova entra no painel.
+function PlayerAudio({ src, aoFalhar }) {
+  const ref = useRef(null);
+  const [tocando, setTocando] = useState(false);
+  const [pos, setPos] = useState(0);
+  const [dur, setDur] = useState(0);
+  const [picos, setPicos] = useState(null);
+
+  // Desenha a onda a partir do próprio arquivo já baixado — sem ida extra à
+  // rede. Se a decodificação falhar, cai para barras planas: perde o desenho,
+  // mas o áudio continua tocando.
+  useEffect(() => {
+    let cancelado = false;
+    if (!src) return undefined;
+    (async () => {
+      try {
+        const ctx = contextoAudio();
+        if (!ctx) return;
+        const dados = await (await fetch(src)).arrayBuffer();
+        const buffer = await ctx.decodeAudioData(dados);
+        if (cancelado) return;
+        setPicos(extrairPicos(buffer));
+        setDur(d => (d > 0 ? d : buffer.duration));
+      } catch {
+        if (!cancelado) setPicos(Array(BARRAS).fill(0.35));
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [src]);
+
+  const alternar = () => {
+    const el = ref.current;
+    if (!el) return;
+    if (el.paused) el.play().catch(() => {});
+    else el.pause();
+  };
+
+  const buscar = e => {
+    const el = ref.current;
+    if (!el || !dur) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const fracao = Math.min(Math.max((e.clientX - r.left) / r.width, 0), 1);
+    el.currentTime = fracao * dur;
+    setPos(fracao * dur);
+  };
+
+  const progresso = dur > 0 ? pos / dur : 0;
+  const barras = picos || Array(BARRAS).fill(0.3);
+
+  return (
+    <div className="flex items-center gap-2.5">
+      <audio
+        ref={ref}
+        src={src}
+        preload="metadata"
+        onError={aoFalhar}
+        onPlay={() => setTocando(true)}
+        onPause={() => setTocando(false)}
+        onEnded={() => { setTocando(false); setPos(0); }}
+        onTimeUpdate={e => setPos(e.currentTarget.currentTime)}
+        onLoadedMetadata={e => {
+          // MP3 servido em stream às vezes reporta Infinity; nesse caso vale a
+          // duração que veio da decodificação.
+          const d = e.currentTarget.duration;
+          if (Number.isFinite(d) && d > 0) setDur(d);
+        }}
+        className="hidden"
+      />
+
+      <button type="button" onClick={alternar}
+        aria-label={tocando ? 'Pausar áudio' : 'Reproduzir áudio'}
+        className="group relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center">
+        <span aria-hidden="true"
+          className="absolute inset-0 rounded-full bg-current opacity-10 group-hover:opacity-20 transition-opacity" />
+        {tocando
+          ? <Pause className="relative w-4 h-4 fill-current" />
+          : <Play className="relative w-4 h-4 fill-current translate-x-[1px]" />}
+      </button>
+
+      <div role="slider" tabIndex={0} aria-label="Posição do áudio"
+        aria-valuemin={0} aria-valuemax={Math.round(dur)} aria-valuenow={Math.round(pos)}
+        onClick={buscar}
+        className="flex-1 flex items-center gap-[2px] h-8 cursor-pointer">
+        {barras.map((p, i) => (
+          <span key={i}
+            className={`flex-1 rounded-full bg-current transition-opacity ${
+              i / BARRAS <= progresso ? 'opacity-90' : 'opacity-25'
+            }`}
+            style={{ height: `${Math.max(3, p * 26)}px` }}
+          />
+        ))}
+      </div>
+
+      <span className="shrink-0 text-[11px] tabular-nums opacity-60 w-9 text-right">
+        {mmss(pos > 0 ? dur - pos : dur)}
+      </span>
     </div>
   );
 }
@@ -156,13 +297,7 @@ function MidiaBolao({ msg, isCliente }) {
           </p>
         ) : (
           <>
-            <audio
-              src={midiaSrc}
-              controls
-              onError={aoFalhar}
-              className="w-full h-8"
-              style={{ colorScheme: 'light' }}
-            />
+            <PlayerAudio src={midiaSrc} aoFalhar={aoFalhar} />
             {falhaPlayer && <p className="text-xs text-red-500 mt-1">Áudio: {falhaPlayer}.</p>}
           </>
         )}
