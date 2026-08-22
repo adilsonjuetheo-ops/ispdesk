@@ -162,7 +162,7 @@ export default function TenantLayout() {
   const cor = tenant?.corPrimaria || '#0066CC';
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 overflow-hidden md:p-3 md:gap-3">
 
       {/* Backdrop mobile */}
       {sidebarOpen && (
@@ -171,7 +171,8 @@ export default function TenantLayout() {
 
       <aside className={`
         fixed md:static inset-y-0 left-0 z-30 h-full
-        w-72 ${colapsado ? 'md:w-14' : 'md:w-56'} bg-white border-r border-gray-200 flex flex-col select-none
+        w-72 ${colapsado ? 'md:w-14' : 'md:w-56'} bg-white flex flex-col select-none
+        border-r border-gray-200 md:border md:rounded-2xl md:shadow-sm md:overflow-hidden
         transition-all duration-200 ease-in-out
         ${sidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full md:translate-x-0'}
       `}>
@@ -354,7 +355,7 @@ export default function TenantLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-hidden flex flex-col">
+      <main className="flex-1 min-w-0 overflow-hidden flex flex-col md:gap-3">
         {user?.role === 'admin' && <UpdateBanner />}
         {tenant?.statusPagamento === 'suspenso' && user?.role === 'admin' && (
           <div className="bg-red-900/80 border-b border-red-700 px-4 py-2.5 flex items-center gap-2 shrink-0">

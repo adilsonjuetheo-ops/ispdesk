@@ -200,7 +200,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
   };
 
   return (
-    <div className="flex flex-col h-full min-w-0 bg-white border-r border-gray-200 w-full md:w-[296px]">
+    <div className="flex flex-col h-full min-w-0 bg-white border-r border-gray-200 md:border-r-0 w-full md:w-[296px] md:rounded-2xl md:border md:border-gray-200 md:shadow-sm overflow-hidden">
       <div className="px-4 pt-4 pb-3 border-b border-gray-100">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">

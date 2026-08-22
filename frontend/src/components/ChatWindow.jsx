@@ -724,7 +724,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const isNota = aba === 'nota';
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-gray-50 md:rounded-2xl md:border md:border-gray-200 md:shadow-sm overflow-hidden">
       {/* header */}
       <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex flex-col gap-1.5">
         <div className="flex items-center justify-between">

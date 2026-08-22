@@ -260,7 +260,7 @@ function WelcomePanel({ currentUser, conversas = [], online = [], slaMinutos = 0
   const cards = CARDS.filter(c => !c.admin || isAdmin);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col items-center justify-start py-12 px-8">
+    <div className="flex-1 overflow-y-auto bg-white md:rounded-2xl md:border md:border-gray-200 md:shadow-sm flex flex-col items-center justify-start py-12 px-8">
       <div className="w-full max-w-2xl">
         {/* Logo + greeting */}
         <div className="flex flex-col items-center text-center mb-8">
@@ -368,7 +368,7 @@ export default function Inbox() {
   usePolling(carregarConversas, 5000);
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full md:gap-3">
       {/* Lista — ocupa tela toda no mobile quando não há conversa selecionada */}
       <div className={`h-full min-w-0 ${selecionada ? 'hidden md:block' : 'flex-1 md:flex-none'}`}>
         <ConversationList

@@ -325,7 +325,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
   }
 
   return (
-    <div className="w-64 shrink-0 bg-white border-l border-gray-200 overflow-y-auto flex flex-col">
+    <div className="w-64 shrink-0 bg-white border-l border-gray-200 md:border-l-0 overflow-y-auto flex flex-col md:rounded-2xl md:border md:border-gray-200 md:shadow-sm">
 
       {/* Header */}
       <div className="p-4 border-b border-gray-100">
