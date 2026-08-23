@@ -6,7 +6,7 @@ import { usePushNotifications } from '../../hooks/usePushNotifications.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
   Activity, Clock, UserCheck, Archive, MapPin, Zap, AlertTriangle, Star, X, BookUser,
-  PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+  PanelLeftClose, PanelLeftOpen, BellRing } from 'lucide-react';
 import api from '../../lib/api.js';
 import UpdateBanner from '../UpdateBanner.jsx';
 import BottomTabBar from '../BottomTabBar.jsx';
@@ -48,6 +48,7 @@ export default function TenantLayout() {
   const [tenant, setTenant] = useState(null);
   const [filiais, setFiliais] = useState([]);
   const [counts, setCounts] = useState({ todos: 0, mine: 0, fila: 0, porFilial: {} });
+  const [lembretes, setLembretes] = useState({ abertos: 0, vencidos: 0 });
   const [online, setOnline] = useState([]);
   const [usoIa, setUsoIa] = useState(null);
   const [chatMobileAberto, setChatMobileAberto] = useState(false);
@@ -81,6 +82,16 @@ export default function TenantLayout() {
   usePolling(() => {
     api.get('/conversations/counts').then(r => setCounts(r.data)).catch(() => {});
   }, 15000);
+
+  const buscarLembretes = () => {
+    api.get('/lembretes/contagem').then(r => setLembretes(r.data)).catch(() => {});
+  };
+  usePolling(buscarLembretes, 60000);
+  // Concluir um lembrete atualiza o contador na hora, sem esperar o ciclo.
+  useEffect(() => {
+    window.addEventListener('ispdesk:lembretes-updated', buscarLembretes);
+    return () => window.removeEventListener('ispdesk:lembretes-updated', buscarLembretes);
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -250,7 +261,23 @@ export default function TenantLayout() {
 
           {/* Separado das filiais de propósito: sem a divisória o item lia como
               se fosse mais uma unidade da lista acima. */}
-          <div className="pt-2 mt-1 border-t border-gray-100">
+          <div className="pt-2 mt-1 border-t border-gray-100 space-y-0.5">
+            {/* Vencido pinta de vermelho: um contador azul de tarefa atrasada não
+                comunica atraso nenhum. */}
+            <NavLink to="/lembretes" title={colapsado ? 'Lembretes' : undefined}
+              className={props => `${navClass(props)} relative`}>
+              <BellRing />
+              {!colapsado && <span className="flex-1">Lembretes</span>}
+              {lembretes.abertos > 0 && (colapsado ? (
+                <span className={`absolute top-0.5 right-1.5 w-2 h-2 rounded-full ${
+                  lembretes.vencidos > 0 ? 'bg-red-500' : 'bg-blue-600'}`} />
+              ) : (
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center leading-none text-white ${
+                  lembretes.vencidos > 0 ? 'bg-red-500' : 'bg-blue-600'}`}>
+                  {lembretes.abertos}
+                </span>
+              ))}
+            </NavLink>
             <NavLink to="/contatos" className={navClass} title={colapsado ? 'Contatos' : undefined}>
               <BookUser /> {!colapsado && 'Contatos'}
             </NavLink>

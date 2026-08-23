@@ -217,3 +217,23 @@ export const usoIa = pgTable('uso_ia', {
 }, (t) => ({
   pk: primaryKey({ columns: [t.tenantId, t.mes] }),
 }));
+
+// Tarefa que a equipe precisa lembrar de fazer. Nasceu porque a aba "Lembrete"
+// do chat só gravava nota interna: o texto ficava enterrado na conversa e
+// sumia de vista quando ela encerrava por inatividade.
+export const lembretes = pgTable('lembretes', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  tenantId:      uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  // Some junto se a conversa for apagada, mas o lembrete continua vivo.
+  conversaId:    uuid('conversa_id').references(() => conversas.id, { onDelete: 'set null' }),
+  clienteId:     uuid('cliente_id').references(() => clientes.id, { onDelete: 'set null' }),
+  texto:         text('texto').notNull(),
+  // Nulo = é da equipe inteira, ninguém em particular.
+  responsavelId: uuid('responsavel_id').references(() => tenantUsers.id, { onDelete: 'set null' }),
+  venceEm:       timestamp('vence_em'),          // nulo = sem prazo
+  avisadoEm:     timestamp('avisado_em'),        // push do vencimento já disparado
+  concluidoEm:   timestamp('concluido_em'),
+  concluidoPor:  uuid('concluido_por').references(() => tenantUsers.id, { onDelete: 'set null' }),
+  criadoPor:     uuid('criado_por').references(() => tenantUsers.id, { onDelete: 'set null' }),
+  criadoEm:      timestamp('criado_em').defaultNow(),
+});

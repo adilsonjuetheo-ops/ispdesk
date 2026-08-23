@@ -9,7 +9,7 @@ import {
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
   List, ListOrdered, Plus, ArrowLeft, Video, Sparkles, Maximize2, Clock,
-  MoreHorizontal, PanelRight, Play, Pause,
+  MoreHorizontal, PanelRight, Play, Pause, BellRing,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -183,6 +183,101 @@ function PlayerAudio({ src, aoFalhar }) {
         {mmss(pos > 0 ? dur - pos : dur)}
       </span>
     </div>
+  );
+}
+
+// Lembrete não é nota: nota é contexto daquela conversa, lembrete é tarefa que
+// alguém precisa resolver e que some de vista se ficar só no meio do papo.
+function FormLembrete({ conversa, onCriado }) {
+  const { user } = useAuth();
+  // Busca a equipe aqui dentro: o componente só monta quando a aba é aberta,
+  // então a lista não é carregada em toda conversa que ninguém vai usar.
+  const [agentes, setAgentes] = useState([]);
+  useEffect(() => {
+    if (!user?.tenantId) return;
+    api.get(`/tenants/${user.tenantId}/agents`)
+      .then(r => setAgentes(r.data.filter(a => a.ativo !== false)))
+      .catch(() => {});
+  }, [user?.tenantId]);
+
+  const [texto, setTexto] = useState('');
+  const [venceEm, setVenceEm] = useState('');
+  const [responsavelId, setResponsavelId] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  // Atalhos de prazo: quase todo lembrete daqui é "hoje mais tarde" ou "amanhã
+  // cedo", e digitar data completa para isso é atrito à toa.
+  const emHoras = h => {
+    const d = new Date(Date.now() + h * 3600e3);
+    d.setSeconds(0, 0);
+    // datetime-local espera hora local, e toISOString devolve UTC.
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    setVenceEm(local.toISOString().slice(0, 16));
+  };
+
+  const salvar = async e => {
+    e.preventDefault();
+    if (!texto.trim() || salvando) return;
+    setSalvando(true); setErro('');
+    try {
+      await api.post('/lembretes', {
+        texto,
+        conversaId: conversa.id,
+        responsavelId: responsavelId || null,
+        venceEm: venceEm ? new Date(venceEm).toISOString() : null,
+      });
+      setTexto(''); setVenceEm(''); setResponsavelId('');
+      onCriado?.();
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Não foi possível salvar o lembrete.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <form onSubmit={salvar} className="p-3 space-y-2">
+      <textarea
+        value={texto}
+        onChange={e => setTexto(e.target.value)}
+        rows={2}
+        placeholder="O que precisa ser feito? Ex: ligar para negociar as parcelas em atraso"
+        className="w-full text-[15px] leading-relaxed border border-gray-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
+      />
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <input type="datetime-local" value={venceEm} onChange={e => setVenceEm(e.target.value)}
+          aria-label="Prazo do lembrete"
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+        <button type="button" onClick={() => emHoras(3)}
+          className="text-xs text-gray-600 hover:text-blue-700 bg-gray-100 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors">
+          Em 3h
+        </button>
+        <button type="button" onClick={() => emHoras(24)}
+          className="text-xs text-gray-600 hover:text-blue-700 bg-gray-100 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors">
+          Amanhã
+        </button>
+
+        <select value={responsavelId} onChange={e => setResponsavelId(e.target.value)}
+          aria-label="Responsável pelo lembrete"
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          <option value="">Equipe toda</option>
+          {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+        </select>
+
+        <button type="submit" disabled={!texto.trim() || salvando}
+          className="ml-auto flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+          {salvando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BellRing className="w-3.5 h-3.5" />}
+          Criar lembrete
+        </button>
+      </div>
+
+      {erro && <p className="text-xs text-red-600">{erro}</p>}
+      <p className="text-[11px] text-gray-500">
+        Aparece em <strong>Lembretes</strong> no menu, para toda a equipe. Sem prazo, fica na lista sem cobrar hora.
+      </p>
+    </form>
   );
 }
 
@@ -991,7 +1086,10 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
           <div className="flex border-b border-gray-100 px-3">
             <button className={tabClass('resposta')} onClick={() => setAba('resposta')}>Resposta</button>
             <button className={tabClass('nota')} onClick={() => setAba('nota')}>
-              <span className="flex items-center gap-1"><StickyNote className="w-3 h-3" /> Lembrete</span>
+              <span className="flex items-center gap-1"><StickyNote className="w-3 h-3" /> Nota</span>
+            </button>
+            <button className={tabClass('lembrete')} onClick={() => setAba('lembrete')}>
+              <span className="flex items-center gap-1"><BellRing className="w-3 h-3" /> Lembrete</span>
             </button>
             <button className={tabClass('atalhos')} onClick={() => setAba('atalhos')}>Atalhos</button>
           </div>
@@ -1039,6 +1137,17 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
         )}
 
         {/* input Resposta / Lembrete */}
+        {aba === 'lembrete' && (
+          <FormLembrete
+            conversa={conversa}
+            onCriado={() => {
+              setAba('resposta');
+              // A barra lateral recalcula o contador sem esperar o ciclo.
+              window.dispatchEvent(new CustomEvent('ispdesk:lembretes-updated'));
+            }}
+          />
+        )}
+
         {(aba === 'resposta' || aba === 'nota') && (
           <form onSubmit={handleEnviar}>
             <input ref={fileRef} type="file" className="hidden"

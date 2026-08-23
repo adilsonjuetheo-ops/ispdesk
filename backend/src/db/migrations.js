@@ -137,6 +137,25 @@ export async function runMigrations() {
     `;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_lembrete_enviado_unico ON lembrete_fatura_enviados(tenant_id, titulo_id, tipo)`;
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS numero_recebido_id text`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS lembretes (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        conversa_id uuid REFERENCES conversas(id) ON DELETE SET NULL,
+        cliente_id uuid REFERENCES clientes(id) ON DELETE SET NULL,
+        texto text NOT NULL,
+        responsavel_id uuid REFERENCES tenant_users(id) ON DELETE SET NULL,
+        vence_em timestamp,
+        avisado_em timestamp,
+        concluido_em timestamp,
+        concluido_por uuid REFERENCES tenant_users(id) ON DELETE SET NULL,
+        criado_por uuid REFERENCES tenant_users(id) ON DELETE SET NULL,
+        criado_em timestamp DEFAULT now()
+      )
+    `;
+    // A lista e o contador da barra lateral só olham os em aberto do provedor.
+    await sql`CREATE INDEX IF NOT EXISTS idx_lembretes_abertos ON lembretes(tenant_id, concluido_em, vence_em)`;
+
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

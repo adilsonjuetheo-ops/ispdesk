@@ -11,6 +11,7 @@ import Agents from './pages/tenant/Agents.jsx';
 import Settings from './pages/tenant/Settings.jsx';
 import Relatorio from './pages/tenant/Relatorio.jsx';
 import Atalhos from './pages/tenant/Atalhos.jsx';
+import Lembretes from './pages/tenant/Lembretes.jsx';
 import Contatos from './pages/tenant/Contatos.jsx';
 import Nps from './pages/tenant/Nps.jsx';
 import Incidentes from './pages/tenant/Incidentes.jsx';
@@ -57,6 +58,7 @@ export default function App() {
         }>
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/contatos" element={<Contatos />} />
+          <Route path="/lembretes" element={<Lembretes />} />
           <Route path="/agents" element={
             <ProtectedRoute roles={['admin']}>
               <Agents />

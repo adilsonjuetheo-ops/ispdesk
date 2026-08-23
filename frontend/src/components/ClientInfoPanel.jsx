@@ -241,6 +241,27 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
   const [erroReenvio, setErroReenvio] = useState('');
   const temAssinatura = ['pro', 'enterprise'].includes(user?.plano);
 
+  // Lembretes em aberto deste cliente. Recarrega quando algum é concluído em
+  // qualquer lugar do painel, para a lista não mostrar tarefa já resolvida.
+  const [lembretesCliente, setLembretesCliente] = useState([]);
+  const carregarLembretes = useCallback(() => {
+    if (!conversa.clienteId) { setLembretesCliente([]); return; }
+    api.get(`/lembretes/cliente/${conversa.clienteId}`)
+      .then(r => setLembretesCliente(r.data))
+      .catch(() => setLembretesCliente([]));
+  }, [conversa.clienteId]);
+
+  useEffect(() => { carregarLembretes(); }, [carregarLembretes]);
+  useEffect(() => {
+    window.addEventListener('ispdesk:lembretes-updated', carregarLembretes);
+    return () => window.removeEventListener('ispdesk:lembretes-updated', carregarLembretes);
+  }, [carregarLembretes]);
+
+  const concluirLembrete = async (id) => {
+    await api.patch(`/lembretes/${id}/concluir`, {}).catch(() => {});
+    window.dispatchEvent(new CustomEvent('ispdesk:lembretes-updated'));
+  };
+
   // Sai da lista que o Inbox já tem em mãos — nenhuma consulta nova. Saber que
   // é o quarto contato do mês, e sobre o quê, muda como a atendente responde.
   const historico = useMemo(() => {
@@ -548,6 +569,30 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
           )}
         </div>
       </Section>
+
+      {lembretesCliente.length > 0 && (
+        <Section title="Lembretes em aberto">
+          <div className="space-y-2">
+            {lembretesCliente.map(l => (
+              <div key={l.id} className="flex items-start gap-2">
+                <button
+                  onClick={() => concluirLembrete(l.id)}
+                  title="Marcar como resolvido"
+                  className="shrink-0 mt-0.5 w-4 h-4 rounded border border-gray-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors" />
+                <div className="min-w-0">
+                  <p className="text-sm text-gray-700 leading-relaxed">{l.texto}</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    {l.venceEm
+                      ? format(new Date(l.venceEm), "d 'de' MMM 'às' HH:mm", { locale: ptBR })
+                      : 'Sem prazo'}
+                    {' · '}{l.responsavelNome || 'Equipe'}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Histórico do cliente */}
       {historico && (

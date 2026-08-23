@@ -17,9 +17,11 @@ import cobrancaRouter from './routes/cobranca.js';
 import npsRouter from './routes/nps.js';
 import whatsappRouter from './routes/whatsapp.js';
 import contractsRouter from './routes/contracts.js';
+import lembretesRouter from './routes/lembretes.js';
 import incidentesRouter from './routes/incidentes.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
+import { agendarLembretesVencendo } from './jobs/lembretesVencendo.js';
 import { agendarCobrancaRecorrente } from './jobs/cobrancaRecorrente.js';
 import { agendarRenovacaoTokenMeta } from './jobs/renovarTokenMeta.js';
 import { agendarLembretesFatura } from './jobs/lembreteFaturas.js';
@@ -83,6 +85,7 @@ app.use('/api/whatsapp', whatsappRouter);
 app.use('/api', cobrancaRouter);
 app.use('/api/nps', npsRouter);
 app.use('/api/contracts', contractsRouter);
+app.use('/api/lembretes', lembretesRouter);
 app.use('/api/incidentes', incidentesRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -105,6 +108,7 @@ app.listen(PORT, async () => {
   await runMigrations();
   agendarLimpeza();
   agendarEncerramentoInativo();
+  agendarLembretesVencendo();
   agendarCobrancaRecorrente();
   agendarRenovacaoTokenMeta();
   agendarLembretesFatura();
