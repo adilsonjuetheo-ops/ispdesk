@@ -677,6 +677,9 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const msgIdsRef = useRef(new Set());
   const inicialRef = useRef(false);
   const atBottomRef = useRef(true);
+  // true até a primeira leva de mensagens da conversa aberta — evita rolar
+  // suavemente (e visivelmente) por todo o histórico só pra abrir no fim.
+  const scrollInstantaneoRef = useRef(true);
   const tocarNotificacao = useNotificationSound();
 
   const checkAtBottom = () => {
@@ -707,6 +710,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
     inicialRef.current = false;
     msgIdsRef.current = new Set();
     atBottomRef.current = true;
+    scrollInstantaneoRef.current = true;
     carregarMsgs();
     setAba('resposta');
   }, [conversa.id]);
@@ -715,7 +719,8 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
 
   useEffect(() => {
     if (atBottomRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      bottomRef.current?.scrollIntoView({ behavior: scrollInstantaneoRef.current ? 'auto' : 'smooth' });
+      scrollInstantaneoRef.current = false;
     }
   }, [msgs, pendentes]);
 
