@@ -718,6 +718,11 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   usePolling(carregarMsgs, 5000);
 
   useEffect(() => {
+    // A troca de conversa esvazia msgs antes do fetch responder — esse
+    // estado vazio também disparava este efeito e consumia a rolagem
+    // instantânea nele, sobrando 'smooth' pra quando as mensagens de
+    // verdade chegassem. Sem nada pra rolar, não há o que consumir.
+    if (!msgs.length && !pendentes.length) return;
     if (atBottomRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: scrollInstantaneoRef.current ? 'auto' : 'smooth' });
       scrollInstantaneoRef.current = false;
