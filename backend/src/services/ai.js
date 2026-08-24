@@ -13,6 +13,19 @@ const MODELO_COMPLETO = 'claude-sonnet-4-6';
 // clienteWhatsapp: número do remetente vindo direto do payload do webhook
 const TAGS_VALIDAS = ['Financeiro','Sem Conexão','Lentidão','Mudança de Endereço','Cancelamento','Nova Contratação','Problema no Roteador','Segunda Via','Outros'];
 
+// Calcula a saudação certa em código em vez de pedir pro modelo somar hora —
+// pedir pra ele ler "09:09" num texto de data por extenso e decidir "bom dia"
+// é fácil de errar (o Haiku já mandou "boa noite" às 9h da manhã). hourCycle
+// h23 evita a meia-noite virar "24" que hour12:false às vezes produz.
+function saudacaoAtual() {
+  const hora = Number(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo', hour: 'numeric', hourCycle: 'h23',
+  }).format(new Date()));
+  if (hora < 12) return 'Bom dia';
+  if (hora < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
 function extrairIdsAutorizados(contexto) {
   const idsCliente = new Set();
   const idsContrato = new Set();
@@ -86,7 +99,7 @@ ATENDIMENTO HUMANO INDISPONÍVEL AGORA:
 
   const systemPrompt = `${tenant.systemPrompt || ''}
 
-DATA E HORA ATUAL: ${agora} (horário de Brasília). Use isso para saudar o cliente corretamente (bom dia até 12h, boa tarde até 18h, boa noite após 18h) e para contextualizar qualquer referência a datas.
+DATA E HORA ATUAL: ${agora} (horário de Brasília). Use isso para contextualizar qualquer referência a datas. Se for cumprimentar o cliente, use exatamente "${saudacaoAtual()}" — não calcule por conta própria a partir da hora acima.
 
 ${contextoSgp}
 ${blocoForaHorario}
@@ -302,7 +315,7 @@ export async function sugerirResposta(tenant, conversa, historico, clienteWhatsa
 
   const systemPrompt = `${tenant.systemPrompt || ''}
 
-DATA E HORA ATUAL: ${agora} (horário de Brasília).
+DATA E HORA ATUAL: ${agora} (horário de Brasília). Se a sugestão abrir com cumprimento, use exatamente "${saudacaoAtual()}" — não calcule por conta própria a partir da hora acima.
 
 ${contextoSgp}
 
