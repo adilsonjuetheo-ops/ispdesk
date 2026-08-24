@@ -672,6 +672,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const [tenantNome, setTenantNome] = useState('');
   const bottomRef = useRef(null);
   const msgAreaRef = useRef(null);
+  const conteudoRef = useRef(null);
   const fileRef = useRef(null);
   const textareaRef = useRef(null);
   const msgIdsRef = useRef(new Set());
@@ -717,17 +718,43 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
 
   usePolling(carregarMsgs, 5000);
 
+  const rolarSeNoFim = () => {
+    if (!atBottomRef.current) return;
+    bottomRef.current?.scrollIntoView({ behavior: scrollInstantaneoRef.current ? 'auto' : 'smooth' });
+    scrollInstantaneoRef.current = false;
+  };
+
   useEffect(() => {
     // A troca de conversa esvazia msgs antes do fetch responder — esse
     // estado vazio também disparava este efeito e consumia a rolagem
     // instantânea nele, sobrando 'smooth' pra quando as mensagens de
     // verdade chegassem. Sem nada pra rolar, não há o que consumir.
     if (!msgs.length && !pendentes.length) return;
-    if (atBottomRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: scrollInstantaneoRef.current ? 'auto' : 'smooth' });
-      scrollInstantaneoRef.current = false;
-    }
+    rolarSeNoFim();
   }, [msgs, pendentes]);
+
+  // Áudio, imagem e vídeo carregam depois do texto e mudam a altura da
+  // conversa sem tocar em msgs/pendentes (o próprio MidiaBolao busca e
+  // decodifica por conta própria) — sem isso, uma conversa com mídia no
+  // fim ficava pra trás assim que ela terminava de carregar, mesmo o
+  // efeito acima já tendo rolado pro que parecia ser o fim.
+  useEffect(() => {
+    const el = conteudoRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => rolarSeNoFim());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Antes atBottomRef só era recalculado a cada busca (até 5s de atraso) —
+  // rolar pra cima pra ler o histórico e ficar parado ali não bastava pra
+  // impedir um "puxão" de volta pro fim vindo de uma mídia carregando.
+  useEffect(() => {
+    const el = msgAreaRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkAtBottom, { passive: true });
+    return () => el.removeEventListener('scroll', checkAtBottom);
+  }, []);
 
   useEffect(() => {
     if (!user?.tenantId) return;
@@ -1074,18 +1101,20 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
 
       {/* mensagens */}
       <div ref={msgAreaRef} className="flex-1 overflow-y-auto p-4">
-        {groupMsgsByDate(pendentes.length ? [...msgs, ...pendentes] : msgs).map(item =>
-          item.type === 'separator'
-            ? <DateSeparator key={item.key} date={item.date} />
-            : <BolaoMsg key={item.key} msg={item.msg} agenteNome={item.msg.agenteNome || user?.nome} nomeAssistente={user?.nomeAssistente} />
-        )}
-        {(() => {
-          const ultima = msgs[msgs.length - 1];
-          const aguardando = ultima?.origem === 'cliente'
-            && conversa.status !== 'encerrada'
-            && (Date.now() - new Date(ultima.enviadaEm).getTime()) < 30000;
-          return aguardando ? <TypingIndicator /> : null;
-        })()}
+        <div ref={conteudoRef}>
+          {groupMsgsByDate(pendentes.length ? [...msgs, ...pendentes] : msgs).map(item =>
+            item.type === 'separator'
+              ? <DateSeparator key={item.key} date={item.date} />
+              : <BolaoMsg key={item.key} msg={item.msg} agenteNome={item.msg.agenteNome || user?.nome} nomeAssistente={user?.nomeAssistente} />
+          )}
+          {(() => {
+            const ultima = msgs[msgs.length - 1];
+            const aguardando = ultima?.origem === 'cliente'
+              && conversa.status !== 'encerrada'
+              && (Date.now() - new Date(ultima.enviadaEm).getTime()) < 30000;
+            return aguardando ? <TypingIndicator /> : null;
+          })()}
+        </div>
         <div ref={bottomRef} />
       </div>
 
