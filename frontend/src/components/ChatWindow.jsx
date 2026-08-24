@@ -9,11 +9,21 @@ import {
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
   List, ListOrdered, Plus, ArrowLeft, Video, Sparkles, Maximize2, Clock,
-  MoreHorizontal, PanelRight, Play, Pause, BellRing,
+  MoreHorizontal, PanelRight, Play, Pause, BellRing, ChevronDown,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import clsx from 'clsx';
+
+// O polling devolve JSON novo a cada 5 segundos. Sem comparar, o array trocava
+// de identidade sem nada ter mudado e refazia o efeito de rolagem — que é o que
+// deslizava a tela sozinha de tempos em tempos. O status entra na conta porque
+// muda por fora (enviando → entregue → lida) sem alterar o tamanho da lista.
+function mesmasMsgs(a, b) {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((m, i) => m.id === b[i].id && m.status === b[i].status);
+}
 
 function groupMsgsByDate(msgs) {
   const result = [];
@@ -652,6 +662,8 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const [msgs, setMsgs] = useState([]);
   const [texto, setTexto] = useState('');
   const [pendentes, setPendentes] = useState([]);
+  const [temNovas, setTemNovas] = useState(false);
+  const [carregando, setCarregando] = useState(true);
   const [menuAberto, setMenuAberto] = useState(false);
   const filaEnvioRef = useRef(Promise.resolve());
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
@@ -670,7 +682,6 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const [showTransfer, setShowTransfer] = useState(false);
   const [tagsCatalog, setTagsCatalog] = useState([]);
   const [tenantNome, setTenantNome] = useState('');
-  const bottomRef = useRef(null);
   const msgAreaRef = useRef(null);
   const conteudoRef = useRef(null);
   const fileRef = useRef(null);
@@ -681,33 +692,55 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   // true até a primeira leva de mensagens da conversa aberta — evita rolar
   // suavemente (e visivelmente) por todo o histórico só pra abrir no fim.
   const scrollInstantaneoRef = useRef(true);
+  const rolandoRef = useRef(false);
+  const destravaRef = useRef(null);
+  const conversaIdRef = useRef(conversa.id);
   const tocarNotificacao = useNotificationSound();
 
+  // A rolagem que parte do código dispara 'scroll' igual à do dedo, e uma
+  // animação suave passa por posições que não são o fim. Sem a trava, o próprio
+  // salto era lido como "o atendente rolou pra cima" e desgrudava a vista — daí
+  // a mídia carregando depois não reencostava mais no fim.
   const checkAtBottom = () => {
+    if (rolandoRef.current) return;
     const el = msgAreaRef.current;
     atBottomRef.current = !el || (el.scrollHeight - el.scrollTop - el.clientHeight < 120);
+    if (atBottomRef.current) setTemNovas(false);
   };
 
   const carregarMsgs = () => {
-    checkAtBottom();
-    return api.get(`/conversations/${conversa.id}/messages`).then(r => {
+    const idAlvo = conversa.id;
+    return api.get(`/conversations/${idAlvo}/messages`).then(r => {
+      // A resposta pode chegar depois de o atendente já ter trocado de conversa;
+      // sem isto as mensagens de uma caíam na tela da outra.
+      if (idAlvo !== conversaIdRef.current) return;
       if (inicialRef.current) {
         const temNovaCliente = r.data.some(
           m => m.origem === 'cliente' && !msgIdsRef.current.has(m.id)
         );
         if (temNovaCliente) {
           tocarNotificacao();
-          atBottomRef.current = true;
+          // Antes isto forçava a vista de volta ao fim. Quem tinha rolado pra
+          // ler o histórico era arrancado dali no meio da leitura; agora só
+          // avisa, e descer continua sendo decisão do atendente.
+          if (!atBottomRef.current) setTemNovas(true);
         }
       }
       msgIdsRef.current = new Set(r.data.map(m => m.id));
       inicialRef.current = true;
-      setMsgs(r.data);
+      setMsgs(prev => (mesmasMsgs(prev, r.data) ? prev : r.data));
+      setCarregando(false);
     });
   };
 
   useEffect(() => {
+    conversaIdRef.current = conversa.id;
     setMsgs([]);
+    // Balão otimista é da conversa em que foi digitado. Sem limpar, ele
+    // aparecia na conversa seguinte como se fosse dela.
+    setPendentes([]);
+    setTemNovas(false);
+    setCarregando(true);
     inicialRef.current = false;
     msgIdsRef.current = new Set();
     atBottomRef.current = true;
@@ -718,11 +751,26 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
 
   usePolling(carregarMsgs, 5000);
 
-  const rolarSeNoFim = () => {
-    if (!atBottomRef.current) return;
-    bottomRef.current?.scrollIntoView({ behavior: scrollInstantaneoRef.current ? 'auto' : 'smooth' });
-    scrollInstantaneoRef.current = false;
+  const irParaOFim = (suave) => {
+    const el = msgAreaRef.current;
+    if (!el) return;
+    rolandoRef.current = true;
+    clearTimeout(destravaRef.current);
+    // scrollTo no próprio container em vez de scrollIntoView: este só mexe
+    // nesta caixa, enquanto aquele podia arrastar os elementos em volta junto.
+    el.scrollTo({ top: el.scrollHeight, behavior: suave ? 'smooth' : 'auto' });
+    destravaRef.current = setTimeout(() => { rolandoRef.current = false; }, suave ? 600 : 100);
   };
+
+  // `suave` só na chegada de mensagem nova. Reencostar no fim porque uma imagem
+  // terminou de carregar é acompanhar o conteúdo que cresceu, não um passeio
+  // pela conversa — animar isso era metade da sensação de tela andando sozinha.
+  const rolarSeNoFim = (suave = false) => {
+    if (!atBottomRef.current) return;
+    irParaOFim(suave && !scrollInstantaneoRef.current);
+  };
+
+  useEffect(() => () => clearTimeout(destravaRef.current), []);
 
   useEffect(() => {
     // A troca de conversa esvazia msgs antes do fetch responder — esse
@@ -730,7 +778,10 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
     // instantânea nele, sobrando 'smooth' pra quando as mensagens de
     // verdade chegassem. Sem nada pra rolar, não há o que consumir.
     if (!msgs.length && !pendentes.length) return;
-    rolarSeNoFim();
+    rolarSeNoFim(true);
+    // A bandeira se gasta só aqui. Se o ResizeObserver a gastasse, a primeira
+    // leva de mensagens voltaria a entrar rolando suavemente pelo histórico.
+    scrollInstantaneoRef.current = false;
   }, [msgs, pendentes]);
 
   // Áudio, imagem e vídeo carregam depois do texto e mudam a altura da
@@ -813,22 +864,31 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
 
     setTexto('');
     setPendentes(p => [...p, pendente]);
+    // Mandar mensagem é intenção de estar no fim da conversa, esteja o atendente
+    // onde estiver na rolagem.
+    atBottomRef.current = true;
+    setTemNovas(false);
 
     // Serializa os envios: com o campo limpando na hora dá tempo de digitar a
     // próxima antes de a anterior voltar, e duas requisições em paralelo podem
     // chegar fora de ordem no WhatsApp.
+    const idAlvo = conversa.id;
     filaEnvioRef.current = filaEnvioRef.current.then(async () => {
       try {
         const { data } = await api.post(
-          `/conversations/${conversa.id}/${ehNota ? 'note' : 'send'}`,
+          `/conversations/${idAlvo}/${ehNota ? 'note' : 'send'}`,
           { texto: conteudo },
         );
+        // Trocar de conversa com o envio no ar não pode fazer o balão cair na
+        // conversa errada; a de destino recarrega sozinha no próximo ciclo.
+        if (idAlvo !== conversaIdRef.current) return;
         // A mensagem gravada volta na resposta — recarregar a conversa inteira
         // só para vê-la era uma segunda ida ao servidor por mensagem enviada.
         setMsgs(prev => (prev.some(m => m.id === data.id) ? prev : [...prev, data]));
         // Enviar pode ter assumido a conversa — atualiza cabeçalho, fila e contadores.
         if (!eHumano) onAtualizar();
       } catch (err) {
+        if (idAlvo !== conversaIdRef.current) return;
         setTexto(t => t || conteudo);
         alert(err.response?.data?.erro || 'Erro ao enviar mensagem. Verifique o token do WhatsApp.');
       } finally {
@@ -1100,22 +1160,41 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
       ) : null}
 
       {/* mensagens */}
-      <div ref={msgAreaRef} className="flex-1 overflow-y-auto p-4">
-        <div ref={conteudoRef}>
-          {groupMsgsByDate(pendentes.length ? [...msgs, ...pendentes] : msgs).map(item =>
-            item.type === 'separator'
-              ? <DateSeparator key={item.key} date={item.date} />
-              : <BolaoMsg key={item.key} msg={item.msg} agenteNome={item.msg.agenteNome || user?.nome} nomeAssistente={user?.nomeAssistente} />
-          )}
-          {(() => {
-            const ultima = msgs[msgs.length - 1];
-            const aguardando = ultima?.origem === 'cliente'
-              && conversa.status !== 'encerrada'
-              && (Date.now() - new Date(ultima.enviadaEm).getTime()) < 30000;
-            return aguardando ? <TypingIndicator /> : null;
-          })()}
+      <div className="relative flex-1 min-h-0 flex">
+        <div ref={msgAreaRef} className="flex-1 overflow-y-auto p-4">
+          <div ref={conteudoRef}>
+            {carregando && !msgs.length && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-6">
+                Carregando a conversa...
+              </p>
+            )}
+            {groupMsgsByDate(pendentes.length ? [...msgs, ...pendentes] : msgs).map(item =>
+              item.type === 'separator'
+                ? <DateSeparator key={item.key} date={item.date} />
+                : <BolaoMsg key={item.key} msg={item.msg} agenteNome={item.msg.agenteNome || user?.nome} nomeAssistente={user?.nomeAssistente} />
+            )}
+            {(() => {
+              const ultima = msgs[msgs.length - 1];
+              const aguardando = ultima?.origem === 'cliente'
+                && conversa.status !== 'encerrada'
+                && (Date.now() - new Date(ultima.enviadaEm).getTime()) < 30000;
+              return aguardando ? <TypingIndicator /> : null;
+            })()}
+          </div>
         </div>
-        <div ref={bottomRef} />
+
+        {/* Chegou mensagem enquanto o atendente lia o histórico. Avisa em vez de
+            arrastar a vista de volta: descer é decisão dele. */}
+        {temNovas && (
+          <button
+            type="button"
+            onClick={() => { atBottomRef.current = true; setTemNovas(false); irParaOFim(true); }}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 shadow-lg transition-colors"
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+            Novas mensagens
+          </button>
+        )}
       </div>
 
       {/* área de input com tabs */}
