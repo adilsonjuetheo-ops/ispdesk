@@ -359,11 +359,14 @@ export default function Inbox() {
     convIdsRef.current = new Set(data.map(c => c.id));
 
     setConversas(data);
-    if (selecionada) {
-      const atualizada = data.find(c => c.id === selecionada.id);
-      if (atualizada) setSelecionada(atualizada);
-    }
-  }, [selecionada?.id, tocarNotificacao]);
+
+    // Pela forma funcional, de propósito. Antes isto lia `selecionada` do
+    // fechamento de quando a busca começou: clicar noutra conversa enquanto uma
+    // requisição estava no ar fazia a resposta antiga chegar depois e devolver a
+    // seleção para a conversa anterior — a tela "voltava" sozinha. `prev` é
+    // sempre a conversa aberta agora, não a de quando a busca saiu.
+    setSelecionada(prev => (prev ? data.find(c => c.id === prev.id) || prev : prev));
+  }, [tocarNotificacao]);
 
   usePolling(carregarConversas, 5000);
 
