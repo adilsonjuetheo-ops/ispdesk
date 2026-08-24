@@ -156,6 +156,11 @@ export async function runMigrations() {
     // A lista e o contador da barra lateral só olham os em aberto do provedor.
     await sql`CREATE INDEX IF NOT EXISTS idx_lembretes_abertos ON lembretes(tenant_id, concluido_em, vence_em)`;
 
+    // Abrir uma conversa lê todas as mensagens dela, e o painel repete isso a
+    // cada 5 segundos. Sem índice o Postgres varria a tabela inteira toda vez —
+    // hoje ainda é rápido porque ela é pequena, mas cresce a cada atendimento.
+    await sql`CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON mensagens(conversa_id, enviada_em)`;
+
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

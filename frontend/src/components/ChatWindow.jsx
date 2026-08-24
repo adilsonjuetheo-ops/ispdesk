@@ -664,6 +664,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const [pendentes, setPendentes] = useState([]);
   const [temNovas, setTemNovas] = useState(false);
   const [carregando, setCarregando] = useState(true);
+  const [falhou, setFalhou] = useState(false);
   const [menuAberto, setMenuAberto] = useState(false);
   const filaEnvioRef = useRef(Promise.resolve());
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
@@ -730,6 +731,13 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
       inicialRef.current = true;
       setMsgs(prev => (mesmasMsgs(prev, r.data) ? prev : r.data));
       setCarregando(false);
+      setFalhou(false);
+    }).catch(() => {
+      // Sem isto, uma busca que falhasse deixava "Carregando a conversa..." na
+      // tela para sempre — a tela mentia dizendo que ainda estava vindo.
+      if (idAlvo !== conversaIdRef.current) return;
+      setCarregando(false);
+      setFalhou(true);
     });
   };
 
@@ -741,6 +749,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
     setPendentes([]);
     setTemNovas(false);
     setCarregando(true);
+    setFalhou(false);
     inicialRef.current = false;
     msgIdsRef.current = new Set();
     atBottomRef.current = true;
@@ -1167,6 +1176,17 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
               <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-6">
                 Carregando a conversa...
               </p>
+            )}
+            {falhou && !msgs.length && (
+              <div className="text-center py-6">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Não foi possível carregar as mensagens.
+                </p>
+                <button type="button" onClick={() => { setCarregando(true); carregarMsgs(); }}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                  Tentar de novo
+                </button>
+              </div>
             )}
             {groupMsgsByDate(pendentes.length ? [...msgs, ...pendentes] : msgs).map(item =>
               item.type === 'separator'
