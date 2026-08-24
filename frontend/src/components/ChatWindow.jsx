@@ -36,11 +36,11 @@ function DateSeparator({ date }) {
     : format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
   return (
     <div className="flex items-center gap-3 my-4 px-2">
-      <div className="flex-1 h-px bg-gray-200" />
-      <span className="text-[11px] text-gray-500 bg-gray-100 px-3 py-1 rounded-full whitespace-nowrap">
+      <div className="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+      <span className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full whitespace-nowrap">
         {label}
       </span>
-      <div className="flex-1 h-px bg-gray-200" />
+      <div className="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
     </div>
   );
 }
@@ -243,25 +243,25 @@ function FormLembrete({ conversa, onCriado }) {
         onChange={e => setTexto(e.target.value)}
         rows={2}
         placeholder="O que precisa ser feito? Ex: ligar para negociar as parcelas em atraso"
-        className="w-full text-[15px] leading-relaxed border border-gray-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
+        className="w-full text-[15px] leading-relaxed border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
       />
 
       <div className="flex items-center gap-2 flex-wrap">
         <input type="datetime-local" value={venceEm} onChange={e => setVenceEm(e.target.value)}
           aria-label="Prazo do lembrete"
-          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          className="text-xs border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400" />
         <button type="button" onClick={() => emHoras(3)}
-          className="text-xs text-gray-600 hover:text-blue-700 bg-gray-100 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors">
+          className="text-xs text-gray-600 hover:text-blue-700 bg-gray-100 hover:bg-blue-50 dark:text-gray-300 dark:hover:text-blue-300 dark:bg-gray-800 dark:hover:bg-blue-950 px-2 py-1.5 rounded-lg transition-colors">
           Em 3h
         </button>
         <button type="button" onClick={() => emHoras(24)}
-          className="text-xs text-gray-600 hover:text-blue-700 bg-gray-100 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors">
+          className="text-xs text-gray-600 hover:text-blue-700 bg-gray-100 hover:bg-blue-50 dark:text-gray-300 dark:hover:text-blue-300 dark:bg-gray-800 dark:hover:bg-blue-950 px-2 py-1.5 rounded-lg transition-colors">
           Amanhã
         </button>
 
         <select value={responsavelId} onChange={e => setResponsavelId(e.target.value)}
           aria-label="Responsável pelo lembrete"
-          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          className="text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-400">
           <option value="">Equipe toda</option>
           {agentes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
         </select>
@@ -274,7 +274,7 @@ function FormLembrete({ conversa, onCriado }) {
       </div>
 
       {erro && <p className="text-xs text-red-600">{erro}</p>}
-      <p className="text-[11px] text-gray-500">
+      <p className="text-[11px] text-gray-500 dark:text-gray-400">
         Aparece em <strong>Lembretes</strong> no menu, para toda a equipe. Sem prazo, fica na lista sem cobrar hora.
       </p>
     </form>
@@ -323,8 +323,8 @@ function MidiaBolao({ msg, isCliente }) {
   const isVideo  = conteudo.startsWith('[Vídeo]');
   const nome = conteudo.replace(/^\[(Imagem|Arquivo|Áudio|Vídeo)\] /, '');
   const cor = isCliente
-    ? 'bg-white border border-gray-200 text-gray-700'
-    : 'bg-blue-50 border border-blue-100 text-blue-800';
+    ? 'bg-white border border-gray-200 text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200'
+    : 'bg-blue-50 border border-blue-100 text-blue-800 dark:bg-blue-950 dark:border-blue-900 dark:text-blue-200';
 
   if (isImagem && midiaUrl) {
     // Comprovante é imagem alta e estreita. Sem teto de altura ela vira uma tira
@@ -362,7 +362,7 @@ function MidiaBolao({ msg, isCliente }) {
         {midiaErro ? (
           <p className="text-xs text-red-500 p-3">Não foi possível carregar o vídeo.</p>
         ) : !midiaSrc ? (
-          <p className="text-xs text-gray-500 p-3 flex items-center gap-1.5">
+          <p className="text-xs text-gray-500 dark:text-gray-400 p-3 flex items-center gap-1.5">
             <Loader2 className="w-3 h-3 animate-spin" /> Carregando vídeo...
           </p>
         ) : (
@@ -420,7 +420,7 @@ function MidiaBolao({ msg, isCliente }) {
 function TypingIndicator() {
   return (
     <div className="flex justify-start mb-3">
-      <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1.5 items-center">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1.5 items-center">
         <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
         <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '160ms' }} />
         <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '320ms' }} />
@@ -448,7 +448,7 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
   if (isSistema) {
     return (
       <div className="flex justify-center my-2">
-        <span className="bg-gray-200 text-gray-500 text-xs px-3 py-1 rounded-full">
+        <span className="bg-gray-200 text-gray-500 dark:bg-gray-800 dark:text-gray-400 text-xs px-3 py-1 rounded-full">
           {msg.conteudo.replace('[Sistema] ', '')}
         </span>
       </div>
@@ -458,13 +458,13 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
   if (isNota) {
     return (
       <div className="flex justify-center my-2">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-2 max-w-[80%]">
+        <div className="bg-yellow-50 border border-yellow-200 dark:bg-yellow-950 dark:border-yellow-900 rounded-xl px-4 py-2 max-w-[80%]">
           <div className="flex items-center gap-1.5 mb-1">
-            <StickyNote className="w-3 h-3 text-yellow-600" />
-            <span className="text-[10px] font-semibold text-yellow-700 uppercase tracking-wide">Nota interna</span>
+            <StickyNote className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
+            <span className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 uppercase tracking-wide">Nota interna</span>
           </div>
-          <p className="text-sm leading-relaxed text-yellow-900 whitespace-pre-wrap">{msg.conteudo}</p>
-          <p className="text-[10px] text-yellow-600 mt-1">
+          <p className="text-sm leading-relaxed text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap">{msg.conteudo}</p>
+          <p className="text-[10px] text-yellow-600 dark:text-yellow-400 mt-1">
             {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
           </p>
         </div>
@@ -478,8 +478,8 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
         {!isCliente && (
           <p className="text-xs mb-1 text-right">
             {isBot
-              ? <span className="text-gray-500">{nomeAssistente || 'Bot'}</span>
-              : <span className="font-bold text-gray-700">{agenteNome || 'Agente'}</span>
+              ? <span className="text-gray-500 dark:text-gray-400">{nomeAssistente || 'Bot'}</span>
+              : <span className="font-bold text-gray-700 dark:text-gray-300">{agenteNome || 'Agente'}</span>
             }
           </p>
         )}
@@ -487,15 +487,15 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
           <MidiaBolao msg={{ ...msg, conversaId: msg.conversaId }} isCliente={isCliente} />
         ) : (
           <div className={clsx('rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap', {
-            'bg-white border border-gray-200 text-gray-800 rounded-tl-sm': isCliente,
-            'bg-emerald-50 text-emerald-900 rounded-tr-sm border border-emerald-100': isBot,
-            'bg-blue-50 text-blue-900 rounded-tr-sm border border-blue-100': !isCliente && !isBot,
+            'bg-white border border-gray-200 text-gray-800 rounded-tl-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100': isCliente,
+            'bg-emerald-50 text-emerald-900 rounded-tr-sm border border-emerald-100 dark:bg-emerald-950 dark:text-emerald-100 dark:border-emerald-900': isBot,
+            'bg-blue-50 text-blue-900 rounded-tr-sm border border-blue-100 dark:bg-blue-950 dark:text-blue-100 dark:border-blue-900': !isCliente && !isBot,
           })}>
             {msg.conteudo}
           </div>
         )}
         <div className={clsx('flex items-center gap-1 mt-1', isCliente ? 'justify-start' : 'justify-end')}>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
           </span>
           {!isCliente && !isNota && !isSistema && <StatusIcon status={msg.status} />}
@@ -557,16 +557,16 @@ function TagsBar({ conversa, onUpdate, catalog = [], podeEditar = false }) {
       {podeEditar && disponiveis.length > 0 && (
         <div className="relative">
           <button onClick={() => setAberto(v => !v)}
-            className="inline-flex items-center gap-0.5 text-xs text-gray-500 hover:text-blue-600 px-1.5 py-0.5 rounded-full hover:bg-blue-50 transition-colors">
+            className="inline-flex items-center gap-0.5 text-xs text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 px-1.5 py-0.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors">
             <Plus className="w-3 h-3" /> Tag
           </button>
           {aberto && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setAberto(false)} />
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 min-w-44 py-1">
+              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 min-w-44 py-1">
                 {disponiveis.map(t => (
                   <button key={t.nome} onClick={() => adicionarTag(t.nome)}
-                    className="w-full text-left flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 text-sm text-gray-700">
+                    className="w-full text-left flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-200">
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.cor }} />
                     {t.nome}
                   </button>
@@ -608,32 +608,32 @@ function TransferModal({ conversa, onClose, onTransferred }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-80 p-5" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-80 p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
-          <h3 className="font-semibold text-gray-800">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100">
             {naFila ? 'Atribuir conversa' : 'Transferir conversa'}
           </h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-600"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200"><X className="w-4 h-4" /></button>
         </div>
-        <p className="text-xs text-gray-500 mb-4">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
           {naFila
             ? 'O colega escolhido já fica como responsável, sem precisar assumir.'
             : 'A conversa passa para o colega escolhido.'}
         </p>
         {erro && <p className="text-xs text-red-500 mb-2">{erro}</p>}
         {agentes.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-4">Nenhum agente disponível</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">Nenhum agente disponível</p>
         ) : (
           <div className="space-y-1 max-h-72 overflow-y-auto">
             {agentes.map(a => (
               <button key={a.id} onClick={() => transferir(a.id)} disabled={loading}
-                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 disabled:opacity-50 rounded-xl transition-colors text-left">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm shrink-0">
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 rounded-xl transition-colors text-left">
+                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm shrink-0">
                   {(a.nome || '?')[0].toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">{a.nome}</p>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{a.nome}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                     <span className="capitalize">{a.role}</span>
                     {a.filialNome ? ` · ${a.filialNome}` : ''}
                   </p>
@@ -952,27 +952,27 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const tabClass = (t) =>
     `px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
       aba === t
-        ? 'border-blue-600 text-blue-600'
-        : 'border-transparent text-gray-500 hover:text-gray-700'
+        ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
     }`;
 
   const isNota = aba === 'nota';
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 md:rounded-2xl md:border md:border-gray-200 md:shadow-sm overflow-hidden">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950 md:rounded-2xl md:border md:border-gray-200 dark:md:border-gray-800 md:shadow-sm overflow-hidden">
       {/* header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex flex-col gap-1.5">
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2.5 flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             {onVoltar && (
               <button onClick={onVoltar}
-                className="md:hidden shrink-0 p-1 -ml-1 text-gray-500 hover:text-gray-800 transition-colors">
+                className="md:hidden shrink-0 p-1 -ml-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100 transition-colors">
                 <ArrowLeft className="w-5 h-5" />
               </button>
             )}
             <div className="min-w-0">
-              <p className="font-semibold text-gray-800 truncate">{conversa.clienteNome || conversa.clienteWhatsapp}</p>
-              <p className="text-xs text-gray-500 truncate">{conversa.clienteWhatsapp}{conversa.clienteFilial ? ` · ${conversa.clienteFilial}` : ''}</p>
+              <p className="font-semibold text-gray-800 dark:text-gray-100 truncate">{conversa.clienteNome || conversa.clienteWhatsapp}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{conversa.clienteWhatsapp}{conversa.clienteFilial ? ` · ${conversa.clienteFilial}` : ''}</p>
             </div>
           </div>
           {/* Uma ação primária por estado; as raras vão para o menu. Antes eram
@@ -986,7 +986,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
             )}
             {eHumano && (
               <button onClick={handleEncerrar} disabled={acao}
-                className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-700 hover:bg-red-50 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60">
+                className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-700 hover:bg-red-50 dark:border-gray-700 dark:text-gray-400 dark:hover:border-red-800 dark:hover:text-red-400 dark:hover:bg-red-950 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60">
                 <X className="w-3.5 h-3.5" /> Encerrar
               </button>
             )}
@@ -995,22 +995,22 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
               <div className="relative">
                 <button onClick={() => setMenuAberto(v => !v)} title="Mais ações"
                   aria-label="Mais ações" aria-expanded={menuAberto}
-                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 transition-colors">
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
                 {menuAberto && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setMenuAberto(false)} />
-                    <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-white rounded-xl shadow-lg border border-gray-200 py-1">
+                    <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1">
                       <button onClick={() => { setMenuAberto(false); setShowTransfer(true); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                        <ArrowRightLeft className="w-4 h-4 text-gray-400" />
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <ArrowRightLeft className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                         {eHumano ? 'Transferir conversa' : 'Atribuir a alguém'}
                       </button>
                       {eHumano && (
                         <button onClick={() => { setMenuAberto(false); handleLiberar(); }} disabled={acao}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
-                          <Bot className="w-4 h-4 text-gray-400" /> Liberar para o bot
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50">
+                          <Bot className="w-4 h-4 text-gray-400 dark:text-gray-500" /> Liberar para o bot
                         </button>
                       )}
                     </div>
@@ -1025,8 +1025,8 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                 aria-label={painelAberto ? 'Ocultar dados do cliente' : 'Mostrar dados do cliente'}
                 className={`hidden md:block p-1.5 rounded-lg transition-colors ${
                   painelAberto
-                    ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    ? 'text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800'
                 }`}>
                 <PanelRight className="w-4 h-4" />
               </button>
@@ -1037,7 +1037,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
         {/* Tags */}
         {((Array.isArray(conversa.tags) && conversa.tags.length > 0) || (eHumano && tagsCatalog.length > 0)) && (
           <div className="flex items-center gap-1.5">
-            <Tag className="w-3 h-3 text-gray-300 shrink-0" />
+            <Tag className="w-3 h-3 text-gray-300 dark:text-gray-600 shrink-0" />
             <TagsBar
               conversa={conversa}
               onUpdate={onAtualizar}
@@ -1062,7 +1062,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
           Bot está respondendo
         </div>
       ) : conversa.status === 'encerrada' ? (
-        <div className="bg-gray-300 text-gray-600 text-xs font-semibold text-center py-1.5 px-4 shrink-0">
+        <div className="bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-200 text-xs font-semibold text-center py-1.5 px-4 shrink-0">
           Atendimento encerrado
         </div>
       ) : null}
@@ -1085,10 +1085,10 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
       </div>
 
       {/* área de input com tabs */}
-      <div className="bg-white border-t border-gray-200">
+      <div className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
         {/* Tabs */}
         {podeAtuar && (
-          <div className="flex border-b border-gray-100 px-3">
+          <div className="flex border-b border-gray-100 dark:border-gray-800 px-3">
             <button className={tabClass('resposta')} onClick={() => setAba('resposta')}>Resposta</button>
             <button className={tabClass('nota')} onClick={() => setAba('nota')}>
               <span className="flex items-center gap-1"><StickyNote className="w-3 h-3" /> Nota</span>
@@ -1104,36 +1104,36 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
         {podeAtuar && aba === 'atalhos' && (
           <div className="max-h-56 flex flex-col">
             <div className="px-3 pt-2 pb-1">
-              <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1.5">
-                <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-1.5">
+                <Search className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" />
                 <input
                   autoFocus
                   type="text"
                   placeholder="Pesquisar atalhos..."
                   value={buscaAtalho}
                   onChange={e => setBuscaAtalho(e.target.value)}
-                  className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+                  className="flex-1 bg-transparent text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none"
                 />
               </div>
             </div>
             <div className="overflow-y-auto flex-1">
               {atalhosFiltrados.length === 0 ? (
-                <p className="text-xs text-gray-500 text-center py-4">
+                <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
                   {atalhosList.length === 0 ? 'Nenhum atalho configurado' : 'Nenhum resultado'}
                 </p>
               ) : (
                 atalhosFiltrados.map(a => (
                   <button key={a.id} onClick={() => selecionarAtalho(a)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
+                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors border-b border-gray-50 dark:border-gray-800 last:border-0">
                     <div className="flex items-center gap-2">
                       {a.atalho && (
-                        <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded shrink-0">
+                        <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 dark:text-blue-300 dark:bg-blue-950 px-1.5 py-0.5 rounded shrink-0">
                           {a.atalho}
                         </span>
                       )}
-                      <span className="text-sm font-medium text-gray-700 truncate">{a.titulo}</span>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{a.titulo}</span>
                     </div>
-                    <p className="text-xs text-gray-500 truncate mt-0.5">{a.conteudo}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{a.conteudo}</p>
                   </button>
                 ))
               )}
@@ -1164,12 +1164,12 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
             {/* Preview áudio gravado */}
             {!isNota && audioPreview ? (
               <div className="flex items-center gap-2 px-3 py-2">
-                <div className="flex-1 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
+                <div className="flex-1 flex items-center gap-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-900 rounded-xl px-3 py-1.5">
                   <Mic className="w-4 h-4 text-blue-500 shrink-0" />
                   <audio src={audioPreview} controls className="h-8 flex-1 min-w-0" style={{ colorScheme: 'light' }} />
                 </div>
                 <button type="button" onClick={descartarAudio} title="Descartar"
-                  className="text-gray-500 hover:text-red-500 p-1.5 transition-colors shrink-0">
+                  className="text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 p-1.5 transition-colors shrink-0">
                   <X className="w-5 h-5" />
                 </button>
                 <button type="button" onClick={confirmarAudio} disabled={enviandoArquivo}
@@ -1179,7 +1179,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
               </div>
             ) : !isNota && gravando ? (
               <div className="flex items-center gap-2 px-3 py-2">
-                <div className="flex-1 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+                <div className="flex-1 flex items-center gap-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-2">
                   <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
                   <span className="text-sm text-red-600 font-medium">
                     Gravando {String(Math.floor(tempoGravacao / 60)).padStart(2, '0')}:{String(tempoGravacao % 60).padStart(2, '0')}
@@ -1194,8 +1194,8 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
               <>
                 {/* Textarea */}
                 <div className={clsx('mx-3 mt-2.5 mb-1 rounded-xl border focus-within:ring-2 transition-all', isNota
-                  ? 'bg-yellow-50 border-yellow-200 focus-within:ring-yellow-300'
-                  : 'bg-white border-gray-200 focus-within:ring-blue-300 focus-within:border-blue-300'
+                  ? 'bg-yellow-50 border-yellow-200 focus-within:ring-yellow-300 dark:bg-yellow-950 dark:border-yellow-900'
+                  : 'bg-white border-gray-200 focus-within:ring-blue-300 focus-within:border-blue-300 dark:bg-gray-800 dark:border-gray-700'
                 )}>
                   <textarea
                     ref={textareaRef}
@@ -1216,8 +1216,8 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                             : 'Digite para assumir e responder...'
                     }
                     className={clsx(
-                      'w-full px-3 pt-2.5 pb-1 text-[15px] leading-relaxed bg-transparent resize-none focus:outline-none placeholder-gray-400 rounded-t-xl',
-                      isNota ? 'text-yellow-900' : 'text-gray-800'
+                      'w-full px-3 pt-2.5 pb-1 text-[15px] leading-relaxed bg-transparent resize-none focus:outline-none placeholder-gray-400 dark:placeholder-gray-500 rounded-t-xl',
+                      isNota ? 'text-yellow-900 dark:text-yellow-100' : 'text-gray-800 dark:text-gray-100'
                     )}
                   />
 
@@ -1237,12 +1237,12 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                           <button key={title} type="button" onClick={action}
                             disabled={!podeAtuar}
                             title={title}
-                            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-500 hover:text-gray-800 transition-colors">
+                            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 transition-colors">
                             <Icon className="w-3.5 h-3.5" />
                           </button>
                         ))}
                         {texto.length > 0 && (
-                          <span className="ml-2 text-[10px] text-gray-500 font-mono">{texto.length}</span>
+                          <span className="ml-2 text-[10px] text-gray-500 dark:text-gray-400 font-mono">{texto.length}</span>
                         )}
                       </div>
                     ) : (
@@ -1257,7 +1257,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                             onClick={handleSugerir}
                             disabled={!podeAtuar || sugerindo}
                             title="Gerar resposta com IA"
-                            className="flex items-center gap-1 px-2 py-1.5 rounded hover:bg-blue-50 disabled:opacity-30 text-blue-600 transition-colors">
+                            className="flex items-center gap-1 px-2 py-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-30 text-blue-600 dark:text-blue-400 transition-colors">
                             {sugerindo
                               ? <Loader2 className="w-4 h-4 animate-spin" />
                               : <Sparkles className="w-4 h-4" />}
@@ -1269,7 +1269,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                             onClick={() => fileRef.current?.click()}
                             disabled={!podeAtuar || enviandoArquivo || gravando}
                             title="Enviar arquivo"
-                            className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-500 hover:text-blue-600 transition-colors">
+                            className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors">
                             {enviandoArquivo
                               ? <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                               : <Paperclip className="w-4 h-4" />}
@@ -1278,7 +1278,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                             <button type="button" onClick={iniciarGravacao}
                               disabled={enviandoArquivo}
                               title="Gravar áudio"
-                              className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-500 hover:text-red-500 transition-colors">
+                              className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 transition-colors">
                               <Mic className="w-4 h-4" />
                             </button>
                           )}
@@ -1295,7 +1295,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                     </div>
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-500 px-4 pb-2">
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 px-4 pb-2">
                   {isNota ? 'Shift+Enter para nova linha' : 'Enter para enviar · Shift+Enter para nova linha'}
                 </p>
               </>

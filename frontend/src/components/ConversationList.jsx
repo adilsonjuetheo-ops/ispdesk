@@ -57,11 +57,11 @@ const VIEW_LABEL = {
 };
 
 const TAG_COLORS = [
-  'bg-indigo-100 text-indigo-700',
-  'bg-purple-100 text-purple-700',
-  'bg-pink-100 text-pink-700',
-  'bg-amber-100 text-amber-700',
-  'bg-teal-100 text-teal-700',
+  'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300',
+  'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
+  'bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300',
+  'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+  'bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300',
 ];
 function tagColor(tag) {
   let h = 0;
@@ -99,9 +99,9 @@ function WaitTime({ iniciadaEm, status }) {
   // Este número convive com o horário da última mensagem, logo acima no mesmo
   // item. Sem rótulo os dois viravam "1h" e "1h26m" soltos, sem dizer qual era
   // qual — o chip diz o que está sendo contado.
-  const tom = mins < 5 ? 'bg-emerald-50 text-emerald-700'
-    : mins < 15 ? 'bg-amber-50 text-amber-700'
-    : 'bg-red-50 text-red-700';
+  const tom = mins < 5 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+    : mins < 15 ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+    : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300';
   const tempo = mins < 60
     ? `${mins}min`
     : `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, '0')}`;
@@ -141,7 +141,7 @@ function filtrar(conversas, view, filialId, userId, busca) {
 function PreviewMsg({ c }) {
   const { ultimaMensagem, ultimaMsgOrigem, ultimaMsgNome } = c;
   if (!ultimaMensagem) {
-    return <span className="text-gray-500 italic">Sem mensagens</span>;
+    return <span className="text-gray-500 dark:text-gray-400 italic">Sem mensagens</span>;
   }
   if (ultimaMsgOrigem === 'agente' && ultimaMsgNome) {
     return (
@@ -153,7 +153,7 @@ function PreviewMsg({ c }) {
     );
   }
   if (ultimaMsgOrigem === 'bot') {
-    return <span className="truncate text-gray-500">{ultimaMensagem}</span>;
+    return <span className="truncate text-gray-500 dark:text-gray-400">{ultimaMensagem}</span>;
   }
   return <span className="truncate">{ultimaMensagem}</span>;
 }
@@ -200,50 +200,50 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
   };
 
   return (
-    <div className="flex flex-col h-full min-w-0 bg-white border-r border-gray-200 md:border-r-0 w-full md:w-[296px] md:rounded-2xl md:border md:border-gray-200 md:shadow-sm overflow-hidden">
-      <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+    <div className="flex flex-col h-full min-w-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 md:border-r-0 w-full md:w-[296px] md:rounded-2xl md:border md:border-gray-200 dark:md:border-gray-800 md:shadow-sm overflow-hidden">
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             {onOpenSidebar && (
-              <button onClick={onOpenSidebar} className="md:hidden p-1 -ml-1 text-gray-500 hover:text-gray-800 transition-colors">
+              <button onClick={onOpenSidebar} className="md:hidden p-1 -ml-1 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100 transition-colors">
                 <Menu className="w-5 h-5" />
               </button>
             )}
-            <h2 className="text-sm font-semibold text-gray-800">{VIEW_LABEL[view] || 'Conversas'}</h2>
+            <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{VIEW_LABEL[view] || 'Conversas'}</h2>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">{filtrados.length}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-full px-2 py-0.5">{filtrados.length}</span>
             <button
               onClick={() => setNovaConversa(true)}
               title="Nova conversa"
-              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:text-gray-400 dark:hover:text-blue-400 dark:hover:bg-blue-950 transition-colors"
             >
               <PenSquare className="w-4 h-4" />
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2">
-          <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl px-3 py-2">
+          <Search className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" />
           <input
             type="text"
             value={busca}
             onChange={e => setBusca(e.target.value)}
             placeholder="Buscar cliente..."
-            className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none border-0"
+            className="flex-1 bg-transparent text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 outline-none border-0"
           />
         </div>
       </div>
 
       {/* Abas de navegação — mobile only, substituem a barra lateral pra essas visões */}
       {!filialId && (
-        <div className="md:hidden flex items-center gap-1.5 px-4 py-2 min-w-0 overflow-x-auto border-b border-gray-100 [scrollbar-width:none]">
+        <div className="md:hidden flex items-center gap-1.5 px-4 py-2 min-w-0 overflow-x-auto border-b border-gray-100 dark:border-gray-800 [scrollbar-width:none]">
           {SUB_TABS.map(t => (
             <button
               key={t.key}
               onClick={() => navigate(t.href)}
               className={clsx(
                 'shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-colors whitespace-nowrap',
-                view === t.key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'
+                view === t.key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
               )}
             >
               {t.label}
@@ -252,9 +252,9 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto bg-gray-50 md:bg-white">
+      <div className="flex-1 overflow-y-auto bg-gray-50 md:bg-white dark:bg-gray-950 dark:md:bg-gray-900">
         {filtrados.length === 0 && (
-          <div className="p-8 text-center text-gray-500 text-sm">Nenhuma conversa</div>
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">Nenhuma conversa</div>
         )}
         {filtrados.map(c => {
           const naoLida = hasUnread(c);
@@ -295,18 +295,18 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
             <button key={c.id} onClick={() => handleSelecionar(c)}
               className={clsx(
                 'w-full text-left relative transition-colors',
-                ativa && 'bg-blue-50 md:border-l-[3px] md:border-l-blue-500',
-                !ativa && slaExcedido(c) && 'bg-red-50 md:border-l-[3px] md:border-l-red-500',
-                naoLida && !ativa && !slaExcedido(c) && 'bg-amber-50/60',
+                ativa && 'bg-blue-50 dark:bg-blue-950 md:border-l-[3px] md:border-l-blue-500',
+                !ativa && slaExcedido(c) && 'bg-red-50 dark:bg-red-950 md:border-l-[3px] md:border-l-red-500',
+                naoLida && !ativa && !slaExcedido(c) && 'bg-amber-50/60 dark:bg-amber-950/40',
               )}>
 
               {/* ── Linha compacta (desktop) ── */}
-              <div className="hidden md:flex items-start gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
+              <div className="hidden md:flex items-start gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
                 {avatarNode}
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 mb-0.5">
-                    <p title={c.clienteNome || undefined} className={clsx('text-sm truncate flex-1 min-w-0', naoLida ? 'font-bold text-gray-900' : 'font-semibold text-gray-800')}>
+                    <p title={c.clienteNome || undefined} className={clsx('text-sm truncate flex-1 min-w-0', naoLida ? 'font-bold text-gray-900 dark:text-gray-50' : 'font-semibold text-gray-800 dark:text-gray-100')}>
                       {nomeExib}
                     </p>
                     {tags.slice(0, 1).map(t => (
@@ -314,10 +314,10 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                         {t}
                       </span>
                     ))}
-                    <span className="ml-auto text-xs text-gray-500 shrink-0">{tempoCompacto(tempoRef)}</span>
+                    <span className="ml-auto text-xs text-gray-500 dark:text-gray-400 shrink-0">{tempoCompacto(tempoRef)}</span>
                   </div>
 
-                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                     <div className="flex-1 min-w-0 truncate">
                       <PreviewMsg c={c} />
                     </div>
@@ -326,7 +326,7 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                   <WaitTime iniciadaEm={c.iniciadaEm} status={c.status} />
 
                   {(c.agenteNome || c.filialNome) && (
-                    <p className="text-[10px] text-gray-500 mt-0.5 truncate">
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                       {[c.agenteNome, c.filialNome].filter(Boolean).join(' › ')}
                     </p>
                   )}
@@ -334,12 +334,12 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
               </div>
 
               {/* ── Card (mobile) ── */}
-              <div className="md:hidden mx-3 my-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-3.5">
+              <div className="md:hidden mx-3 my-2 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-3.5">
                 <div className="flex items-start gap-3">
                   {avatarNode}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <p title={c.clienteNome || undefined} className={clsx('text-sm truncate flex-1 min-w-0', naoLida ? 'font-bold text-gray-900' : 'font-semibold text-gray-800')}>
+                      <p title={c.clienteNome || undefined} className={clsx('text-sm truncate flex-1 min-w-0', naoLida ? 'font-bold text-gray-900 dark:text-gray-50' : 'font-semibold text-gray-800 dark:text-gray-100')}>
                         {nomeExib}
                       </p>
                       {tags.slice(0, 1).map(t => (
@@ -347,27 +347,27 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                           {t}
                         </span>
                       ))}
-                      <span className="ml-auto text-xs text-gray-500 shrink-0">{tempoCompacto(tempoRef)}</span>
+                      <span className="ml-auto text-xs text-gray-500 dark:text-gray-400 shrink-0">{tempoCompacto(tempoRef)}</span>
                     </div>
 
-                    <p className={clsx('text-xs font-medium mt-0.5', statusAberto ? 'text-emerald-600' : 'text-gray-400')}>
+                    <p className={clsx('text-xs font-medium mt-0.5', statusAberto ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500')}>
                       {statusAberto ? 'Atendimento Aberto' : 'Atendimento Encerrado'}
                     </p>
 
                     {c.clienteWhatsapp && (
-                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-1">
                         <Phone className="w-3 h-3 shrink-0" />
                         <span className="truncate">{c.clienteWhatsapp}</span>
                       </div>
                     )}
                     {c.filialNome && (
-                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                         <MapPin className="w-3 h-3 shrink-0" />
                         <span className="truncate">{c.filialNome}</span>
                       </div>
                     )}
 
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mt-1.5 pt-1.5 border-t border-gray-100">
+                    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-1.5 pt-1.5 border-t border-gray-100 dark:border-gray-800">
                       <div className="flex-1 min-w-0 truncate"><PreviewMsg c={c} /></div>
                     </div>
                     <WaitTime iniciadaEm={c.iniciadaEm} status={c.status} />
@@ -381,8 +381,8 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
 
       {/* Presença: Online agora */}
       {online.length > 0 && (
-        <div className="px-3 py-2 border-t border-gray-100 bg-white">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Online agora</p>
+        <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Online agora</p>
           <div className="flex flex-wrap gap-1.5">
             {online.map(u => (
               <div key={u.id} className="relative group">

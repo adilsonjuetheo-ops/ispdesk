@@ -104,26 +104,26 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-800">Nova conversa</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-600"><X className="w-5 h-5" /></button>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-800">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100">Nova conversa</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200"><X className="w-5 h-5" /></button>
         </div>
 
         <form onSubmit={enviar} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Buscar contato salvo</label>
-            <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2">
-              <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Buscar contato salvo</label>
+            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2">
+              <Search className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" />
               <input
                 value={buscaContato}
                 onChange={e => setBuscaContato(e.target.value)}
                 placeholder="Nome, telefone ou contrato..."
-                className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none border-0"
+                className="flex-1 bg-transparent text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 outline-none border-0"
               />
             </div>
             {achados.length > 0 && (
-              <div className="mt-1 border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+              <div className="mt-1 border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
                 {achados.map(c => (
                   <button
                     key={c.id}
@@ -134,10 +134,10 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                       setAchados([]);
                       setPrecisaTemplate(false);
                     }}
-                    className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors"
+                    className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
                   >
-                    <p className="text-sm text-gray-800">{c.nome || 'Sem nome'}</p>
-                    <p className="text-xs text-gray-500 tabular-nums">{c.whatsapp}</p>
+                    <p className="text-sm text-gray-800 dark:text-gray-100">{c.nome || 'Sem nome'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">{c.whatsapp}</p>
                   </button>
                 ))}
               </div>
@@ -145,62 +145,62 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
           </div>
 
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Telefone do cliente</label>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Telefone do cliente</label>
             <input
               value={telefone}
               onChange={e => { setTelefone(e.target.value); setPrecisaTemplate(false); setTemplateSel(null); }}
               placeholder="(33) 99999-9999"
               inputMode="tel"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-            <p className="text-xs text-gray-500 mt-1">Com DDD. O 55 do Brasil é adicionado sozinho.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Com DDD. O 55 do Brasil é adicionado sozinho.</p>
           </div>
 
           {remetentes.length > 1 && (
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Enviar pelo número</label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Enviar pelo número</label>
               <select
                 value={remetenteSel}
                 onChange={e => setRemetenteSel(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
                 {remetentes.map(r => (
                   <option key={r.id} value={r.id}>{r.rotulo}</option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">É o número que aparece para o cliente.</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">É o número que aparece para o cliente.</p>
             </div>
           )}
 
           {!precisaTemplate ? (
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Mensagem</label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Mensagem</label>
               <textarea
                 value={texto}
                 onChange={e => setTexto(e.target.value)}
                 rows={4}
                 placeholder="Escreva a mensagem..."
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-100 placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
               />
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <div className="flex gap-2 bg-amber-50 border border-amber-200 dark:bg-amber-950 dark:border-amber-900 rounded-lg p-3">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-800 leading-relaxed">
+                <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
                   Esse cliente não escreve há mais de 24 horas. O WhatsApp só permite iniciar
                   com um template aprovado. Assim que ele responder, a conversa segue normal.
                 </p>
               </div>
 
               {templates.length === 0 ? (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   Nenhum template aprovado neste provedor. É preciso criar um no Gerenciador
                   do WhatsApp e aguardar a aprovação da Meta.
                 </p>
               ) : (
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                     {templates.length > 1 ? 'Escolha o template' : 'Template'}
                   </label>
                   <div className="space-y-1 max-h-44 overflow-y-auto">
@@ -212,17 +212,17 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                           type="button"
                           onClick={() => escolherTemplate(t)}
                           className={`w-full flex items-start gap-2 text-left px-3 py-2 rounded-lg border transition-colors ${
-                            ativo ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                            ativo ? 'border-blue-400 bg-blue-50 dark:border-blue-700 dark:bg-blue-950' : 'border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
                           }`}
                         >
                           <span className={`mt-0.5 w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${
-                            ativo ? 'border-blue-500' : 'border-gray-300'
+                            ativo ? 'border-blue-500' : 'border-gray-300 dark:border-gray-600'
                           }`}>
                             {ativo && <span className="w-2 h-2 rounded-full bg-blue-500" />}
                           </span>
                           <span className="min-w-0">
-                            <span className="block text-sm font-medium text-gray-800">{t.name}</span>
-                            {t.texto && <span className="block text-xs text-gray-500 mt-0.5 line-clamp-2">{t.texto}</span>}
+                            <span className="block text-sm font-medium text-gray-800 dark:text-gray-100">{t.name}</span>
+                            {t.texto && <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{t.texto}</span>}
                           </span>
                         </button>
                       );
@@ -235,16 +235,16 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
                 <div className="space-y-2">
                   {params.map((v, i) => (
                     <div key={i}>
-                      <label className="block text-xs text-gray-500 mb-1">
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                         {`Variável {{${i + 1}}}`}
                         {templateSel.exemplos?.[i] && (
-                          <span className="text-gray-500"> — ex: {templateSel.exemplos[i]}</span>
+                          <span className="text-gray-500 dark:text-gray-400"> — ex: {templateSel.exemplos[i]}</span>
                         )}
                       </label>
                       <input
                         value={v}
                         onChange={e => setParams(p => p.map((x, j) => (j === i ? e.target.value : x)))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
                       />
                     </div>
                   ))}
@@ -257,7 +257,7 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
 
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
+              className="flex-1 px-4 py-2 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
               Cancelar
             </button>
             <button type="submit" disabled={enviando || !telefone.trim()}

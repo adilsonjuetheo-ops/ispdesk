@@ -6,7 +6,7 @@ function Tab({ Icon, label, active, badge, onClick }) {
     <button
       onClick={onClick}
       className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 relative ${
-        active ? 'text-blue-600' : 'text-gray-500'
+        active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
       }`}
     >
       <div className="relative">
@@ -31,7 +31,7 @@ export default function BottomTabBar({ isAdmin, counts = {} }) {
   const naInbox = location.pathname === '/inbox';
 
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-gray-200 flex items-stretch shadow-[0_-1px_6px_rgba(0,0,0,0.05)]">
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex items-stretch shadow-[0_-1px_6px_rgba(0,0,0,0.05)]">
       <Tab
         Icon={Activity}
         label="Conversas"

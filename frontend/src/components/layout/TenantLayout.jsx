@@ -3,10 +3,11 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 import { usePolling } from '../../hooks/usePolling.js';
 import { usePushNotifications } from '../../hooks/usePushNotifications.js';
+import { useTheme } from '../../hooks/useTheme.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
   Activity, Clock, UserCheck, Archive, MapPin, Zap, AlertTriangle, Star, X, BookUser,
-  PanelLeftClose, PanelLeftOpen, BellRing } from 'lucide-react';
+  PanelLeftClose, PanelLeftOpen, BellRing, Sun, Moon } from 'lucide-react';
 import api from '../../lib/api.js';
 import UpdateBanner from '../UpdateBanner.jsx';
 import BottomTabBar from '../BottomTabBar.jsx';
@@ -30,7 +31,7 @@ function lerMenuRecolhido() {
 const ICONE = '[&>svg]:w-4 [&>svg]:h-4 [&>svg]:shrink-0 [&>svg]:stroke-[1.75] [&>svg]:transition-colors';
 // O ícone sai um tom mais claro que o rótulo: a palavra lidera, o ícone apoia.
 // Antes os dois usavam exatamente a mesma cor e competiam entre si.
-const ICONE_APAGADO = '[&>svg]:text-gray-400 hover:[&>svg]:text-gray-600';
+const ICONE_APAGADO = '[&>svg]:text-gray-400 hover:[&>svg]:text-gray-600 dark:[&>svg]:text-gray-500 dark:hover:[&>svg]:text-gray-300';
 
 function avatarColor(nome) {
   let hash = 0;
@@ -40,6 +41,7 @@ function avatarColor(nome) {
 
 export default function TenantLayout() {
   const { user, logout } = useAuth();
+  const { escuro, alternar } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -145,8 +147,8 @@ export default function TenantLayout() {
         colapsado ? 'justify-center px-0' : 'pl-3 pr-2'
       } ${
         active
-          ? 'bg-blue-50 text-blue-700 font-medium [&>svg]:text-blue-600'
-          : `text-gray-500 hover:text-gray-800 hover:bg-gray-50 ${ICONE_APAGADO}`
+          ? 'bg-blue-50 text-blue-700 font-medium [&>svg]:text-blue-600 dark:bg-blue-950 dark:text-blue-300 dark:[&>svg]:text-blue-400'
+          : `text-gray-500 hover:text-gray-800 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 ${ICONE_APAGADO}`
       }`}
     >
       <Icon />
@@ -166,14 +168,14 @@ export default function TenantLayout() {
       colapsado ? 'justify-center px-0' : 'px-3'
     } ${
       isActive
-        ? 'bg-blue-50 text-blue-700 [&>svg]:text-blue-600'
-        : `text-gray-600 hover:text-gray-900 hover:bg-gray-100 ${ICONE_APAGADO}`
+        ? 'bg-blue-50 text-blue-700 [&>svg]:text-blue-600 dark:bg-blue-950 dark:text-blue-300 dark:[&>svg]:text-blue-400'
+        : `text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 ${ICONE_APAGADO}`
     }`;
 
   const cor = tenant?.corPrimaria || '#0066CC';
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden md:p-3 md:gap-3">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden md:p-3 md:gap-3">
 
       {/* Backdrop mobile */}
       {sidebarOpen && (
@@ -182,28 +184,28 @@ export default function TenantLayout() {
 
       <aside className={`
         fixed md:static inset-y-0 left-0 z-30 h-full
-        w-72 ${colapsado ? 'md:w-14' : 'md:w-56'} bg-white flex flex-col select-none
-        border-r border-gray-200 md:border md:rounded-2xl md:shadow-sm md:overflow-hidden
+        w-72 ${colapsado ? 'md:w-14' : 'md:w-56'} bg-white dark:bg-gray-900 flex flex-col select-none
+        border-r border-gray-200 dark:border-gray-800 md:border md:rounded-2xl md:shadow-sm md:overflow-hidden
         transition-all duration-200 ease-in-out
         ${sidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full md:translate-x-0'}
       `}>
         {/* Botão fechar — mobile only */}
         <button onClick={() => setSidebarOpen(false)}
-          className="absolute top-3 right-3 md:hidden p-1 text-gray-500 hover:text-gray-700 transition-colors">
+          className="absolute top-3 right-3 md:hidden p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
           <X className="w-5 h-5" />
         </button>
 
         {/* logo / nome do provedor */}
-        <div className={`border-b border-gray-200 ${colapsado ? 'p-2' : 'p-4'}`}>
+        <div className={`border-b border-gray-200 dark:border-gray-800 ${colapsado ? 'p-2' : 'p-4'}`}>
           {tenant?.logoUrl ? (
             <div className="flex items-center gap-2">
               <img src={tenant.logoUrl} alt={tenant.nome}
-                className="h-9 w-9 object-contain rounded-lg border border-gray-100 bg-gray-50 p-0.5" />
+                className="h-9 w-9 object-contain rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-0.5" />
               <div className={`min-w-0 ${colapsado ? 'hidden' : ''}`}>
-                <p className="text-sm font-bold text-gray-800 truncate leading-tight">
+                <p className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate leading-tight">
                   {tenant.nomeFantasia || tenant.nome}
                 </p>
-                <p className="text-xs text-gray-500 truncate">Painel de atendimento</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">Painel de atendimento</p>
               </div>
             </div>
           ) : (
@@ -212,10 +214,10 @@ export default function TenantLayout() {
                 <Wifi className="w-4 h-4 text-white" />
               </div>
               <div className={`min-w-0 ${colapsado ? 'hidden' : ''}`}>
-                <p className="text-sm font-bold text-gray-800 truncate leading-tight">
+                <p className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate leading-tight">
                   {tenant?.nomeFantasia || tenant?.nome}
                 </p>
-                <p className="text-xs text-gray-500">Painel de atendimento</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Painel de atendimento</p>
               </div>
             </div>
           )}
@@ -225,7 +227,7 @@ export default function TenantLayout() {
           {/* Conversas */}
           <div className="mb-2">
             {!colapsado && (
-              <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wider">
                 Conversas
               </p>
             )}
@@ -241,7 +243,7 @@ export default function TenantLayout() {
           {filiais.length > 0 && (
             <div className="mb-2">
               {!colapsado && (
-                <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wider">
                   Filiais
                 </p>
               )}
@@ -261,7 +263,7 @@ export default function TenantLayout() {
 
           {/* Separado das filiais de propósito: sem a divisória o item lia como
               se fosse mais uma unidade da lista acima. */}
-          <div className="pt-2 mt-1 border-t border-gray-100 space-y-0.5">
+          <div className="pt-2 mt-1 border-t border-gray-100 dark:border-gray-800 space-y-0.5">
             {/* Vencido pinta de vermelho: um contador azul de tarefa atrasada não
                 comunica atraso nenhum. */}
             <NavLink to="/lembretes" title={colapsado ? 'Lembretes' : undefined}
@@ -285,7 +287,7 @@ export default function TenantLayout() {
 
           {/* Admin */}
           {user?.role === 'admin' && (
-            <div className="pt-2 mt-1 border-t border-gray-100 space-y-0.5">
+            <div className="pt-2 mt-1 border-t border-gray-100 dark:border-gray-800 space-y-0.5">
               <NavLink to="/relatorio" className={navClass} title={colapsado ? 'Relatório' : undefined}>
                 <BarChart2 /> {!colapsado && 'Relatório'}
               </NavLink>
@@ -303,8 +305,8 @@ export default function TenantLayout() {
                   colapsado ? 'justify-center px-0' : 'px-3'
                 } ${
                   isActive
-                    ? 'bg-red-50 text-red-700 [&>svg]:text-red-600'
-                    : `text-gray-600 hover:text-gray-900 hover:bg-gray-100 ${ICONE_APAGADO}`
+                    ? 'bg-red-50 text-red-700 [&>svg]:text-red-600 dark:bg-red-950 dark:text-red-300 dark:[&>svg]:text-red-400'
+                    : `text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 ${ICONE_APAGADO}`
                 }`}>
                 <AlertTriangle />
                 {!colapsado && <span className="flex-1">Incidentes</span>}
@@ -319,10 +321,10 @@ export default function TenantLayout() {
         {usoIa && usoIa.percentual >= 80 && !colapsado && (
           <div className={`mx-2 mb-2 p-2.5 rounded-lg border text-xs ${
             usoIa.percentual >= 100
-              ? 'bg-red-50 border-red-200 text-red-800'
+              ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950 dark:border-red-900 dark:text-red-300'
               : usoIa.percentual >= 90
-                ? 'bg-orange-50 border-orange-200 text-orange-800'
-                : 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                ? 'bg-orange-50 border-orange-200 text-orange-800 dark:bg-orange-950 dark:border-orange-900 dark:text-orange-300'
+                : 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950 dark:border-yellow-900 dark:text-yellow-300'
           }`}>
             <div className="flex items-center gap-1.5 mb-1.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
@@ -330,7 +332,7 @@ export default function TenantLayout() {
                 {usoIa.percentual >= 100 ? 'Limite de IA atingido' : `IA: ${usoIa.percentual}% utilizada`}
               </span>
             </div>
-            <div className="w-full bg-white/60 rounded-full h-1.5 mb-1.5">
+            <div className="w-full bg-white/60 dark:bg-black/30 rounded-full h-1.5 mb-1.5">
               <div
                 className={`h-1.5 rounded-full transition-all ${
                   usoIa.percentual >= 100 ? 'bg-red-500' : usoIa.percentual >= 90 ? 'bg-orange-500' : 'bg-yellow-500'
@@ -348,13 +350,23 @@ export default function TenantLayout() {
           </div>
         )}
 
-        <div className={`border-t border-gray-200 ${colapsado ? 'p-2' : 'p-3'}`}>
-          {/* Recolher é preferência de tela, não navegação — por isso mora aqui
-              embaixo, junto com sair e configurações, e não no meio dos itens. */}
+        <div className={`border-t border-gray-200 dark:border-gray-800 ${colapsado ? 'p-2' : 'p-3'}`}>
+          {/* Tema, recolher etc. são preferência de tela, não navegação — por
+              isso moram aqui embaixo, junto com sair e configurações. */}
+          <button onClick={alternar}
+            title={escuro ? 'Usar tema claro' : 'Usar tema escuro'}
+            aria-label={escuro ? 'Usar tema claro' : 'Usar tema escuro'}
+            className={`flex items-center gap-2.5 w-full py-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 transition-colors ${ICONE} ${ICONE_APAGADO} ${
+              colapsado ? 'justify-center px-0' : 'px-3'
+            }`}>
+            {escuro ? <Sun /> : <Moon />}
+            {!colapsado && (escuro ? 'Tema claro' : 'Tema escuro')}
+          </button>
+
           <button onClick={alternarRecolhido}
             title={colapsado ? 'Expandir menu' : 'Recolher menu'}
             aria-label={colapsado ? 'Expandir menu' : 'Recolher menu'}
-            className={`hidden md:flex items-center gap-2.5 w-full py-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors ${ICONE} ${ICONE_APAGADO} ${
+            className={`hidden md:flex items-center gap-2.5 w-full py-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 transition-colors ${ICONE} ${ICONE_APAGADO} ${
               colapsado ? 'justify-center px-0' : 'px-3'
             }`}>
             {colapsado ? <PanelLeftOpen /> : <PanelLeftClose />}
@@ -368,13 +380,13 @@ export default function TenantLayout() {
           )}
           {!colapsado && (
             <div className="px-3 py-2">
-              <p className="text-xs font-medium text-gray-800 truncate">{user?.nome}</p>
-              <p className="text-xs text-gray-500 truncate capitalize">{user?.role}</p>
+              <p className="text-xs font-medium text-gray-800 dark:text-gray-100 truncate">{user?.nome}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">{user?.role}</p>
             </div>
           )}
           <button onClick={handleLogout}
             title={colapsado ? 'Sair' : undefined}
-            className={`flex items-center gap-2.5 w-full py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ${ICONE} [&>svg]:text-gray-500 hover:[&>svg]:text-red-600 ${
+            className={`flex items-center gap-2.5 w-full py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 dark:text-gray-400 dark:hover:text-red-400 dark:hover:bg-red-950 rounded-lg transition-colors ${ICONE} [&>svg]:text-gray-500 hover:[&>svg]:text-red-600 dark:[&>svg]:text-gray-400 dark:hover:[&>svg]:text-red-400 ${
               colapsado ? 'justify-center px-0' : 'px-3'
             }`}>
             <LogOut /> {!colapsado && 'Sair'}

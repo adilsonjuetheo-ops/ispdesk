@@ -6,7 +6,7 @@ import api from '../lib/api.js';
 import { useAuth } from '../hooks/useAuth.js';
 
 const WaIcon = () => (
-  <svg className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
   </svg>
 );
@@ -52,13 +52,13 @@ function primeiraTag(tags) {
 function Section({ title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-b border-gray-100">
+    <div className="border-b border-gray-100 dark:border-gray-800">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
       >
-        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{title}</span>
-        <ChevronDown className={`w-4 h-4 text-gray-300 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{title}</span>
+        <ChevronDown className={`w-4 h-4 text-gray-300 dark:text-gray-600 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && <div className="px-4 pb-3">{children}</div>}
     </div>
@@ -77,7 +77,7 @@ function CopyButton({ texto }) {
     <button
       onClick={copiar}
       title="Copiar"
-      className="ml-1 p-0.5 rounded text-gray-300 hover:text-gray-500 transition-colors shrink-0"
+      className="ml-1 p-0.5 rounded text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 transition-colors shrink-0"
     >
       {copiado ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
     </button>
@@ -120,16 +120,16 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
   const set = (k, v) => setDados(p => ({ ...p, [k]: v }));
   const field = (label, key, opts = {}) => (
     <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}{opts.req && <span className="text-red-400 ml-0.5">*</span>}</label>
+      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}{opts.req && <span className="text-red-400 ml-0.5">*</span>}</label>
       {opts.options ? (
         <select value={dados[key]} onChange={e => set(key, e.target.value)}
-          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          className="w-full text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400">
           {opts.options.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
       ) : (
         <input type={opts.type || 'text'} value={dados[key]} placeholder={opts.placeholder || ''}
           onChange={e => set(key, e.target.value)}
-          className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          className="w-full text-xs border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400" />
       )}
     </div>
   );
@@ -150,19 +150,19 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-end">
-      <div className="w-[420px] h-full bg-white shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+      <div className="w-[420px] h-full bg-white dark:bg-gray-900 shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <div className="flex items-center gap-2">
             <FileSignature className="w-4 h-4 text-blue-600" />
-            <span className="font-semibold text-gray-800 text-sm">Enviar Contrato</span>
+            <span className="font-semibold text-gray-800 dark:text-gray-100 text-sm">Enviar Contrato</span>
             {carregandoPrefill && <span className="text-[10px] text-blue-400 animate-pulse">Buscando dados...</span>}
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-500"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"><X className="w-4 h-4" /></button>
         </div>
 
         <form onSubmit={enviar} className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           <div>
-            <p className="text-sm font-semibold text-gray-800 pb-2 mb-3 border-b border-gray-100">Dados do cliente</p>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 pb-2 mb-3 border-b border-gray-100 dark:border-gray-800">Dados do cliente</p>
             <div className="space-y-2.5">
               {field('Nome completo', 'nome_contratante', { req: true })}
               {field('CPF / CNPJ', 'cpf_cnpj', { req: true, placeholder: '000.000.000-00' })}
@@ -173,7 +173,7 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-gray-800 pb-2 mb-3 border-b border-gray-100">Plano contratado</p>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 pb-2 mb-3 border-b border-gray-100 dark:border-gray-800">Plano contratado</p>
             <div className="space-y-2.5">
               {field('Nome / código do plano', 'identificacao_oferta', { req: true, placeholder: 'Ex: Fibra 300M' })}
               {field('Tecnologia', 'tecnologia', { options: ['Fibra Óptica', 'Rádio', 'Cabo', 'Outra'] })}
@@ -194,7 +194,7 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-gray-800 pb-2 mb-3 border-b border-gray-100">Instalação</p>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 pb-2 mb-3 border-b border-gray-100 dark:border-gray-800">Instalação</p>
             <div className="space-y-2.5">
               {field('Endereço de instalação', 'endereco_instalacao', { placeholder: 'Igual ao do cliente ou diferente' })}
               {field('Equipamentos fornecidos', 'equipamentos', { placeholder: 'Ex: Roteador TP-Link AX1500' })}
@@ -206,7 +206,7 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-gray-800 pb-2 mb-3 border-b border-gray-100">Prestadora</p>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 pb-2 mb-3 border-b border-gray-100 dark:border-gray-800">Prestadora</p>
             <div className="space-y-2.5">
               {field('Nome do representante', 'nome_representante', { req: true, placeholder: 'Quem assina pela empresa' })}
               {field('Nº autorização ANATEL', 'numero_anatel', { placeholder: 'Opcional' })}
@@ -214,11 +214,11 @@ function ContratoModal({ conversa, onClose, onEnviado }) {
           </div>
 
           {erro && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{erro}</div>
+            <div className="bg-red-50 border border-red-200 dark:bg-red-950 dark:border-red-900 rounded-lg px-3 py-2 text-xs text-red-700 dark:text-red-300">{erro}</div>
           )}
         </form>
 
-        <div className="px-5 py-4 border-t border-gray-100 shrink-0">
+        <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 shrink-0">
           <button type="submit" onClick={enviar} disabled={enviando}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
             <FileSignature className="w-4 h-4" />
@@ -346,18 +346,18 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
   }
 
   return (
-    <div className="w-64 shrink-0 bg-white border-l border-gray-200 md:border-l-0 overflow-y-auto flex flex-col md:rounded-2xl md:border md:border-gray-200 md:shadow-sm">
+    <div className="w-64 shrink-0 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 md:border-l-0 overflow-y-auto flex flex-col md:rounded-2xl md:border md:border-gray-200 dark:md:border-gray-800 md:shadow-sm">
 
       {/* Header */}
-      <div className="p-4 border-b border-gray-100">
+      <div className="p-4 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-3 mb-4">
           <Avatar nome={conversa.clienteNome} />
           <div className="min-w-0">
-            <p className="font-semibold text-gray-800 text-sm leading-tight truncate">
+            <p className="font-semibold text-gray-800 dark:text-gray-100 text-sm leading-tight truncate">
               {nomeExibido || conversa.clienteWhatsapp}
             </p>
             {nomeExibido && (
-              <p className="text-xs text-gray-500 truncate mt-0.5">{conversa.clienteWhatsapp}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{conversa.clienteWhatsapp}</p>
             )}
           </div>
         </div>
@@ -367,7 +367,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
             {temAssinatura && conversa.status === 'humano' && !conversa.contratoStatus && (
               <button
                 onClick={() => setModalContrato(true)}
-                className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium py-2.5 rounded-lg transition-colors border border-blue-200"
+                className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium py-2.5 rounded-lg transition-colors border border-blue-200 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 dark:border-blue-900"
               >
                 <FileSignature className="w-4 h-4" />
                 Enviar Contrato
@@ -376,14 +376,14 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
 
             {conversa.contratoStatus === 'pendente' && (
               <div className="space-y-1.5">
-                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 dark:bg-amber-950 dark:border-amber-900 rounded-lg">
                   <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                  <span className="text-xs text-amber-700">Contrato aguardando assinatura</span>
+                  <span className="text-xs text-amber-700 dark:text-amber-300">Contrato aguardando assinatura</span>
                 </div>
                 <button
                   onClick={reenviarLink}
                   disabled={reenviando}
-                  className="w-full flex items-center justify-center gap-1.5 text-xs text-amber-700 hover:text-amber-900 py-1.5 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-1.5 text-xs text-amber-700 hover:text-amber-900 py-1.5 rounded-lg hover:bg-amber-50 dark:text-amber-300 dark:hover:text-amber-100 dark:hover:bg-amber-950 transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3 h-3 ${reenviando ? 'animate-spin' : ''}`} />
                   {reenviando ? 'Reenviando...' : 'Reenviar link ao cliente'}
@@ -393,9 +393,9 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
             )}
 
             {conversa.contratoStatus === 'assinado' && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950 dark:border-emerald-900 rounded-lg">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span className="text-xs text-emerald-700">Contrato assinado</span>
+                <span className="text-xs text-emerald-700 dark:text-emerald-300">Contrato assinado</span>
               </div>
             )}
           </div>
@@ -403,13 +403,13 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
 
         {isEncerrada && (
           <div className="space-y-2">
-            <span className="w-full flex items-center justify-center text-xs text-gray-500 py-1.5 bg-gray-50 rounded-lg">
+            <span className="w-full flex items-center justify-center text-xs text-gray-500 dark:text-gray-400 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg">
               Atendimento encerrado
             </span>
             {conversa.contratoStatus === 'assinado' && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950 dark:border-emerald-900 rounded-lg">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span className="text-xs text-emerald-700">Contrato assinado</span>
+                <span className="text-xs text-emerald-700 dark:text-emerald-300">Contrato assinado</span>
               </div>
             )}
           </div>
@@ -423,7 +423,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
         <Section title="Motivo da transferência">
           <div className="flex items-start gap-2.5">
             <ArrowRightLeft className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-gray-700 leading-relaxed">{conversa.motivoHandoff}</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{conversa.motivoHandoff}</p>
           </div>
         </Section>
       )}
@@ -434,7 +434,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
         <Section title="Resumo da conversa">
           <div className="flex items-start gap-2.5">
             <Sparkles className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-gray-600 leading-relaxed">{conversa.resumoIa}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{conversa.resumoIa}</p>
           </div>
         </Section>
       )}
@@ -443,10 +443,10 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
       <Section title="Operador Responsável">
         {isEncerrada || agentes.length === 0 ? (
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-              <User className="w-3 h-3 text-blue-600" />
+            <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
+              <User className="w-3 h-3 text-blue-600 dark:text-blue-300" />
             </div>
-            <span className="text-sm text-gray-700 truncate">
+            <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
               {conversa.agenteNome || 'Não atribuído'}
             </span>
           </div>
@@ -457,7 +457,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
             onBlur={() => setEditandoAgente(false)}
             autoFocus
             disabled={transferindo}
-            className="w-full text-sm border border-blue-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-60"
+            className="w-full text-sm border border-blue-300 dark:border-blue-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-60"
           >
             <option value="" disabled>Selecionar agente...</option>
             {agentes.map(a => (
@@ -467,17 +467,17 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
         ) : (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                <User className="w-3 h-3 text-blue-600" />
+              <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
+                <User className="w-3 h-3 text-blue-600 dark:text-blue-300" />
               </div>
-              <span className="text-sm text-gray-700 truncate">
+              <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
                 {conversa.agenteNome || 'Não atribuído'}
               </span>
             </div>
             {!isEncerrada && (
               <button
                 onClick={() => setEditandoAgente(true)}
-                className="text-[11px] text-blue-500 hover:text-blue-700 shrink-0 ml-1"
+                className="text-[11px] text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 shrink-0 ml-1"
               >
                 Alterar
               </button>
@@ -489,7 +489,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
       {/* Caixa de entrada */}
       <Section title="Caixa de Entrada">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-700">
+          <span className="text-sm text-gray-700 dark:text-gray-300">
             {conversa.filialNome || conversa.clienteFilial || 'Geral'}
           </span>
         </div>
@@ -500,28 +500,28 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
         <div className="space-y-2.5">
           {conversa.clienteContratoId && (
             <div className="flex items-center gap-2.5">
-              <Fingerprint className="w-4 h-4 text-gray-400 shrink-0" />
-              <span className="text-sm text-gray-600 font-mono truncate">{conversa.clienteContratoId}</span>
+              <Fingerprint className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm text-gray-600 dark:text-gray-400 font-mono truncate">{conversa.clienteContratoId}</span>
               <CopyButton texto={conversa.clienteContratoId} />
             </div>
           )}
           <div className="flex items-center gap-2.5">
             <WaIcon />
-            <span className="text-sm text-gray-600 truncate">
+            <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
               {conversa.clienteWhatsapp}
             </span>
             <CopyButton texto={conversa.clienteWhatsapp} />
           </div>
           {conversa.clienteFilial && (
             <div className="flex items-center gap-2.5">
-              <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
-              <span className="text-sm text-gray-600 truncate">{conversa.clienteFilial}</span>
+              <MapPin className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm text-gray-600 dark:text-gray-400 truncate">{conversa.clienteFilial}</span>
             </div>
           )}
           {conversa.iniciadaEm && desde(conversa.iniciadaEm) && (
             <div className="flex items-center gap-2.5">
-              <Clock className="w-4 h-4 text-gray-400 shrink-0" />
-              <span className="text-sm text-gray-600">
+              <Clock className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">
                 aberta há {desde(conversa.iniciadaEm)}
               </span>
             </div>
@@ -533,7 +533,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
                 : conversa.clienteStatus === 'bloqueado' ? 'bg-red-500'
                 : 'bg-gray-400'
               }`} />
-              <span className="text-sm text-gray-600 capitalize">{conversa.clienteStatus}</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">{conversa.clienteStatus}</span>
             </div>
           )}
         </div>
@@ -545,10 +545,10 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {tags.map(tag => (
-                <span key={tag} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full">
+                <span key={tag} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 text-xs px-2 py-0.5 rounded-full">
                   {tag}
                   {!isEncerrada && (
-                    <button onClick={() => removerTag(tag)} className="hover:text-blue-900 leading-none">
+                    <button onClick={() => removerTag(tag)} className="hover:text-blue-900 dark:hover:text-blue-100 leading-none">
                       <X className="w-3 h-3" />
                     </button>
                   )}
@@ -557,13 +557,13 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
             </div>
           )}
           {!isEncerrada && (
-            <form onSubmit={adicionarTag} className="flex items-center gap-1.5 text-gray-500">
+            <form onSubmit={adicionarTag} className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
               <Plus className="w-3.5 h-3.5 shrink-0" />
               <input
                 value={tagInput}
                 onChange={e => setTagInput(e.target.value)}
                 placeholder="Adicionar Tag..."
-                className="text-sm text-gray-600 placeholder-gray-400 bg-transparent outline-none w-full"
+                className="text-sm text-gray-600 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 bg-transparent outline-none w-full"
               />
             </form>
           )}
@@ -578,10 +578,10 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
                 <button
                   onClick={() => concluirLembrete(l.id)}
                   title="Marcar como resolvido"
-                  className="shrink-0 mt-0.5 w-4 h-4 rounded border border-gray-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors" />
+                  className="shrink-0 mt-0.5 w-4 h-4 rounded border border-gray-300 hover:border-emerald-500 hover:bg-emerald-50 dark:border-gray-600 dark:hover:border-emerald-500 dark:hover:bg-emerald-950 transition-colors" />
                 <div className="min-w-0">
-                  <p className="text-sm text-gray-700 leading-relaxed">{l.texto}</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{l.texto}</p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
                     {l.venceEm
                       ? format(new Date(l.venceEm), "d 'de' MMM 'às' HH:mm", { locale: ptBR })
                       : 'Sem prazo'}
@@ -599,21 +599,21 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
         <Section title="Histórico do cliente">
           {historico.total === 0 ? (
             <div className="flex items-center gap-2.5">
-              <History className="w-4 h-4 text-gray-400 shrink-0" />
-              <span className="text-sm text-gray-600">Primeiro contato</span>
+              <History className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">Primeiro contato</span>
             </div>
           ) : (
             <div className="space-y-2.5">
               <div className="flex items-center gap-2.5">
-                <History className="w-4 h-4 text-gray-400 shrink-0" />
-                <span className="text-sm text-gray-600">
+                <History className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                <span className="text-sm text-gray-600 dark:text-gray-400">
                   {historico.total === 1
                     ? '1 atendimento anterior'
                     : `${historico.total} atendimentos anteriores`}
                 </span>
               </div>
               {historico.ultima && (
-                <p className="text-xs text-gray-500 pl-[26px] leading-relaxed">
+                <p className="text-xs text-gray-500 dark:text-gray-400 pl-[26px] leading-relaxed">
                   Último há {desde(historico.ultima.ultimaMsgEm || historico.ultima.iniciadaEm)}
                   {historico.ultima.iniciadaEm
                     ? ` · ${format(new Date(historico.ultima.ultimaMsgEm || historico.ultima.iniciadaEm), 'dd/MM/yyyy')}`
@@ -621,8 +621,8 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
                 </p>
               )}
               {historico.assunto && (
-                <p className="text-xs text-gray-500 pl-[26px] leading-relaxed">
-                  Assunto mais frequente: <span className="text-gray-700 font-medium">{historico.assunto}</span>
+                <p className="text-xs text-gray-500 dark:text-gray-400 pl-[26px] leading-relaxed">
+                  Assunto mais frequente: <span className="text-gray-700 dark:text-gray-300 font-medium">{historico.assunto}</span>
                   {historico.vezes > 1 ? ` (${historico.vezes}×)` : ''}
                 </p>
               )}

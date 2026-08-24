@@ -6,6 +6,13 @@
   box-sizing: border-box;
 }
 
+:root {
+  color-scheme: light;
+}
+:root.dark {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -13,6 +20,14 @@ body {
   /* Companheiro do antialiased: sem ele o texto sai mais encorpado no macOS
      que no Windows, e o mesmo painel parece dois produtos diferentes. */
   -moz-osx-font-smoothing: grayscale;
+  /* Cor de fundo antes do React montar e aplicar a classe "dark" — sem isso,
+     quem usa o SO no escuro via um flash branco antes da tela pintar. */
+  background-color: #f9fafb;
+}
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #030712;
+  }
 }
 
 /* Números que se empilham em coluna — horário, contador, valor — alinham pela
@@ -37,6 +52,10 @@ time,
   background: #dbeafe;
   color: #1e3a8a;
 }
+:root.dark ::selection {
+  background: #1e3a8a;
+  color: #dbeafe;
+}
 
 ::-webkit-scrollbar {
   width: 6px;
@@ -51,6 +70,12 @@ time,
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
+}
+:root.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+:root.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 /* Quem configurou o sistema para reduzir animação costuma ter motivo — enjoo,

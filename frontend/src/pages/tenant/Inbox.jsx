@@ -119,24 +119,24 @@ function useBuild() {
 function Rodape() {
   const build = useBuild();
   return (
-    <footer className="mt-12 pt-6 border-t border-gray-200 text-center space-y-1">
-      <p className="text-xs text-gray-500">
+    <footer className="mt-12 pt-6 border-t border-gray-200 dark:border-gray-800 text-center space-y-1">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
         ISPDesk — atendimento por WhatsApp para provedores de internet
       </p>
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
         Desenvolvido por{' '}
         <a
           href="https://www.adilsondev.com.br"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 font-medium text-gray-500 hover:text-blue-600 transition-colors"
+          className="inline-flex items-center gap-1 font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
         >
           adilsondev.com.br
           <ExternalLink className="w-3 h-3" />
         </a>
       </p>
       {build?.data && (
-        <p className="text-[10px] text-gray-300 font-mono pt-1">
+        <p className="text-[10px] text-gray-300 dark:text-gray-600 font-mono pt-1">
           versão de {format(new Date(build.data), 'dd/MM/yyyy HH:mm')}
           {build.commit ? ` · ${build.commit}` : ''}
         </p>
@@ -182,16 +182,16 @@ function Indicador({ icon: Icon, rotulo, valor, detalhe, tom, onClick }) {
   return (
     <Tag
       onClick={onClick}
-      className={`text-left bg-white rounded-2xl border border-gray-200 px-4 py-3.5 ${
-        onClick ? 'hover:border-gray-300 hover:shadow-sm transition-all duration-150' : ''
+      className={`text-left bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 px-4 py-3.5 ${
+        onClick ? 'hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-sm transition-all duration-150' : ''
       }`}
     >
-      <div className="flex items-center gap-1.5 mb-1.5 text-gray-500">
+      <div className="flex items-center gap-1.5 mb-1.5 text-gray-500 dark:text-gray-400">
         <Icon className="w-3.5 h-3.5 shrink-0" />
         <span className="text-[11px] font-medium uppercase tracking-wide truncate">{rotulo}</span>
       </div>
-      <p className={`text-2xl font-bold tabular-nums leading-none ${tom || 'text-gray-900'}`}>{valor}</p>
-      <p className="text-[11px] text-gray-500 mt-1.5 truncate">{detalhe || ' '}</p>
+      <p className={`text-2xl font-bold tabular-nums leading-none ${tom || 'text-gray-900 dark:text-gray-50'}`}>{valor}</p>
+      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5 truncate">{detalhe || ' '}</p>
     </Tag>
   );
 }
@@ -260,13 +260,13 @@ function WelcomePanel({ currentUser, conversas = [], online = [], slaMinutos = 0
   const cards = CARDS.filter(c => !c.admin || isAdmin);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-white md:rounded-2xl md:border md:border-gray-200 md:shadow-sm flex flex-col items-center justify-start py-12 px-8">
+    <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900 md:rounded-2xl md:border md:border-gray-200 dark:md:border-gray-800 md:shadow-sm flex flex-col items-center justify-start py-12 px-8">
       <div className="w-full max-w-2xl">
         {/* Logo + greeting */}
         <div className="flex flex-col items-center text-center mb-8">
           <img src="/logoisp.png" alt="Logo" className="h-16 rounded-xl mb-6 shadow-sm" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">{saudacao(nome)}</h1>
-          <p className="text-gray-500 text-sm">{chamada(conversas, isAdmin)}</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50 mb-1">{saudacao(nome)}</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{chamada(conversas, isAdmin)}</p>
         </div>
 
         <PainelAgora
@@ -276,7 +276,7 @@ function WelcomePanel({ currentUser, conversas = [], online = [], slaMinutos = 0
           navigate={navigate}
         />
 
-        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
           {isAdmin ? 'Configurar a plataforma' : 'Atalhos'}
         </p>
 
@@ -292,13 +292,13 @@ function WelcomePanel({ currentUser, conversas = [], online = [], slaMinutos = 0
               <button
                 key={card.title}
                 onClick={() => navigate(card.href)}
-                className={`group text-left bg-white rounded-2xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-md transition-all duration-150 ${ultimoImpar ? 'col-span-2' : ''}`}
+                className={`group text-left bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all duration-150 ${ultimoImpar ? 'col-span-2' : ''}`}
               >
                 <div className={`w-10 h-10 rounded-xl ${card.bg} flex items-center justify-center mb-3`}>
                   <Icon className={`w-5 h-5 ${card.color}`} />
                 </div>
-                <p className="text-sm font-semibold text-gray-900 mb-1">{card.title}</p>
-                <p className="text-xs text-gray-500 leading-relaxed mb-3">{card.desc}</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">{card.title}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-3">{card.desc}</p>
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 group-hover:gap-2 transition-all">
                   {card.label}
                   <ArrowRight className="w-3 h-3" />
