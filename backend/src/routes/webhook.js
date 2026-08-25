@@ -5,7 +5,7 @@ import { eq, and, ne, lt, sql as sqlRaw } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { buscarDadosCliente } from '../services/sgp.js';
 import { dividirEmBlocos } from '../services/blocosResposta.js';
-import { enviarMensagem, transcreverAudioMeta, downloadMidiaBase64, baixarArquivoUrl, uploadMidia, enviarMidia } from '../services/whatsapp.js';
+import { enviarMensagem, enviarBotoes, transcreverAudioMeta, downloadMidiaBase64, baixarArquivoUrl, uploadMidia, enviarMidia } from '../services/whatsapp.js';
 import { realizarHandoff } from '../services/handoff.js';
 import { enviarPushParaTenant } from '../services/pushNotification.js';
 import { dentroDoHorario, proximoAtendimento } from '../services/horarios.js';
@@ -239,6 +239,18 @@ router.post('/', async (req, res) => {
             await processarWebhookMsg(tenant, remetente, texto, wamid, false, mediaId, nomeWa, filialEntrada, null);
             await confirmarWamid(wamid);
             continue;
+          } else if (msg.type === 'interactive') {
+            // Toque em botão de resposta rápida. Sem tratar aqui, o cliente
+            // tocava e o bot ficava mudo — pior que não ter botão, porque quem
+            // tocou conclui que o sistema travou.
+            //
+            // Vira texto normal: o título do botão é o que o cliente vê, então é
+            // o que ele diria se tivesse digitado. A IA segue a conversa sem
+            // precisar conhecer botão nenhum.
+            texto = msg.interactive?.button_reply?.title
+              || msg.interactive?.list_reply?.title
+              || null;
+            if (!texto) continue;
           } else {
             // Ignora outros tipos silenciosamente (sticker, reação, etc.)
             continue;
@@ -466,15 +478,28 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     // Código de pagamento vai sozinho num balão: no celular, copiar é segurar a
     // mensagem, e isso copia ela inteira. Resposta sem código sai igual a antes.
     const blocos = dividirEmBlocos(resultado.resposta);
-    for (const bloco of blocos) {
+    for (const [i, bloco] of blocos.entries()) {
+      // Os botões acompanham o último balão, que é onde está a pergunta.
+      const comBotoes = resultado.botoes?.length && i === blocos.length - 1;
       let botWamid = null;
       try {
         // Um de cada vez, esperando o anterior: dois envios em paralelo podem
         // chegar fora de ordem no WhatsApp, e aí o código cai antes do label.
-        const apiRes = await enviarMensagem(wConfig, remetente, bloco);
+        const apiRes = comBotoes
+          ? await enviarBotoes(wConfig, remetente, bloco, resultado.botoes)
+          : await enviarMensagem(wConfig, remetente, bloco);
         botWamid = apiRes?.messages?.[0]?.id || null;
       } catch (err) {
         console.error('Erro ao enviar resposta IA:', err.message);
+        // Botão é enfeite; a pergunta não pode se perder junto com ele.
+        if (comBotoes) {
+          try {
+            const apiRes = await enviarMensagem(wConfig, remetente, bloco);
+            botWamid = apiRes?.messages?.[0]?.id || null;
+          } catch (err2) {
+            console.error('Erro ao reenviar sem botões:', err2.message);
+          }
+        }
       }
       await db.insert(mensagens).values({
         conversaId: conversa.id,

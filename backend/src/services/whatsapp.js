@@ -169,3 +169,43 @@ export async function enviarMensagem(tenant, para, texto) {
   }
   return res.json();
 }
+
+// Botões de resposta rápida. Só valem dentro da janela de 24h — fora dela a Meta
+// exige template aprovado, mas aqui sempre é resposta a quem acabou de escrever.
+//
+// Limites da Meta, que quebram o envio inteiro se estourarem: no máximo 3
+// botões, título de até 20 caracteres, e títulos distintos entre si. O corte é
+// feito aqui em vez de confiar em quem chama, porque o erro volta como 400
+// genérico e o cliente simplesmente ficaria sem resposta.
+export async function enviarBotoes(tenant, para, texto, botoes) {
+  const url = `https://graph.facebook.com/v19.0/${tenant.whatsappNumberId}/messages`;
+  const vistos = new Set();
+  const acoes = botoes
+    .filter(b => b?.titulo && !vistos.has(b.titulo) && vistos.add(b.titulo))
+    .slice(0, 3)
+    .map(b => ({ type: 'reply', reply: { id: b.id, title: b.titulo.slice(0, 20) } }));
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${tenant.whatsappToken}`,
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: para,
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: texto.slice(0, 1024) },
+        action: { buttons: acoes },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Meta API erro ${res.status}: ${JSON.stringify(err)}`);
+  }
+  return res.json();
+}

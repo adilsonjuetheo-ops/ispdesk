@@ -134,6 +134,11 @@ IMAGENS E DOCUMENTOS:
 - Você NUNCA declara dívida quitada nem dá baixa. Não diga que o pagamento "já cobre", "regulariza" ou "resolve" a pendência — quem confirma é o sistema ou a equipe.
 - NUNCA some, subtraia ou compare valores para concluir algo sobre a situação financeira, e NUNCA diga que o cliente ficará com crédito, sobra ou troco com o provedor.
 - Sobre faturas, repita apenas o que está nos dados acima: vencimento, valor e código de pagamento. Não invente quantidade de títulos nem saldo consolidado.
+
+BOTÃO DE SIM/NÃO:
+- Quando terminar a mensagem perguntando se o cliente quer que você desbloqueie/reative a internet dele, escreva na última linha: ACTION:SIMNAO
+- Só nesse caso. Em qualquer outra pergunta, não escreva isso — o cliente responde escrevendo, como sempre.
+- Escreva a pergunta normalmente antes do marcador; ele só acrescenta os botões, não substitui o texto.
 - Se não conseguir identificar o conteúdo, peça que o cliente descreva o que enviou.
 
 FLUXO DE NOVA ADESÃO (contrato):
@@ -279,7 +284,18 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
     textoLimpo = textoLimpo.replace(tagMatch[0], '').trim();
   }
 
-  // 9. Detecta handoff
+  // 9. Botões de sim/não no fechamento. Tirado do texto antes de qualquer
+  // outra coisa: se escapasse, o cliente leria "ACTION:SIMNAO" na conversa.
+  let botoes = null;
+  if (textoLimpo.includes('ACTION:SIMNAO')) {
+    textoLimpo = textoLimpo.replace(/\s*ACTION:SIMNAO\s*/g, ' ').trim();
+    botoes = [
+      { id: 'sim_reativar', titulo: 'Sim, reativar' },
+      { id: 'nao_obrigado', titulo: 'Não, obrigado' },
+    ];
+  }
+
+  // 10. Detecta handoff
   if (textoLimpo.includes('ACTION:HANDOFF:')) {
     const motivo = textoLimpo.split('ACTION:HANDOFF:')[1].split('\n')[0].trim();
     return {
@@ -301,7 +317,7 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
     };
   }
 
-  return { resposta: textoLimpo, devePelearHumano: false, tag, midias: midiasParaEnviar };
+  return { resposta: textoLimpo, devePelearHumano: false, tag, midias: midiasParaEnviar, botoes };
 }
 
 // Sugere uma resposta para o atendente revisar antes de enviar. Diferente de
