@@ -4,6 +4,7 @@ import { tenants, clientes, conversas, mensagens, webhookLog, filiais, filialWha
 import { eq, and, ne, lt, sql as sqlRaw } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { buscarDadosCliente } from '../services/sgp.js';
+import { dividirEmBlocos } from '../services/blocosResposta.js';
 import { enviarMensagem, transcreverAudioMeta, downloadMidiaBase64, baixarArquivoUrl, uploadMidia, enviarMidia } from '../services/whatsapp.js';
 import { realizarHandoff } from '../services/handoff.js';
 import { enviarPushParaTenant } from '../services/pushNotification.js';
@@ -462,20 +463,30 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
   incrementarUso(tenant).catch(err => console.error('[limites] Erro ao incrementar uso:', err.message));
 
   if (resultado.resposta) {
-    let botWamid = null;
-    try {
-      const apiRes = await enviarMensagem(wConfig, remetente, resultado.resposta);
-      botWamid = apiRes?.messages?.[0]?.id || null;
-    } catch (err) {
-      console.error('Erro ao enviar resposta IA:', err.message);
+    // Código de pagamento vai sozinho num balão: no celular, copiar é segurar a
+    // mensagem, e isso copia ela inteira. Resposta sem código sai igual a antes.
+    const blocos = dividirEmBlocos(resultado.resposta);
+    for (const bloco of blocos) {
+      let botWamid = null;
+      try {
+        // Um de cada vez, esperando o anterior: dois envios em paralelo podem
+        // chegar fora de ordem no WhatsApp, e aí o código cai antes do label.
+        const apiRes = await enviarMensagem(wConfig, remetente, bloco);
+        botWamid = apiRes?.messages?.[0]?.id || null;
+      } catch (err) {
+        console.error('Erro ao enviar resposta IA:', err.message);
+      }
+      await db.insert(mensagens).values({
+        conversaId: conversa.id,
+        origem: 'bot',
+        conteudo: bloco,
+        wamid: botWamid,
+        status: 'enviada',
+      });
     }
-    await db.insert(mensagens).values({
-      conversaId: conversa.id,
-      origem: 'bot',
-      conteudo: resultado.resposta,
-      wamid: botWamid,
-      status: 'enviada',
-    });
+    // A prévia da lista leva a resposta inteira, não o último balão: dividida, a
+    // conversa poderia terminar num código de pagamento e a lista de conversas
+    // mostraria uma parede de números no lugar do assunto.
     await atualizarUltMsg(conversa.id, resultado.resposta, 'bot');
   }
 
