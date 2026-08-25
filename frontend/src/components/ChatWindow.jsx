@@ -9,7 +9,7 @@ import {
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
   List, ListOrdered, Plus, ArrowLeft, Video, Sparkles, Maximize2, Clock,
-  MoreHorizontal, PanelRight, Play, Pause, BellRing, ChevronDown,
+  MoreHorizontal, PanelRight, Play, Pause, BellRing, ChevronDown, Download,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -311,6 +311,39 @@ function Lightbox({ src, onFechar }) {
   );
 }
 
+// Comprovante de PIX chega quase sempre em PDF. Abrir numa aba nova esbarra na
+// CSP herdada pela blob:, então o visualizador vive aqui dentro, num iframe do
+// próprio painel — e o botão de baixar continua ao lado para quem quiser o
+// arquivo em mãos.
+function VisorPdf({ src, nome, onFechar }) {
+  useEffect(() => {
+    const aoTeclar = e => { if (e.key === 'Escape') onFechar(); };
+    document.addEventListener('keydown', aoTeclar);
+    return () => document.removeEventListener('keydown', aoTeclar);
+  }, [onFechar]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex flex-col p-4 md:p-8"
+      onClick={onFechar} role="dialog" aria-modal="true">
+      <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
+        <p className="text-sm text-white/90 truncate">{nome}</p>
+        <div className="flex items-center gap-2 shrink-0">
+          <a href={src} download={nome} onClick={e => e.stopPropagation()}
+            className="flex items-center gap-1.5 text-xs font-medium text-white bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-lg transition-colors">
+            <Download className="w-3.5 h-3.5" /> Baixar
+          </a>
+          <button onClick={onFechar} aria-label="Fechar"
+            className="p-2 rounded-full bg-white/10 text-white hover:bg-white/25 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+      <iframe src={src} title={nome} onClick={e => e.stopPropagation()}
+        className="flex-1 w-full rounded-lg bg-white shadow-2xl" />
+    </div>
+  );
+}
+
 function MidiaBolao({ msg, isCliente }) {
   const { conteudo, midiaUrl, conversaId } = msg;
   const { src: midiaSrc, erro: midiaErro } = useMidiaBlob(conversaId, midiaUrl);
@@ -331,7 +364,12 @@ function MidiaBolao({ msg, isCliente }) {
   const isImagem = conteudo.startsWith('[Imagem]');
   const isAudio  = conteudo.startsWith('[Áudio]');
   const isVideo  = conteudo.startsWith('[Vídeo]');
-  const nome = conteudo.replace(/^\[(Imagem|Arquivo|Áudio|Vídeo)\] /, '');
+  // Cliente manda "[Documento]", o bot manda "[Arquivo]". "Documento" não
+  // estava em lugar nenhum aqui: o PDF do cliente caía no cartão sem ação
+  // lá embaixo, virava texto morto e o atendente não tinha como pegar o
+  // arquivo — apesar de ele estar no servidor o tempo todo.
+  const isDocumento = conteudo.startsWith('[Documento]') || conteudo.startsWith('[Arquivo]');
+  const nome = conteudo.replace(/^\[(Imagem|Arquivo|Documento|Áudio|Vídeo)\] /, '');
   const cor = isCliente
     ? 'bg-white border border-gray-200 text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200'
     : 'bg-blue-50 border border-blue-100 text-blue-800 dark:bg-blue-950 dark:border-blue-900 dark:text-blue-200';
@@ -408,6 +446,52 @@ function MidiaBolao({ msg, isCliente }) {
         )}
         {nome && <p className="text-xs leading-relaxed mt-1.5 opacity-80">{nome}</p>}
       </div>
+    );
+  }
+
+  if (isDocumento && midiaUrl) {
+    const ehPdf = /\.pdf$/i.test(nome);
+    return (
+      <>
+        <div className={`rounded-2xl px-3 py-2.5 text-sm max-w-[20rem] ${cor}`}>
+          <div className="flex items-start gap-2">
+            <FileText className="w-5 h-5 shrink-0 opacity-60 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-xs opacity-60 mb-0.5 font-medium">
+                {ehPdf ? 'PDF' : 'Documento'}
+              </p>
+              <p className="text-xs leading-relaxed break-words">{nome}</p>
+            </div>
+          </div>
+
+          {midiaErro ? (
+            <p className="text-xs text-red-500 mt-2">Não foi possível baixar o arquivo.</p>
+          ) : !midiaSrc ? (
+            <p className="text-xs opacity-50 mt-2 flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" /> Carregando arquivo...
+            </p>
+          ) : (
+            <div className="flex items-center gap-3 mt-2">
+              {ehPdf && (
+                <button type="button" onClick={() => setAmpliada(true)}
+                  className="flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100 underline underline-offset-2">
+                  <Maximize2 className="w-3 h-3" /> Abrir
+                </button>
+              )}
+              {/* <a download> em vez de window.open: a blob: herda a CSP do
+                  painel e a navegação seria barrada, mas salvar não é
+                  navegação — isto funciona em todos os navegadores. */}
+              <a href={midiaSrc} download={nome}
+                className="flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100 underline underline-offset-2">
+                <Download className="w-3 h-3" /> Baixar
+              </a>
+            </div>
+          )}
+        </div>
+        {ampliada && midiaSrc && (
+          <VisorPdf src={midiaSrc} nome={nome} onFechar={() => setAmpliada(false)} />
+        )}
+      </>
     );
   }
 
