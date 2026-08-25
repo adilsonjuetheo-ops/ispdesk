@@ -25,6 +25,12 @@ function mesmasMsgs(a, b) {
   return a.every((m, i) => m.id === b[i].id && m.status === b[i].status);
 }
 
+// Uma definição só do que é mídia. Havia duas listas soltas, em pontos
+// distantes do arquivo, e "[Documento]" faltava nas duas — o PDF do cliente
+// nem chegava no balão de mídia, aparecia como texto cru na conversa. Separadas,
+// elas voltam a divergir na próxima vez que surgir um tipo novo.
+const PREFIXO_MIDIA = /^\[(Imagem|Arquivo|Documento|Áudio|Vídeo)\]/;
+
 function groupMsgsByDate(msgs) {
   const result = [];
   let lastDate = null;
@@ -369,7 +375,7 @@ function MidiaBolao({ msg, isCliente }) {
   // lá embaixo, virava texto morto e o atendente não tinha como pegar o
   // arquivo — apesar de ele estar no servidor o tempo todo.
   const isDocumento = conteudo.startsWith('[Documento]') || conteudo.startsWith('[Arquivo]');
-  const nome = conteudo.replace(/^\[(Imagem|Arquivo|Documento|Áudio|Vídeo)\] /, '');
+  const nome = conteudo.replace(PREFIXO_MIDIA, '').replace(/^ /, '');
   const cor = isCliente
     ? 'bg-white border border-gray-200 text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200'
     : 'bg-blue-50 border border-blue-100 text-blue-800 dark:bg-blue-950 dark:border-blue-900 dark:text-blue-200';
@@ -537,7 +543,7 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
   const isBot = msg.origem === 'bot';
   const isNota = msg.origem === 'nota';
   const isSistema = msg.conteudo.startsWith('[Sistema]');
-  const isMidia = msg.conteudo.startsWith('[Arquivo]') || msg.conteudo.startsWith('[Imagem]') || msg.conteudo.startsWith('[Áudio]') || msg.conteudo.startsWith('[Vídeo]');
+  const isMidia = PREFIXO_MIDIA.test(msg.conteudo);
 
   if (isSistema) {
     return (
