@@ -73,12 +73,16 @@ async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo) {
     }
 
     const valor = Number(titulo.valorCorrigido || titulo.valor || 0).toFixed(2).replace('.', ',');
+    // Com link da central configurado, o provedor pediu pra parar de mandar
+    // o PIX ali e mandar o link em vez disso — mesma posição de variável,
+    // template não muda.
+    const linkOuPix = tenant.lembreteFaturaLinkAssinante || titulo.codigoPix || titulo.link || '';
     const parametros = [
       titulo.clienteNome || 'Cliente',
       titulo.demonstrativo || 'Mensalidade',
       `R$ ${valor}`,
       formatarData(titulo.dataVencimento),
-      titulo.codigoPix || titulo.link || '',
+      linkOuPix,
     ];
 
     await enviarTemplate(tenant, telefone, nomeTemplate, tenant.lembreteFaturaIdioma || 'pt_BR', parametros);

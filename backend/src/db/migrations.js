@@ -161,6 +161,8 @@ export async function runMigrations() {
     // hoje ainda é rápido porque ela é pequena, mas cresce a cada atendimento.
     await sql`CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON mensagens(conversa_id, enviada_em)`;
 
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_link_assinante text`;
+
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

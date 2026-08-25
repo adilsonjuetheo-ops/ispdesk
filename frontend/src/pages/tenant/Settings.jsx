@@ -1274,6 +1274,17 @@ export default function Settings() {
                       onChange={v => set('lembreteFaturaIdioma', v)}
                       placeholder="pt_BR"
                     />
+                    <Field
+                      label="Link da central do assinante (opcional)"
+                      value={tenant.lembreteFaturaLinkAssinante || ''}
+                      onChange={v => set('lembreteFaturaLinkAssinante', v)}
+                      placeholder="https://exemplo.com/central"
+                    />
+                    {tenant.lembreteFaturaLinkAssinante && (
+                      <p className="text-xs text-gray-400 -mt-2">
+                        Preenchido: o link acima substitui o código PIX/boleto na mensagem. Vazio: continua mandando o PIX/boleto normalmente.
+                      </p>
+                    )}
                   </div>
                   {tenant.lembreteFaturaAtivo && <TestarLembretes />}
                   {tenant.lembreteFaturaAtivo && <TestarLembreteCliente />}

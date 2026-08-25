@@ -41,6 +41,9 @@ export const tenants = pgTable('tenants', {
   lembreteFaturaTemplatePre:   text('lembrete_fatura_template_pre'), // nome do template aprovado — D-1
   lembreteFaturaTemplatePos:   text('lembrete_fatura_template_pos'), // nome do template aprovado — D+5
   lembreteFaturaIdioma:        text('lembrete_fatura_idioma').default('pt_BR'),
+  // Quando preenchido, substitui o PIX/boleto na variável do template pelo
+  // link da central do assinante do provedor — nulo mantém o PIX/boleto.
+  lembreteFaturaLinkAssinante: text('lembrete_fatura_link_assinante'),
   criadoEm:           timestamp('criado_em').defaultNow(),
   atualizadoEm:       timestamp('atualizado_em').defaultNow(),
 });
