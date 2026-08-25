@@ -7,17 +7,28 @@ export default function Dashboard() {
   const [tenants, setTenants] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const carregar = () => {
+    setLoading(true);
+    setErro('');
     Promise.all([
       api.get('/tenants'),
       api.get('/conversations'),
     ]).then(([t, c]) => {
       setTenants(t.data);
       setConversations(c.data);
+    // Sem este catch a tela ficava com tudo zerado e a tabela vazia quando uma
+    // das buscas falhava — indistinguível de uma plataforma sem provedor
+    // nenhum. O painel precisa dizer que falhou, não fingir que está vazio.
+    }).catch(err => {
+      setErro(err.response?.data?.erro
+        || (err.response ? `O servidor respondeu ${err.response.status}.` : 'Sem resposta do servidor.'));
     }).finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { carregar(); }, []);
 
   const ativas = conversations.filter(c => c.status !== 'encerrada').length;
   const aguardando = conversations.filter(c => c.status === 'aguardando').length;
@@ -38,6 +49,17 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
         <p className="text-gray-400 text-sm mt-1">Visão geral da plataforma ISPDesk</p>
       </div>
+
+      {erro && (
+        <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-4">
+          <p className="text-sm text-red-300 font-medium">Não foi possível carregar os dados.</p>
+          <p className="text-xs text-red-400/80 mt-1">{erro}</p>
+          <button onClick={carregar}
+            className="mt-3 text-xs font-medium text-red-200 hover:text-white underline underline-offset-2">
+            Tentar de novo
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4 mb-8">
         {cards.map(card => (

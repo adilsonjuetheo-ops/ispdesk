@@ -21,10 +21,16 @@ export default function Tenants() {
   const [form, setForm] = useState(FORM_VAZIO);
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState('');
+  const [erroLista, setErroLista] = useState('');
   const navigate = useNavigate();
   const fileRef = useRef(null);
 
-  const carregar = () => api.get('/tenants').then(r => setTenants(r.data));
+  // O catch não existia: uma busca que falhasse deixava a lista vazia e a tela
+  // parecia dizer que não há provedor cadastrado.
+  const carregar = () => api.get('/tenants')
+    .then(r => { setTenants(r.data); setErroLista(''); })
+    .catch(err => setErroLista(err.response?.data?.erro
+      || (err.response ? `O servidor respondeu ${err.response.status}.` : 'Sem resposta do servidor.')));
   useEffect(() => { carregar(); }, []);
 
   const handleLogoUpload = e => {
@@ -66,6 +72,17 @@ export default function Tenants() {
           Novo provedor
         </button>
       </div>
+
+      {erroLista && (
+        <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-4">
+          <p className="text-sm text-red-300 font-medium">Não foi possível carregar os provedores.</p>
+          <p className="text-xs text-red-400/80 mt-1">{erroLista}</p>
+          <button onClick={carregar}
+            className="mt-3 text-xs font-medium text-red-200 hover:text-white underline underline-offset-2">
+            Tentar de novo
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-4">
         {tenants.map(t => (

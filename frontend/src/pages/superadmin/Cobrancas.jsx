@@ -34,10 +34,17 @@ export default function Cobrancas() {
   const [loading, setLoading] = useState(true);
   const [acao, setAcao] = useState({}); // { [tenantId]: 'verificando' | 'baixa' | null }
   const [feedback, setFeedback] = useState({}); // { [tenantId]: { ok, msg } }
+  const [erroLista, setErroLista] = useState('');
 
   const carregar = useCallback(() => {
     setLoading(true);
-    api.get('/cobrancas').then(r => setRows(r.data)).finally(() => setLoading(false));
+    // Sem o catch, uma falha aqui esvaziava a tabela em silêncio — parecia que
+    // não havia cobrança nenhuma em vez de dizer que a busca não voltou.
+    api.get('/cobrancas')
+      .then(r => { setRows(r.data); setErroLista(''); })
+      .catch(err => setErroLista(err.response?.data?.erro
+        || (err.response ? `O servidor respondeu ${err.response.status}.` : 'Sem resposta do servidor.')))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
@@ -105,6 +112,17 @@ export default function Cobrancas() {
           Atualizar
         </button>
       </div>
+
+      {erroLista && (
+        <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-4">
+          <p className="text-sm text-red-300 font-medium">Não foi possível carregar as cobranças.</p>
+          <p className="text-xs text-red-400/80 mt-1">{erroLista}</p>
+          <button onClick={carregar}
+            className="mt-3 text-xs font-medium text-red-200 hover:text-white underline underline-offset-2">
+            Tentar de novo
+          </button>
+        </div>
+      )}
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-4 gap-3 mb-6">
