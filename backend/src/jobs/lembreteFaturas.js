@@ -77,10 +77,13 @@ async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo) {
     // o PIX ali e mandar o link em vez disso — mesma posição de variável,
     // template não muda.
     const linkOuPix = tenant.lembreteFaturaLinkAssinante || titulo.codigoPix || titulo.link || '';
+    // {{3}} vai sem "R$": os templates aprovados escrevem "no valor de R$ {{3}}",
+    // com o cifrão no corpo. Mandar "R$ 89,90" aqui faria o cliente ler
+    // "no valor de R$ R$ 89,90".
     const parametros = [
       titulo.clienteNome || 'Cliente',
       titulo.demonstrativo || 'Mensalidade',
-      `R$ ${valor}`,
+      valor,
       formatarData(titulo.dataVencimento),
       linkOuPix,
     ];
