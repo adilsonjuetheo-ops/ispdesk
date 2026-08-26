@@ -2,6 +2,7 @@ import { db } from '../db/index.js';
 import { tenants } from '../db/schema.js';
 import { eq, and, lte, isNotNull } from 'drizzle-orm';
 import { criarPIX, consultarPagamento, getValorPlano } from '../services/mercadopago.js';
+import { getLabelPlano } from '../config/planos.js';
 import { enviarMensagem } from '../services/whatsapp.js';
 
 async function processarCobrancas() {
@@ -31,7 +32,7 @@ async function processarCobrancas() {
       if (tenant.whatsappContato && tenant.whatsappNumberId && tenant.whatsappToken) {
         const numero = tenant.whatsappContato.replace(/\D/g, '');
         const valor  = getValorPlano(tenant.plano).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-        const label  = tenant.plano === 'pro' ? 'Pro' : tenant.plano === 'enterprise' ? 'Enterprise' : 'Basic';
+        const label  = getLabelPlano(tenant.plano);
         const vencStr = pixExpira.toLocaleDateString('pt-BR');
 
         const msg =

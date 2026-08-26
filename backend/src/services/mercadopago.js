@@ -1,10 +1,9 @@
 const MP_BASE = 'https://api.mercadopago.com';
 
-const VALORES_PLANO = { basic: 149.90, pro: 249.90, enterprise: 549.90 };
-const LABELS_PLANO  = { basic: 'Basic', pro: 'Pro', enterprise: 'Enterprise' };
+import { getValorPlano as valorDoPlano, getLabelPlano } from '../config/planos.js';
 
 export function getValorPlano(plano) {
-  return VALORES_PLANO[plano] || VALORES_PLANO.basic;
+  return valorDoPlano(plano);
 }
 
 export async function criarPIX(tenant) {
@@ -16,7 +15,7 @@ export async function criarPIX(tenant) {
   const expiracaoISO = expiracao.toISOString().replace('Z', '-03:00');
 
   const mesRef = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-  const label  = LABELS_PLANO[tenant.plano] || 'Basic';
+  const label  = getLabelPlano(tenant.plano);
 
   const body = {
     transaction_amount: valor,

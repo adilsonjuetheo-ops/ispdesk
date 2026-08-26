@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../../lib/api.js';
 import { useNavigate } from 'react-router-dom';
+import { precoPlano, ORDEM_PLANOS, labelPlano } from '../../lib/planos.js';
 import { Plus, X, Loader2, Building2, Upload } from 'lucide-react';
 
 const PLANO_BADGE = {
   basic:      'bg-gray-700/60 text-gray-300',
+  exclusivo:  'bg-emerald-900/50 text-emerald-300 border border-emerald-800',
   pro:        'bg-blue-900/50 text-blue-300 border border-blue-800',
   enterprise: 'bg-amber-900/50 text-amber-300 border border-amber-800',
 };
-const PLANO_PRECO = { basic: 'R$149,90', pro: 'R$299,90', enterprise: 'R$549,90' };
 
 const FORM_VAZIO = {
   slug: '', nome: '', corPrimaria: '#0066CC', whatsappNumberId: '',
@@ -102,7 +103,7 @@ export default function Tenants() {
             </div>
             <div className="flex items-center gap-3">
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${PLANO_BADGE[t.plano] || PLANO_BADGE.basic}`}>
-                {t.plano} · {PLANO_PRECO[t.plano] || '—'}
+                {t.plano} · {precoPlano(t.plano)}
               </span>
               <span className={`text-xs px-2 py-1 rounded-full ${t.ativo ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
                 {t.ativo ? 'Ativo' : 'Inativo'}
@@ -166,9 +167,9 @@ export default function Tenants() {
                   <label className="block text-xs text-gray-400 mb-1">Plano</label>
                   <select value={form.plano} onChange={e => setForm(f => ({ ...f, plano: e.target.value }))}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm">
-                    <option value="basic">Basic — R$149,90/mês</option>
-                    <option value="pro">Pro — R$299,90/mês</option>
-                    <option value="enterprise">Enterprise — R$549,90/mês</option>
+                    {ORDEM_PLANOS.map(v => (
+                      <option key={v} value={v}>{labelPlano(v)} — {precoPlano(v)}/mês</option>
+                    ))}
                   </select>
                 </div>
               </div>

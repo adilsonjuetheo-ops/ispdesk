@@ -1,11 +1,10 @@
 import { neon } from '@neondatabase/serverless';
 import { enviarMensagem } from './whatsapp.js';
 import { enviarPushParaTenant } from './pushNotification.js';
-
-const LIMITES = { basic: 3000, pro: 10000 };
+import { getLimitePlano } from '../config/planos.js';
 
 export function getLimite(plano) {
-  return LIMITES[plano] || LIMITES.basic;
+  return getLimitePlano(plano);
 }
 
 export function getMes() {

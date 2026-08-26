@@ -4,6 +4,7 @@ import { tenants } from '../db/schema.js';
 import { eq, and, ne, or, isNull } from 'drizzle-orm';
 import { autenticar, apenasSuper } from '../middleware/auth.js';
 import { criarPIX, consultarPagamento, getValorPlano } from '../services/mercadopago.js';
+import { getLabelPlano } from '../config/planos.js';
 import { enviarMensagem } from '../services/whatsapp.js';
 import { criarRateLimit } from '../middleware/security.js';
 
@@ -70,7 +71,7 @@ router.post('/tenants/:id/gerar-cobranca', autenticar, apenasSuper, async (req, 
     if (tenant.whatsappContato && tenant.whatsappNumberId && tenant.whatsappToken) {
       const numero = tenant.whatsappContato.replace(/\D/g, '');
       const valor  = getValorPlano(tenant.plano).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-      const label  = tenant.plano === 'pro' ? 'Pro' : tenant.plano === 'enterprise' ? 'Enterprise' : 'Basic';
+      const label  = getLabelPlano(tenant.plano);
       const vencStr = pixExpira.toLocaleDateString('pt-BR');
 
       const msg =

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
+import { labelPlano } from '../../lib/planos.js';
 import {
   CreditCard, CheckCircle, Clock, Ban, RefreshCw,
   Loader2, ExternalLink, AlertCircle, ThumbsUp,
@@ -21,7 +22,7 @@ const STATUS_ICON = {
   suspenso: Ban,
 };
 
-const PLANO_LABEL = { basic: 'Basic', pro: 'Pro', enterprise: 'Enterprise' };
+
 
 function fmt(date) {
   if (!date) return '—';
@@ -184,7 +185,7 @@ export default function Cobrancas() {
                     {/* Plano */}
                     <td className="px-5 py-3">
                       <span className="text-xs text-gray-300 capitalize">
-                        {PLANO_LABEL[t.plano] || t.plano}
+                        {labelPlano(t.plano)}
                       </span>
                     </td>
 

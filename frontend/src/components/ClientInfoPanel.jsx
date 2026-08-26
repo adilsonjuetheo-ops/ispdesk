@@ -3,6 +3,7 @@ import { Fingerprint, ChevronDown, User, X, Plus, MapPin, FileSignature, CheckCi
 import { formatDistanceToNowStrict, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../lib/api.js';
+import { planoTemContrato } from '../lib/planos.js';
 import { useAuth } from '../hooks/useAuth.js';
 
 const WaIcon = () => (
@@ -239,7 +240,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
   const [transferindo, setTransferindo] = useState(false);
   const [reenviando, setReenviando] = useState(false);
   const [erroReenvio, setErroReenvio] = useState('');
-  const temAssinatura = ['pro', 'enterprise'].includes(user?.plano);
+  const temAssinatura = planoTemContrato(user?.plano);
 
   // Lembretes em aberto deste cliente. Recarrega quando algum é concluído em
   // qualquer lugar do painel, para a lista não mostrar tarefa já resolvida.

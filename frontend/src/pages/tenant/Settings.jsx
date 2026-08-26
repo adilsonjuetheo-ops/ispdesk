@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
+import { planoTemContrato } from '../../lib/planos.js';
 import { Save, Loader2, Copy, Check, Upload, X, Building2, Stethoscope, CircleCheck, TriangleAlert, CircleX, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight, ArrowRightLeft } from 'lucide-react';
 
 function carregarFbSdk() {
@@ -1463,7 +1464,7 @@ export default function Settings() {
           </section>
 
           {/* assinatura digital — apenas Pro e Enterprise */}
-          {['pro', 'enterprise'].includes(tenant.plano) && (
+          {planoTemContrato(tenant.plano) && (
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
               <FileSignature className="w-4 h-4 text-blue-500" /> Assinatura Digital de Contratos

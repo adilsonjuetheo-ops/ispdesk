@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db/index.js';
 import { conversas, clientes, tenants, mensagens } from '../db/schema.js';
 import { eq, and, ne, or, isNull } from 'drizzle-orm';
+import { planoTemContrato } from '../config/planos.js';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
 import { enviarContrato, buscarLinkAssinatura } from '../services/assinatura.js';
 import { enviarMensagem } from '../services/whatsapp.js';
@@ -28,8 +29,8 @@ router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {
   const { conversaId } = req.params;
   const dados = req.body;
 
-  if (req.user.role !== 'superadmin' && !['pro', 'enterprise'].includes(req.user.plano)) {
-    return res.status(403).json({ erro: 'O módulo de assinatura digital está disponível apenas nos planos Pro e Enterprise.' });
+  if (req.user.role !== 'superadmin' && !planoTemContrato(req.user.plano)) {
+    return res.status(403).json({ erro: 'O módulo de assinatura digital não está disponível no seu plano.' });
   }
 
   if (!dados.nome_contratante || !dados.cpf_cnpj || !dados.identificacao_oferta || !dados.mensalidade) {

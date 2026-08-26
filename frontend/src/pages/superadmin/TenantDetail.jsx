@@ -1,16 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
+import { ORDEM_PLANOS, labelPlano, precoPlano } from '../../lib/planos.js';
 import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2, MapPin, AlertTriangle, ToggleLeft, ToggleRight, KeyRound, QrCode, CheckCircle, Clock, Ban } from 'lucide-react';
 
-const PLANOS = [
-  { value: 'basic',      label: 'Basic',      preco: 'R$149,90/mês', cor: 'text-gray-300'  },
-  { value: 'pro',        label: 'Pro',         preco: 'R$249,90/mês', cor: 'text-blue-400'  },
-  { value: 'enterprise', label: 'Enterprise',  preco: 'R$549,90/mês', cor: 'text-amber-400' },
-];
+const COR_PLANO = {
+  basic: 'text-gray-300', exclusivo: 'text-emerald-400',
+  pro: 'text-blue-400',   enterprise: 'text-amber-400',
+};
+const PLANOS = ORDEM_PLANOS.map(value => ({
+  value,
+  label: labelPlano(value),
+  preco: `${precoPlano(value)}/mês`,
+  cor: COR_PLANO[value] || 'text-gray-300',
+}));
 
 const PLANO_BADGE = {
   basic:      'bg-gray-700 text-gray-300',
+  exclusivo:  'bg-emerald-900/50 text-emerald-300 border border-emerald-700',
   pro:        'bg-blue-900/50 text-blue-300 border border-blue-700',
   enterprise: 'bg-amber-900/50 text-amber-300 border border-amber-700',
 };
