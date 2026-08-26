@@ -1521,9 +1521,27 @@ export default function Settings() {
                       onChange={e => set('assinaturaExtra', { ...(tenant.assinaturaExtra || {}), cofreUuid: e.target.value })}
                       placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      Pode colar a URL inteira do cofre — o sistema extrai o UUID sozinho.
+                    </p>
                   </div>
                 </>
               )}
+
+              {/* Modelo do contrato: característica do que o provedor vende, não
+                  escolha de quem envia. */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Modelo de contrato</label>
+                <select value={tenant.contratoModelo || 'residencial'}
+                  onChange={e => set('contratoModelo', e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  <option value="residencial">Residencial — banda larga</option>
+                  <option value="dedicado">Link dedicado — com SLA e permanência</option>
+                </select>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  O link dedicado sai com Anexo I (SLA), Anexo II (Termo de Contratação) e Anexo III (Permanência de 12 meses).
+                </p>
+              </div>
 
               {tenant.assinaturaTipo && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700 leading-relaxed">

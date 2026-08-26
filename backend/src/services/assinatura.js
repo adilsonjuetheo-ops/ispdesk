@@ -485,7 +485,12 @@ async function enviarZapSign(tenant, clienteWhatsapp, dados) {
 async function enviarD4Sign(tenant, clienteWhatsapp, dados) {
   const token     = tenant.assinaturaToken;
   const extra     = tenant.assinaturaExtra || {};
-  const cofreUuid = extra.cofreUuid;
+  // Aceita tanto o UUID puro quanto a URL do painel que o D4Sign exibe e a
+  // pessoa copia. Já veio salvo como URL em produção, e o erro resultante era
+  // um 404 sem pista nenhuma do que estava errado.
+  const cofreUuid = String(extra.cofreUuid || '')
+    .match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0]
+    || extra.cofreUuid;
   const cryptKey  = extra.cryptKey;
 
   if (!token)     throw new Error('Token D4Sign não configurado.');

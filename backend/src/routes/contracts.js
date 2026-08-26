@@ -53,7 +53,13 @@ router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {
   }
 
   try {
-    const resultado = await enviarContrato(tenant, cliente.whatsapp, dados);
+    // O modelo sai do cadastro do provedor. A tela pode sobrescrever num caso
+    // pontual, mas o padrão é o que o provedor vende — assim a StaNet nunca
+    // manda contrato residencial por alguém ter esquecido de trocar.
+    const resultado = await enviarContrato(tenant, cliente.whatsapp, {
+      ...dados,
+      modelo_contrato: dados.modelo_contrato || tenant.contratoModelo || 'residencial',
+    });
 
     await db.update(conversas).set({
       contratoUuid: resultado.uuid,

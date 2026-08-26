@@ -11,6 +11,24 @@ import { diagnosticar } from '../services/diagnostico.js';
 
 const router = Router();
 
+// O D4Sign mostra o cofre como uma URL de painel, e é ela que a pessoa copia:
+// https://secure.d4sign.com.br/desk/cofres/1751269/<uuid>.html
+// O código monta `documents/{cofre}/upload`, então a URL inteira vira um
+// endereço quebrado e o envio de contrato falha sem dizer por quê. Já aconteceu
+// em produção — extrair o UUID aqui é mais barato que explicar o formato.
+function extrairUuid(valor) {
+  const txt = String(valor || '').trim();
+  const m = txt.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return m ? m[0] : txt;
+}
+
+function normalizarAssinaturaExtra(extra) {
+  if (!extra || typeof extra !== 'object') return null;
+  const limpo = { ...extra };
+  if (limpo.cofreUuid) limpo.cofreUuid = extrairUuid(limpo.cofreUuid);
+  return Object.keys(limpo).length ? limpo : null;
+}
+
 const CAMPOS_TENANT_SEGUROS = {
   id: tenants.id,
   slug: tenants.slug,
@@ -87,7 +105,7 @@ router.put('/me', autenticar, async (req, res) => {
     sgpTipo, sgpApiUrl, sgpApiKey, exigirDocumento,
     assinaturaTipo, assinaturaToken, assinaturaExtra,
     lembreteFaturaAtivo, lembreteFaturaTemplatePre, lembreteFaturaTemplatePos, lembreteFaturaIdioma,
-    lembreteFaturaLinkAssinante,
+    lembreteFaturaLinkAssinante, contratoModelo,
   } = req.body;
   const [tenant] = await db.update(tenants)
     .set({
@@ -99,7 +117,8 @@ router.put('/me', autenticar, async (req, res) => {
       exigirDocumento: !!exigirDocumento,
       assinaturaTipo: assinaturaTipo || null,
       assinaturaToken: assinaturaToken || null,
-      assinaturaExtra: assinaturaExtra || null,
+      assinaturaExtra: normalizarAssinaturaExtra(assinaturaExtra),
+      contratoModelo: contratoModelo === 'dedicado' ? 'dedicado' : 'residencial',
       lembreteFaturaAtivo: !!lembreteFaturaAtivo,
       lembreteFaturaTemplatePre: lembreteFaturaTemplatePre || null,
       lembreteFaturaTemplatePos: lembreteFaturaTemplatePos || null,

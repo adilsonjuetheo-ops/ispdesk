@@ -161,6 +161,7 @@ export async function runMigrations() {
     // hoje ainda é rápido porque ela é pequena, mas cresce a cada atendimento.
     await sql`CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON mensagens(conversa_id, enviada_em)`;
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS documento_validado text`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS contrato_modelo text DEFAULT 'residencial'`;
 
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_link_assinante text`;
 

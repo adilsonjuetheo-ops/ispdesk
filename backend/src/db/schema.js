@@ -37,6 +37,11 @@ export const tenants = pgTable('tenants', {
   assinaturaTipo:     text('assinatura_tipo'),   // 'zapsign' | 'd4sign' | null
   assinaturaToken:    text('assinatura_token'),
   assinaturaExtra:    jsonb('assinatura_extra'), // { templateToken, cofreUuid, cryptKey }
+  // Qual modelo de contrato este provedor emite: 'residencial' (padrão) ou
+  // 'dedicado' (link dedicado, com SLA e contrato de permanência em anexo).
+  // Fica no provedor e não na tela de envio porque é característica do que ele
+  // vende — depender do atendente lembrar de escolher é onde sai errado.
+  contratoModelo:     text('contrato_modelo').default('residencial'),
   lembreteFaturaAtivo:         boolean('lembrete_fatura_ativo').default(false),
   lembreteFaturaTemplatePre:   text('lembrete_fatura_template_pre'), // nome do template aprovado — D-1
   lembreteFaturaTemplatePos:   text('lembrete_fatura_template_pos'), // nome do template aprovado — D+5
