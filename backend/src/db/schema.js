@@ -135,6 +135,11 @@ export const conversas = pgTable('conversas', {
   // cidade do cliente, sem relação nenhuma com qual número recebeu a msg).
   // Usado pra buscar mídia e responder pelo número/token corretos.
   numeroRecebidoId: text('numero_recebido_id'),
+  // CPF/CNPJ que o cliente já informou e o SGP confirmou nesta conversa. Sem
+  // guardar, a identificação morria no fim da mensagem: a próxima recomeçava
+  // do zero pelo telefone e, se o número não estivesse vinculado no SGP, o bot
+  // pedia o documento de novo — e depois o "ID do cliente", que ninguém sabe.
+  documentoValidado: text('documento_validado'),
 });
 
 export const mensagens = pgTable('mensagens', {

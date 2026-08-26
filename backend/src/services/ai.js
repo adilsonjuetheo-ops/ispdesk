@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { buscarContextoSgp, getTools, executarTool } from './sgp.js';
+import { buscarContextoSgp, buscarContextoPorDocumentoSgp, getTools, executarTool } from './sgp.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -75,8 +75,18 @@ export async function processarMensagem(tenant, conversa, historico, novaMensage
   const tagAtual = Array.isArray(conversa.tags) ? conversa.tags[0] : null;
   const precisaClassificar = !tagAtual || tagAtual === 'Outros';
 
-  // 1. Busca dados do cliente no SGP em tempo real
-  const contextoSgp = await buscarContextoSgp(tenant, clienteWhatsapp);
+  // 1. Busca dados do cliente no SGP em tempo real.
+  //
+  // Se o cliente já provou quem é com CPF/CNPJ antes nesta conversa, a consulta
+  // sai por esse documento, não pelo telefone. Sem isso, cada mensagem
+  // recomeçava do zero: para quem tem o WhatsApp não vinculado no SGP, o
+  // telefone não acha nada, o contexto vem sem ID_INTERNO, toda tool fica
+  // bloqueada — e o bot, sem entender o bloqueio, pedia o documento de novo e
+  // depois o "ID do cliente", que o cliente não tem como saber.
+  let documentoValidado = conversa.documentoValidado || null;
+  const contextoSgp = documentoValidado
+    ? await buscarContextoPorDocumentoSgp(tenant, documentoValidado)
+    : await buscarContextoSgp(tenant, clienteWhatsapp);
 
   // 2. System prompt com contexto SGP injetado
   const temSgp = !!(tenant.sgpTipo && tenant.sgpApiKey);
@@ -217,7 +227,14 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
       if (!toolBlocks.length) break;
 
       const toolResults = [];
-      for (const toolBlock of toolBlocks) {
+      // A identificação vem primeiro. O modelo às vezes pede o documento e a 2ª
+      // via no mesmo turno, e nessa ordem o enviar_segunda_via era avaliado
+      // antes de o documento autorizar os IDs — bloqueado por engano. Os
+      // resultados voltam reordenados para o modelo, o que a API aceita: cada um
+      // é casado pelo tool_use_id, não pela posição.
+      const ordenados = [...toolBlocks].sort((a, b) =>
+        (a.name === 'buscar_por_documento' ? 0 : 1) - (b.name === 'buscar_por_documento' ? 0 : 1));
+      for (const toolBlock of ordenados) {
         let resultado;
         if (!toolAutorizada(toolBlock.name, toolBlock.input, idsAutorizados)) {
           console.warn(`[IA] Tool bloqueada por vínculo inválido: ${toolBlock.name}`);
@@ -229,6 +246,13 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
             const novosIds = extrairIdsAutorizados(typeof resultado === 'object' ? resultado.texto : resultado);
             novosIds.idsCliente.forEach(id => idsAutorizados.idsCliente.add(id));
             novosIds.idsContrato.forEach(id => idsAutorizados.idsContrato.add(id));
+            // Só vale como validado se o SGP devolveu ID_INTERNO. "Cliente não
+            // encontrado" não pode gravar documento nenhum, senão a conversa
+            // ficaria presa a um CPF errado até o fim.
+            if (novosIds.idsCliente.size) {
+              const doc = String(toolBlock.input?.documento || '').replace(/\D/g, '');
+              if (doc) documentoValidado = doc;
+            }
           }
         }
         // Tools podem retornar { texto, midia } quando há um arquivo a enviar
@@ -303,6 +327,7 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
       devePelearHumano: true,
       motivo,
       tag,
+      documentoValidado,
       midias: midiasParaEnviar,
     };
   }
@@ -313,11 +338,12 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
       devePelearHumano: true,
       motivo: handoffForcado,
       tag,
+      documentoValidado,
       midias: midiasParaEnviar,
     };
   }
 
-  return { resposta: textoLimpo, devePelearHumano: false, tag, midias: midiasParaEnviar, botoes };
+  return { resposta: textoLimpo, devePelearHumano: false, tag, midias: midiasParaEnviar, botoes, documentoValidado };
 }
 
 // Sugere uma resposta para o atendente revisar antes de enviar. Diferente de

@@ -471,6 +471,16 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     }
   }
 
+  // Cliente provou quem é com CPF/CNPJ: guarda para as próximas mensagens desta
+  // conversa consultarem o SGP por ele, e não pelo telefone — que pode não estar
+  // vinculado lá e faria o bot pedir o documento de novo a cada resposta.
+  if (resultado.documentoValidado && resultado.documentoValidado !== conversa.documentoValidado) {
+    await db.update(conversas)
+      .set({ documentoValidado: resultado.documentoValidado })
+      .where(eq(conversas.id, conversa.id))
+      .catch(err => console.error('[Webhook] Falha ao gravar documento validado:', err.message));
+  }
+
   // Incrementa contador de uso IA (fire-and-forget em caso de erro)
   incrementarUso(tenant).catch(err => console.error('[limites] Erro ao incrementar uso:', err.message));
 

@@ -160,6 +160,7 @@ export async function runMigrations() {
     // cada 5 segundos. Sem índice o Postgres varria a tabela inteira toda vez —
     // hoje ainda é rápido porque ela é pequena, mas cresce a cada atendimento.
     await sql`CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON mensagens(conversa_id, enviada_em)`;
+    await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS documento_validado text`;
 
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_link_assinante text`;
 
