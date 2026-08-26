@@ -395,7 +395,9 @@ export default function TenantLayout() {
       </aside>
 
       <main className="flex-1 min-w-0 overflow-hidden flex flex-col md:gap-3">
-        {user?.role === 'admin' && <UpdateBanner />}
+        {/* Todo mundo roda o mesmo build — restringir a admin deixava agente
+            preso em código antigo sem nunca ser avisado pra recarregar. */}
+        <UpdateBanner />
         {tenant?.statusPagamento === 'suspenso' && user?.role === 'admin' && (
           <div className="bg-red-900/80 border-b border-red-700 px-4 py-2.5 flex items-center gap-2 shrink-0">
             <AlertTriangle className="w-4 h-4 text-red-300 shrink-0" />
