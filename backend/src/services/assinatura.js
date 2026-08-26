@@ -525,7 +525,37 @@ async function enviarD4Sign(tenant, clienteWhatsapp, dados) {
   const docUuid = uploadData?.uuid;
   if (!docUuid) throw new Error(`D4Sign não retornou UUID. Resposta: ${uploadText}`);
 
-  // 3. Adiciona signatário
+  // 3. Registra o webhook DESTE documento.
+  //
+  // O D4Sign não avisa nada por conta própria: a URL configurada no painel não
+  // vale para todos os documentos, o webhook precisa ser cadastrado por
+  // documento (ou por cofre, na API 2.0). Sem isto o cliente assina, o D4Sign
+  // guarda a assinatura e o painel fica com a conversa "pendente" para sempre —
+  // ninguém fica sabendo.
+  //
+  // Feito aqui, e não uma vez na mão, porque cofre novo ou provedor novo não
+  // pode depender de alguém lembrar deste passo.
+  const baseApi = (process.env.API_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  if (baseApi) {
+    try {
+      const hookRes = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/webhooks?${qs}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: `${baseApi}/api/contracts/webhook/d4sign` }),
+      });
+      if (!hookRes.ok) {
+        console.error(`[contrato] D4Sign recusou o webhook (${hookRes.status}): ${await hookRes.text()}`);
+      }
+    } catch (err) {
+      // Falhar aqui não pode derrubar o envio: o contrato ainda vale e ainda é
+      // assinável. O que se perde é o aviso automático de volta.
+      console.error('[contrato] Falha ao registrar webhook no D4Sign:', err.message);
+    }
+  } else {
+    console.warn('[contrato] API_PUBLIC_URL ausente — webhook não registrado. O contrato será assinado normalmente, mas o painel não vai saber e a conversa ficará como pendente.');
+  }
+
+  // 4. Adiciona signatário
   const createRes = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/createlist?${qs}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -545,7 +575,7 @@ async function enviarD4Sign(tenant, clienteWhatsapp, dados) {
   const createText = await createRes.text();
   if (!createRes.ok) throw new Error(`D4Sign createlist erro ${createRes.status}: ${createText}`);
 
-  // 4. Envia para assinatura
+  // 5. Envia para assinatura
   const sendRes = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/sendtosigner?${qs}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

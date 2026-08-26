@@ -108,6 +108,29 @@ async function checarRecebimento(tenantId) {
     : `Mensagens chegando normalmente (a última há ${horas}h).`);
 }
 
+// Assinatura digital: o que quebra aqui quebra em silêncio. O contrato é
+// assinado no D4Sign e o painel nunca fica sabendo, então a conversa dorme como
+// "pendente" e ninguém percebe até alguém cobrar.
+function checarAssinatura(tenant) {
+  const titulo = 'Assinatura digital de contratos';
+  if (!tenant.assinaturaTipo) {
+    return ok(titulo, 'Não configurada — o envio de contrato está desativado para este provedor.');
+  }
+  if (!tenant.assinaturaToken) {
+    return falha(titulo, `Plataforma ${tenant.assinaturaTipo} escolhida, mas sem token de API.`,
+      'Configurações → Assinatura Digital: preencha o token da plataforma.');
+  }
+  if (tenant.assinaturaTipo === 'd4sign' && !tenant.assinaturaExtra?.cofreUuid) {
+    return falha(titulo, 'D4Sign configurado sem o UUID do cofre — o upload do contrato não tem destino.',
+      'Configurações → Assinatura Digital: cole a URL do cofre no D4Sign.');
+  }
+  if (tenant.assinaturaTipo === 'd4sign' && !process.env.API_PUBLIC_URL) {
+    return alerta(titulo, 'D4Sign pronto, mas o servidor não sabe o próprio endereço público: o webhook de confirmação não é registrado. O cliente assina e a conversa continua marcada como pendente.',
+      'Definir a variável API_PUBLIC_URL no servidor (ex.: https://api.seudominio.com.br) e reiniciar.');
+  }
+  return ok(titulo, `${tenant.assinaturaTipo} configurado, modelo de contrato: ${tenant.contratoModelo || 'residencial'}.`);
+}
+
 export async function diagnosticar(tenantId) {
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
   if (!tenant) throw new Error('Provedor não encontrado');
@@ -122,6 +145,7 @@ export async function diagnosticar(tenantId) {
     checarNumero('Número principal do WhatsApp', tenant.whatsappNumberId, tenant.whatsappToken),
     checarSgp(tenant),
     checarRecebimento(tenantId),
+    checarAssinatura(tenant),
     ...comNumeroProprio.map(f =>
       checarNumero(`Número da filial ${f.nome}`, f.whatsappNumberId, f.whatsappToken)),
   ]);
