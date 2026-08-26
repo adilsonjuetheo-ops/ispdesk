@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { conversas, clientes, tenants, mensagens } from '../db/schema.js';
+import { conversas, clientes, tenants, filiais, filialWhatsappExtra, mensagens } from '../db/schema.js';
 import { eq, and, ne, or, isNull } from 'drizzle-orm';
 import { planoTemContrato } from '../config/planos.js';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
@@ -22,6 +22,32 @@ function podeAcessarContrato(req, conversa) {
   if (conversa.tenantId !== req.user.tenantId) return false;
   if (req.user.filialId && conversa.filialId !== req.user.filialId) return false;
   return true;
+}
+
+// Usa o número que efetivamente recebeu a conversa — mesmo caso de
+// routes/conversations.js e services/handoff.js: filialId é só roteamento de
+// fila, não tem relação com qual número/WABA recebeu a mensagem.
+async function resolverWConfig(tenant, conversa) {
+  const numeroRecebido = conversa?.numeroRecebidoId;
+  if (!numeroRecebido || numeroRecebido === tenant.whatsappNumberId) return tenant;
+
+  const [filial] = await db.select({
+    whatsappNumberId: filiais.whatsappNumberId,
+    whatsappToken: filiais.whatsappToken,
+  }).from(filiais).where(eq(filiais.whatsappNumberId, numeroRecebido)).limit(1);
+  if (filial?.whatsappToken) {
+    return { ...tenant, whatsappNumberId: filial.whatsappNumberId, whatsappToken: filial.whatsappToken };
+  }
+
+  const [extra] = await db.select({
+    whatsappNumberId: filialWhatsappExtra.whatsappNumberId,
+    whatsappToken: filialWhatsappExtra.whatsappToken,
+  }).from(filialWhatsappExtra).where(eq(filialWhatsappExtra.whatsappNumberId, numeroRecebido)).limit(1);
+  if (extra?.whatsappToken) {
+    return { ...tenant, whatsappNumberId: extra.whatsappNumberId, whatsappToken: extra.whatsappToken };
+  }
+
+  return tenant;
 }
 
 // Envia contrato para assinatura digital
@@ -74,15 +100,36 @@ router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {
       conteudo: `[Sistema] Contrato enviado para assinatura digital (${tenant.assinaturaTipo}).`,
     });
 
-    // Avisa o cliente via WhatsApp
+    // Avisa o cliente via WhatsApp — pelo número que a conversa realmente usa,
+    // senão o cliente recebe o link de um número diferente do que ele já fala
+    // com o provedor.
+    const wConfig = await resolverWConfig(tenant, conversa);
     const primeiroNome = (dados.nome_contratante || '').split(' ')[0];
     const msg = resultado.linkAssinatura
       ? `Olá, ${primeiroNome}! Seu contrato de internet está pronto para assinatura digital.\n\nPlano: ${dados.identificacao_oferta}\nMensalidade: R$ ${dados.mensalidade}\n\nClique no link abaixo para assinar pelo celular, sem precisar imprimir nada:\n${resultado.linkAssinatura}\n\nQualquer dúvida, é só chamar aqui!`
       : `Olá, ${primeiroNome}! Seu contrato de internet (${dados.identificacao_oferta} — R$ ${dados.mensalidade}/mês) foi enviado para assinatura digital. Verifique seu e-mail para assinar. Qualquer dúvida, é só chamar!`;
 
-    await enviarMensagem(tenant, cliente.whatsapp, msg).catch(err =>
-      console.error('[Contrato] Erro ao avisar cliente:', err.message)
-    );
+    try {
+      const apiRes = await enviarMensagem(wConfig, cliente.whatsapp, msg);
+      // Sem gravar, o link só existia no WhatsApp do cliente — o atendente
+      // não via na conversa dentro do ISPDesk o que exatamente foi mandado.
+      await db.insert(mensagens).values({
+        conversaId,
+        origem: 'agente',
+        conteudo: msg,
+        wamid: apiRes?.messages?.[0]?.id || null,
+        status: 'enviada',
+        agenteNome: req.user.nome,
+      });
+      await db.update(conversas).set({
+        ultimaMensagem: msg.slice(0, 200),
+        ultimaMsgEm: new Date(),
+        ultimaMsgOrigem: 'agente',
+        ultimaMsgNome: req.user.nome,
+      }).where(eq(conversas.id, conversaId));
+    } catch (err) {
+      console.error('[Contrato] Erro ao avisar cliente:', err.message);
+    }
 
     res.json({ uuid: resultado.uuid, linkAssinatura: resultado.linkAssinatura });
   } catch (err) {
@@ -225,11 +272,28 @@ router.post('/:conversaId/resend-link', autenticar, apenasAdmin, async (req, res
   const linkAssinatura = await buscarLinkAssinatura(tenant, conversa.contratoUuid);
   if (!linkAssinatura) return res.status(502).json({ erro: 'Não foi possível obter o link de assinatura. Tente novamente.' });
 
+  const wConfig = await resolverWConfig(tenant, conversa);
   const primeiroNome = (cliente?.nome || '').split(' ')[0] || 'Cliente';
   const msg = `Olá, ${primeiroNome}! Seu contrato ainda está aguardando assinatura.\n\nClique no link abaixo para assinar pelo celular:\n${linkAssinatura}\n\nQualquer dúvida, é só chamar!`;
-  await enviarMensagem(tenant, cliente.whatsapp, msg).catch(err =>
-    console.error('[Contrato] Erro ao reenviar link:', err.message)
-  );
+  try {
+    const apiRes = await enviarMensagem(wConfig, cliente.whatsapp, msg);
+    await db.insert(mensagens).values({
+      conversaId,
+      origem: 'agente',
+      conteudo: msg,
+      wamid: apiRes?.messages?.[0]?.id || null,
+      status: 'enviada',
+      agenteNome: req.user.nome,
+    });
+    await db.update(conversas).set({
+      ultimaMensagem: msg.slice(0, 200),
+      ultimaMsgEm: new Date(),
+      ultimaMsgOrigem: 'agente',
+      ultimaMsgNome: req.user.nome,
+    }).where(eq(conversas.id, conversaId));
+  } catch (err) {
+    console.error('[Contrato] Erro ao reenviar link:', err.message);
+  }
 
   res.json({ linkAssinatura });
 });
