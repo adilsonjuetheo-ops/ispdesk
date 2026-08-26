@@ -248,6 +248,10 @@ router.get('/:conversaId/prefill', autenticar, apenasAdmin, async (req, res) => 
   const prefill = {
     nome_contratante: cliente?.nome || '',
     telefone:         cliente?.whatsapp || '',
+    // CPF/CNPJ que o próprio cliente já informou e o bot validou no SGP
+    // durante a conversa — sem isso o atendente tinha que perguntar de novo
+    // um dado que o cliente já deu.
+    cpf_cnpj:         conversa.documentoValidado || '',
     email:            '',
     identificacao_oferta: '',
     mensalidade:          '',
