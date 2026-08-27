@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Fingerprint, ChevronDown, User, X, Plus, MapPin, FileSignature, CheckCircle2, Clock, Copy, RefreshCw, Check, ArrowRightLeft, History, Sparkles } from 'lucide-react';
+import { Fingerprint, ChevronDown, User, X, Plus, MapPin, FileSignature, CheckCircle2, Clock, Copy, RefreshCw, Check, ArrowRightLeft, History, Sparkles, Inbox } from 'lucide-react';
 import { formatDistanceToNowStrict, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../lib/api.js';
@@ -59,7 +59,7 @@ function Section({ title, children, defaultOpen = true }) {
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
       >
         <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{title}</span>
-        <ChevronDown className={`w-4 h-4 text-gray-300 dark:text-gray-600 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-gray-500 dark:text-gray-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && <div className="px-4 pb-3">{children}</div>}
     </div>
@@ -78,7 +78,7 @@ function CopyButton({ texto }) {
     <button
       onClick={copiar}
       title="Copiar"
-      className="ml-1 p-0.5 rounded text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 transition-colors shrink-0"
+      className="ml-1 p-0.5 rounded text-gray-500 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300 transition-colors shrink-0"
     >
       {copiado ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
     </button>
@@ -235,6 +235,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
   const { user } = useAuth();
   const [tagInput, setTagInput] = useState('');
   const [modalContrato, setModalContrato] = useState(false);
+  const [nomeExpandido, setNomeExpandido] = useState(false);
   const [agentes, setAgentes] = useState([]);
   const [editandoAgente, setEditandoAgente] = useState(false);
   const [transferindo, setTransferindo] = useState(false);
@@ -353,10 +354,20 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
       <div className="p-4 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-3 mb-4">
           <Avatar nome={conversa.clienteNome} />
-          <div className="min-w-0">
-            <p className="font-semibold text-gray-800 dark:text-gray-100 text-sm leading-tight truncate">
-              {nomeExibido || conversa.clienteWhatsapp}
-            </p>
+          <div className="min-w-0 flex-1">
+            {/* Nome longo era cortado sem recurso: nem tooltip, nem jeito de
+                abrir. Agora o hover mostra inteiro e o clique expande — quem usa
+                teclado ou toque também alcança. */}
+            <button
+              type="button"
+              onClick={() => setNomeExpandido(v => !v)}
+              title={nomeExibido || conversa.clienteWhatsapp}
+              className="block w-full text-left font-semibold text-gray-800 dark:text-gray-100 text-sm leading-tight rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <span className={nomeExpandido ? 'break-words' : 'block truncate'}>
+                {nomeExibido || conversa.clienteWhatsapp}
+              </span>
+            </button>
             {nomeExibido && (
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{conversa.clienteWhatsapp}</p>
             )}
@@ -384,7 +395,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
                 <button
                   onClick={reenviarLink}
                   disabled={reenviando}
-                  className="w-full flex items-center justify-center gap-1.5 text-xs text-amber-700 hover:text-amber-900 py-1.5 rounded-lg hover:bg-amber-50 dark:text-amber-300 dark:hover:text-amber-100 dark:hover:bg-amber-950 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-1.5 text-xs text-amber-700 hover:text-amber-900 py-1.5 rounded-lg hover:bg-amber-50 dark:text-amber-300 dark:hover:text-amber-100 dark:hover:bg-amber-950 transition-colors disabled:text-gray-500 dark:disabled:text-gray-500 disabled:hover:bg-transparent"
                 >
                   <RefreshCw className={`w-3 h-3 ${reenviando ? 'animate-spin' : ''}`} />
                   {reenviando ? 'Reenviando...' : 'Reenviar link ao cliente'}
@@ -420,34 +431,14 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
       {/* Por que a conversa chegou até aqui. O bot grava um motivo detalhado em
           toda transferência e ele não aparecia em lugar nenhum — quem assumia
           tinha que ler a conversa inteira para descobrir. */}
-      {conversa.motivoHandoff && (
-        <Section title="Motivo da transferência">
-          <div className="flex items-start gap-2.5">
-            <ArrowRightLeft className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{conversa.motivoHandoff}</p>
-          </div>
-        </Section>
-      )}
-
-      {/* Resumo da IA — tinha virado um retângulo verde perdido dentro de
-          "Informações principais", onde ninguém procura por ele. */}
-      {conversa.resumoIa && (
-        <Section title="Resumo da conversa">
-          <div className="flex items-start gap-2.5">
-            <Sparkles className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{conversa.resumoIa}</p>
-          </div>
-        </Section>
-      )}
-
-      {/* Operador Responsável */}
+      {/* Quem cuida vem primeiro: é a pergunta de quem abre o painel. */}
       <Section title="Operador Responsável">
         {isEncerrada || agentes.length === 0 ? (
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
-              <User className="w-3 h-3 text-blue-600 dark:text-blue-300" />
+            <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">
+              <User className="w-3 h-3 text-gray-500 dark:text-gray-400" />
             </div>
-            <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+            <span className="text-sm text-gray-700 dark:text-gray-200 truncate">
               {conversa.agenteNome || 'Não atribuído'}
             </span>
           </div>
@@ -458,7 +449,7 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
             onBlur={() => setEditandoAgente(false)}
             autoFocus
             disabled={transferindo}
-            className="w-full text-sm border border-blue-300 dark:border-blue-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-60"
+            className="w-full text-sm border border-blue-300 dark:border-blue-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:text-gray-500 dark:disabled:text-gray-500"
           >
             <option value="" disabled>Selecionar agente...</option>
             {agentes.map(a => (
@@ -468,17 +459,17 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
         ) : (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
-                <User className="w-3 h-3 text-blue-600 dark:text-blue-300" />
+              <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">
+                <User className="w-3 h-3 text-gray-500 dark:text-gray-400" />
               </div>
-              <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+              <span className="text-sm text-gray-700 dark:text-gray-200 truncate">
                 {conversa.agenteNome || 'Não atribuído'}
               </span>
             </div>
             {!isEncerrada && (
               <button
                 onClick={() => setEditandoAgente(true)}
-                className="text-[11px] text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 shrink-0 ml-1"
+                className="text-[11px] font-medium text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 shrink-0 ml-1"
               >
                 Alterar
               </button>
@@ -487,90 +478,8 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
         )}
       </Section>
 
-      {/* Caixa de entrada */}
-      <Section title="Caixa de Entrada">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-700 dark:text-gray-300">
-            {conversa.filialNome || conversa.clienteFilial || 'Geral'}
-          </span>
-        </div>
-      </Section>
-
-      {/* Informações Principais */}
-      <Section title="Informações Principais">
-        <div className="space-y-2.5">
-          {conversa.clienteContratoId && (
-            <div className="flex items-center gap-2.5">
-              <Fingerprint className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-              <span className="text-sm text-gray-600 dark:text-gray-400 font-mono truncate">{conversa.clienteContratoId}</span>
-              <CopyButton texto={conversa.clienteContratoId} />
-            </div>
-          )}
-          <div className="flex items-center gap-2.5">
-            <WaIcon />
-            <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
-              {conversa.clienteWhatsapp}
-            </span>
-            <CopyButton texto={conversa.clienteWhatsapp} />
-          </div>
-          {conversa.clienteFilial && (
-            <div className="flex items-center gap-2.5">
-              <MapPin className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-              <span className="text-sm text-gray-600 dark:text-gray-400 truncate">{conversa.clienteFilial}</span>
-            </div>
-          )}
-          {conversa.iniciadaEm && desde(conversa.iniciadaEm) && (
-            <div className="flex items-center gap-2.5">
-              <Clock className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                aberta há {desde(conversa.iniciadaEm)}
-              </span>
-            </div>
-          )}
-          {conversa.clienteStatus && (
-            <div className="flex items-center gap-2.5">
-              <div className={`w-2 h-2 rounded-full shrink-0 ${
-                conversa.clienteStatus === 'ativo' ? 'bg-emerald-500'
-                : conversa.clienteStatus === 'bloqueado' ? 'bg-red-500'
-                : 'bg-gray-400'
-              }`} />
-              <span className="text-sm text-gray-600 dark:text-gray-400 capitalize">{conversa.clienteStatus}</span>
-            </div>
-          )}
-        </div>
-      </Section>
-
-      {/* Tags */}
-      <Section title="Tags do Atendimento">
-        <div className="space-y-2">
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {tags.map(tag => (
-                <span key={tag} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 text-xs px-2 py-0.5 rounded-full">
-                  {tag}
-                  {!isEncerrada && (
-                    <button onClick={() => removerTag(tag)} className="hover:text-blue-900 dark:hover:text-blue-100 leading-none">
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
-          {!isEncerrada && (
-            <form onSubmit={adicionarTag} className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-              <Plus className="w-3.5 h-3.5 shrink-0" />
-              <input
-                value={tagInput}
-                onChange={e => setTagInput(e.target.value)}
-                placeholder="Adicionar Tag..."
-                className="text-sm text-gray-600 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 bg-transparent outline-none w-full"
-              />
-            </form>
-          )}
-        </div>
-      </Section>
-
+      {/* Pendência logo abaixo do responsável — o que falta fazer não pode
+          ficar no fim, depois dos dados cadastrais. */}
       {lembretesCliente.length > 0 && (
         <Section title="Lembretes em aberto">
           <div className="space-y-2">
@@ -595,9 +504,114 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
         </Section>
       )}
 
+      {conversa.motivoHandoff && (
+        <Section title="Motivo da transferência">
+          <div className="flex items-start gap-2.5">
+            <ArrowRightLeft className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{conversa.motivoHandoff}</p>
+          </div>
+        </Section>
+      )}
+
+      {/* Resumo da IA — tinha virado um retângulo verde perdido dentro de
+          "Informações principais", onde ninguém procura por ele. */}
+      {conversa.resumoIa && (
+        <Section title="Resumo da conversa">
+          <div className="flex items-start gap-2.5">
+            <Sparkles className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{conversa.resumoIa}</p>
+          </div>
+        </Section>
+      )}
+
+
+      {/* Informações Principais */}
+      <Section title="Dados do cliente" defaultOpen={false}>
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2.5">
+            <Inbox className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+            <span className="text-sm text-gray-700 dark:text-gray-200 truncate">
+              {conversa.filialNome || conversa.clienteFilial || 'Geral'}
+            </span>
+          </div>
+          {conversa.clienteContratoId && (
+            <div className="flex items-center gap-2.5">
+              <Fingerprint className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm text-gray-700 dark:text-gray-200 font-mono truncate">{conversa.clienteContratoId}</span>
+              <CopyButton texto={conversa.clienteContratoId} />
+            </div>
+          )}
+          <div className="flex items-center gap-2.5">
+            <WaIcon />
+            <span className="text-sm text-gray-700 dark:text-gray-200 truncate">
+              {conversa.clienteWhatsapp}
+            </span>
+            <CopyButton texto={conversa.clienteWhatsapp} />
+          </div>
+          {conversa.clienteFilial && (
+            <div className="flex items-center gap-2.5">
+              <MapPin className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm text-gray-700 dark:text-gray-200 truncate">{conversa.clienteFilial}</span>
+            </div>
+          )}
+          {conversa.iniciadaEm && desde(conversa.iniciadaEm) && (
+            <div className="flex items-center gap-2.5">
+              <Clock className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm text-gray-700 dark:text-gray-200">
+                aberta há {desde(conversa.iniciadaEm)}
+              </span>
+            </div>
+          )}
+          {conversa.clienteStatus && (
+            <div className="flex items-center gap-2.5">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${
+                conversa.clienteStatus === 'ativo' ? 'bg-emerald-500'
+                : conversa.clienteStatus === 'bloqueado' ? 'bg-red-500'
+                : 'bg-gray-400'
+              }`} />
+              <span className="text-sm text-gray-700 dark:text-gray-200">
+                Contrato {String(conversa.clienteStatus).toLowerCase()}
+              </span>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* Tags */}
+      <Section title="Tags do Atendimento">
+        <div className="space-y-2">
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {tags.map(tag => (
+                <span key={tag} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200 text-xs px-2 py-0.5 rounded-full">
+                  {tag}
+                  {!isEncerrada && (
+                    <button onClick={() => removerTag(tag)} className="hover:text-gray-900 dark:hover:text-gray-50 leading-none">
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+          {!isEncerrada && (
+            <form onSubmit={adicionarTag} className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <input
+                value={tagInput}
+                onChange={e => setTagInput(e.target.value)}
+                placeholder="Adicionar Tag..."
+                className="text-sm text-gray-600 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 bg-transparent outline-none w-full"
+              />
+            </form>
+          )}
+        </div>
+      </Section>
+
+
       {/* Histórico do cliente */}
       {historico && (
-        <Section title="Histórico do cliente">
+        <Section title="Histórico do cliente" defaultOpen={false}>
           {historico.total === 0 ? (
             <div className="flex items-center gap-2.5">
               <History className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
