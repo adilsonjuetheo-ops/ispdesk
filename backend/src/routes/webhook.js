@@ -374,8 +374,17 @@ async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = fa
     conversa = { ...conversa, status: 'bot' };
   }
 
-  // Se humano está atendendo, não aciona IA
-  if (conversa.status === 'humano') return;
+  // Conversa já entregue à equipe: a IA sai de cena.
+  //
+  // 'aguardando' faltava aqui, e é o estado logo depois de transferir, enquanto
+  // ninguém assumiu. O bot continuava respondendo por cima da fila e, vendo o
+  // mesmo contexto que causou a transferência, mandava ACTION:HANDOFF de novo —
+  // o cliente lia "Conversa transferida para atendente humano" duas vezes.
+  // Aconteceu em 68 conversas; em 102 o bot falou depois de já ter transferido.
+  //
+  // A mensagem do cliente continua gravada e o push para a equipe já saiu acima,
+  // então nada se perde: só o bot é que para de falar.
+  if (conversa.status === 'humano' || conversa.status === 'aguardando') return;
 
   // Verifica incidente ativo — responde automaticamente ao cliente
   const [incidenteAtivo] = await db.select().from(incidentes)
