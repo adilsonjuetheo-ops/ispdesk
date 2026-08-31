@@ -17,6 +17,37 @@ import { audioPrecisaConverter, converterParaOggOpus, converterParaMp3 } from '.
 // antes de tocar — sem isso, cada uma rebaixaria o arquivo inteiro da Meta
 // de novo, o que é lento o bastante pra parecer que o áudio "não toca".
 const CACHE_MEDIA_MS = 5 * 60 * 1000;
+const CAMPOS_LISTA = {
+    id: conversas.id,
+    tenantId: conversas.tenantId,
+    status: conversas.status,
+    filialId: conversas.filialId,
+    filialNome: filiais.nome,
+    agenteId: conversas.agenteId,
+    agenteNome: tenantUsers.nome,
+    motivoHandoff: conversas.motivoHandoff,
+    resumoIa: conversas.resumoIa,
+    tags: conversas.tags,
+    ultimaMensagem: conversas.ultimaMensagem,
+    ultimaMsgEm: conversas.ultimaMsgEm,
+    ultimaMsgOrigem: conversas.ultimaMsgOrigem,
+    ultimaMsgNome: conversas.ultimaMsgNome,
+    iniciadaEm: conversas.iniciadaEm,
+    encerradaEm: conversas.encerradaEm,
+    contratoStatus: conversas.contratoStatus,
+    contratoEnviadoEm: conversas.contratoEnviadoEm,
+    clienteId: clientes.id,
+    clienteNome: clientes.nome,
+    clienteWhatsapp: clientes.whatsapp,
+    clienteFilial: clientes.filialNome,
+    clienteStatus: clientes.statusContrato,
+    clienteContratoId: clientes.contratoId,
+  };
+
+// Encerradas que acompanham cada consulta da lista: cobre o que se olha no
+// dia a dia sem arrastar o histórico inteiro a cada 5 segundos.
+const LIMITE_ENCERRADAS = 150;
+
 const cacheMedia = new Map(); // mediaId -> { buffer, mimeType, expiraEm }
 
 function pegarMediaCache(mediaId) {
@@ -454,43 +485,35 @@ router.get('/', async (req, res) => {
     conditions.push(eq(conversas.agenteId, req.user.id));
   }
 
-  const rows = await db.select({
-    id: conversas.id,
-    tenantId: conversas.tenantId,
-    status: conversas.status,
-    filialId: conversas.filialId,
-    filialNome: filiais.nome,
-    agenteId: conversas.agenteId,
-    agenteNome: tenantUsers.nome,
-    motivoHandoff: conversas.motivoHandoff,
-    resumoIa: conversas.resumoIa,
-    tags: conversas.tags,
-    ultimaMensagem: conversas.ultimaMensagem,
-    ultimaMsgEm: conversas.ultimaMsgEm,
-    ultimaMsgOrigem: conversas.ultimaMsgOrigem,
-    ultimaMsgNome: conversas.ultimaMsgNome,
-    iniciadaEm: conversas.iniciadaEm,
-    encerradaEm: conversas.encerradaEm,
-    contratoStatus: conversas.contratoStatus,
-    contratoEnviadoEm: conversas.contratoEnviadoEm,
-    clienteId: clientes.id,
-    clienteNome: clientes.nome,
-    clienteWhatsapp: clientes.whatsapp,
-    clienteFilial: clientes.filialNome,
-    clienteStatus: clientes.statusContrato,
-    clienteContratoId: clientes.contratoId,
-  })
+  const rows = await db.select(CAMPOS_LISTA)
   .from(conversas)
   .innerJoin(clientes, eq(conversas.clienteId, clientes.id))
   .leftJoin(filiais, eq(conversas.filialId, filiais.id))
   .leftJoin(tenantUsers, eq(conversas.agenteId, tenantUsers.id))
-  .where(conditions.length ? and(...conditions) : undefined)
+  .where(and(ne(conversas.status, 'encerrada'), ...conditions))
   // Mais recente no topo: ordenar por iniciadaEm mandava conversa antiga com
   // mensagem nova para o fim da lista. Cai para iniciadaEm quando ainda não há
   // mensagem registrada.
   .orderBy(sqlRaw`coalesce(${conversas.ultimaMsgEm}, ${conversas.iniciadaEm}) desc`);
 
-  res.json(rows);
+  // As encerradas passam a vir limitadas. Esta rota é consultada de 5 em 5
+  // segundos por cada atendente com o painel aberto, e devolvia todas as
+  // conversas do provedor desde sempre: na Microdata eram 674 linhas e 548 KB
+  // por consulta, das quais 619 já encerradas — que nenhuma tela mostra ao
+  // vivo. Com seis atendentes, 2,3 GB por hora de histórico repetido.
+  //
+  // A aba Histórico lê desta mesma resposta, então elas não podem sumir; só
+  // deixam de vir todas. Relatório de período é outra tela.
+  const encerradas = await db.select(CAMPOS_LISTA)
+    .from(conversas)
+    .innerJoin(clientes, eq(conversas.clienteId, clientes.id))
+    .leftJoin(filiais, eq(conversas.filialId, filiais.id))
+    .leftJoin(tenantUsers, eq(conversas.agenteId, tenantUsers.id))
+    .where(and(eq(conversas.status, 'encerrada'), ...conditions))
+    .orderBy(sqlRaw`coalesce(${conversas.ultimaMsgEm}, ${conversas.iniciadaEm}) desc`)
+    .limit(LIMITE_ENCERRADAS);
+
+  res.json([...rows, ...encerradas]);
 });
 
 router.get('/:id/messages', async (req, res) => {

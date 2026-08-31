@@ -1,5 +1,17 @@
 const buckets = new Map();
 
+// O balde só era reescrito quando o MESMO IP voltava depois da janela. IP que
+// aparece uma vez e some ficava para sempre — e a Meta chama o webhook de
+// endereços que rodam. Crescimento lento, mas sem teto: é o tipo de coisa que
+// some ao reiniciar o servidor e volta a crescer no dia seguinte.
+const LIMPEZA_MS = 10 * 60 * 1000;
+setInterval(() => {
+  const agora = Date.now();
+  for (const [chave, dados] of buckets) {
+    if (dados.expiraEm <= agora) buckets.delete(chave);
+  }
+}, LIMPEZA_MS).unref();
+
 function getClientKey(req) {
   return req.ip || req.socket?.remoteAddress || 'unknown';
 }
