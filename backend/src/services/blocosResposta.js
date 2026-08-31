@@ -17,8 +17,12 @@
 // gruda no fim.
 const PIX_BRCODE = /000201\S*6304[0-9A-Fa-f]{4}/g;
 
-// Linha digitável do boleto: 5.5 5.6 5.6 1 14.
-const LINHA_DIGITAVEL = /\d{5}\.\d{5}\s+\d{5}\.\d{6}\s+\d{5}\.\d{6}\s+\d\s+\d{14}/g;
+// Linha digitável do boleto, nas duas formas que os SGPs entregam:
+// formatada — "36490.00027 00043.729805 00000.875955 1 00000000007990" (TSMX);
+// crua — 47 ou 48 dígitos seguidos, sem ponto nem espaço (IXC).
+// A crua faltava, e por isso o boleto da UaiFibra saía no meio do parágrafo,
+// que é exatamente o que a divisão existe para evitar.
+const LINHA_DIGITAVEL = /\d{5}\.\d{5}\s+\d{5}\.\d{6}\s+\d{5}\.\d{6}\s+\d\s+\d{14}|(?<!\d)\d{47,48}(?!\d)/g;
 
 // Acima disso a divisão deixou de ajudar e virou enxurrada de notificação no
 // celular do cliente. Nesse caso vale mais mandar inteiro, como era antes.

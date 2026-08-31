@@ -56,7 +56,10 @@ export class SgpAdaptador {
   }
 
   formatarMoeda(valor) {
-    return `R$ ${parseFloat(valor || 0).toFixed(2)}`;
+    // Vírgula, não ponto. toFixed devolve "79.90" e isso ia direto pro cliente
+    // como "R$ 79.90", que no Brasil se lê torto — ainda mais em valor de
+    // fatura, onde ponto costuma ser separador de milhar.
+    return `R$ ${parseFloat(valor || 0).toFixed(2).replace('.', ',')}`;
   }
 
   formatarData(dataStr) {
