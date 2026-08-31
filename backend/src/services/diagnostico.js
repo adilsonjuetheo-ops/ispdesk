@@ -21,7 +21,7 @@ async function checarNumero(rotulo, numberId, token) {
   }
   try {
     const res = await fetch(
-      `${GRAPH}/${numberId}?fields=display_phone_number,verified_name,quality_rating&access_token=${token}`,
+      `${GRAPH}/${numberId}?fields=display_phone_number,verified_name,quality_rating,status&access_token=${token}`,
       { signal: AbortSignal.timeout(TIMEOUT_MS) },
     );
     const data = await res.json();
@@ -39,6 +39,28 @@ async function checarNumero(rotulo, numberId, token) {
     if (ehTeste) {
       return falha(rotulo, `${numero} é o número de TESTE da Meta, não um número real.`,
         'Nenhum cliente consegue falar com o provedor por aqui. Conecte o número verdadeiro em Configurações › WhatsApp.');
+    }
+    // Conectar o número no Embedded Signup não basta: ele ainda precisa ser
+    // REGISTRADO na Cloud API. Enquanto o status for PENDING, a consulta à Meta
+    // responde bonito — nome, telefone, qualidade — e o número não envia nem
+    // recebe nada. Este check dizia "conectado e respondendo" nesse estado.
+    const situacao = data.status;
+    if (situacao && situacao !== 'CONNECTED') {
+      const explicacao = {
+        PENDING: 'o número foi conectado mas ainda não foi registrado na Cloud API — ele não envia nem recebe mensagens.',
+        DISCONNECTED: 'o número foi desconectado da Cloud API.',
+        BANNED: 'a Meta baniu este número.',
+        RESTRICTED: 'a Meta restringiu este número.',
+        FLAGGED: 'a Meta sinalizou este número por qualidade baixa.',
+        RATE_LIMITED: 'o número atingiu o limite de envio.',
+        UNVERIFIED: 'o número ainda não foi verificado.',
+        MIGRATED: 'o número foi migrado para outra conta.',
+        DELETED: 'o número foi excluído.',
+      }[situacao];
+      const comoResolver = situacao === 'PENDING'
+        ? 'No Gerenciador do WhatsApp da Meta, abra o número e conclua o registro definindo o PIN de verificação em duas etapas.'
+        : 'Verifique a situação do número no Gerenciador do WhatsApp da Meta.';
+      return falha(rotulo, `${numero} está com status ${situacao}: ${explicacao || 'o número não está operacional.'}`, comoResolver);
     }
     if (qualidade && qualidade !== 'GREEN' && qualidade !== 'UNKNOWN') {
       return alerta(rotulo, `${numero} conectado, mas a Meta classificou a qualidade como ${qualidade}.`,
