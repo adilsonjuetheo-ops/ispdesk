@@ -105,7 +105,7 @@ router.put('/me', autenticar, async (req, res) => {
     sgpTipo, sgpApiUrl, sgpApiKey, exigirDocumento,
     assinaturaTipo, assinaturaToken, assinaturaExtra,
     lembreteFaturaAtivo, lembreteFaturaTemplatePre, lembreteFaturaTemplatePos, lembreteFaturaIdioma,
-    lembreteFaturaLinkAssinante, contratoModelo,
+    lembreteFaturaLinkAssinante, contratoModelo, desbloqueioPrazo,
   } = req.body;
   const [tenant] = await db.update(tenants)
     .set({
@@ -119,6 +119,7 @@ router.put('/me', autenticar, async (req, res) => {
       assinaturaToken: assinaturaToken || null,
       assinaturaExtra: normalizarAssinaturaExtra(assinaturaExtra),
       contratoModelo: contratoModelo === 'dedicado' ? 'dedicado' : 'residencial',
+      desbloqueioPrazo: desbloqueioPrazo?.trim() || null,
       lembreteFaturaAtivo: !!lembreteFaturaAtivo,
       lembreteFaturaTemplatePre: lembreteFaturaTemplatePre || null,
       lembreteFaturaTemplatePos: lembreteFaturaTemplatePos || null,

@@ -107,7 +107,7 @@ export class MkAuthAdaptador extends SgpAdaptador {
         const data = await this.#post('/api/cliente/desbloquear', {
           id_cliente: toolInput.id_cliente,
         });
-        if (data.success) return 'Desbloqueio realizado com sucesso!';
+        if (data.success) return `Desbloqueio realizado com sucesso!${this.avisoPrazoDesbloqueio()}`;
         return `Não foi possível desbloquear: ${data.message || 'erro'}`;
       }
 

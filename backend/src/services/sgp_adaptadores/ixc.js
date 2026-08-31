@@ -326,7 +326,7 @@ export class IxcAdaptador extends SgpAdaptador {
         const data = await this.#inserir('desbloqueio_confianca', {
           id: String(toolInput.id_contrato),
         });
-        if (data.type === 'success') return 'Desbloqueio em confiança realizado com sucesso!';
+        if (data.type === 'success') return `Desbloqueio em confiança realizado com sucesso!${this.avisoPrazoDesbloqueio()}`;
 
         // Qualquer recusa do IXC (direito já utilizado, contrato inelegível etc.)
         // vira transferência para o atendente resolver manualmente.

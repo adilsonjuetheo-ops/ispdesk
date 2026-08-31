@@ -42,6 +42,11 @@ export const tenants = pgTable('tenants', {
   // Fica no provedor e não na tela de envio porque é característica do que ele
   // vende — depender do atendente lembrar de escolher é onde sai errado.
   contratoModelo:     text('contrato_modelo').default('residencial'),
+  // Quanto dura o desbloqueio em confiança neste provedor, em texto ("24 horas").
+  // O IXC não devolve esse prazo na resposta — ele é config global de lá —, e sem
+  // ele o cliente é desbloqueado sem saber que expira. Atlaz e TSMX devolvem a
+  // data e não usam este campo.
+  desbloqueioPrazo:   text('desbloqueio_prazo'),
   lembreteFaturaAtivo:         boolean('lembrete_fatura_ativo').default(false),
   lembreteFaturaTemplatePre:   text('lembrete_fatura_template_pre'), // nome do template aprovado — D-1
   lembreteFaturaTemplatePos:   text('lembrete_fatura_template_pos'), // nome do template aprovado — D+5

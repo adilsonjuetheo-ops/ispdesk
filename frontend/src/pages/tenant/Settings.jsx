@@ -1192,6 +1192,19 @@ export default function Settings() {
                 />
               )}
 
+              {/* IXC e MK-Auth não devolvem o prazo do desbloqueio em confiança na
+                  resposta — é configuração de lá. Sem preencher aqui, o cliente
+                  é desbloqueado sem saber que expira. Atlaz e TSMX devolvem a
+                  data e ignoram este campo. */}
+              {['ixc', 'mkauth'].includes(tenant.sgpTipo) && (
+                <Field
+                  label="Prazo do desbloqueio em confiança"
+                  value={tenant.desbloqueioPrazo || ''}
+                  onChange={v => set('desbloqueioPrazo', v)}
+                  placeholder="24 horas"
+                />
+              )}
+
               {tenant.sgpTipo && (
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">

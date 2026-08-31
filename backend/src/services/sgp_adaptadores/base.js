@@ -22,6 +22,16 @@ export class SgpAdaptador {
     return null;
   }
 
+  // Frase de prazo para o desbloqueio em confiança, quando o SGP não devolve a
+  // data por conta própria. Vazia se o provedor não configurou — melhor não
+  // dizer nada do que chutar um prazo, que o cliente trata como promessa.
+  avisoPrazoDesbloqueio() {
+    const prazo = (this.tenant?.desbloqueioPrazo || '').trim();
+    return prazo
+      ? ` O desbloqueio vale por ${prazo} — avise o cliente desse prazo e oriente a pagar dentro dele.`
+      : '';
+  }
+
   tools() {
     return TOOLS_PADRAO;
   }
