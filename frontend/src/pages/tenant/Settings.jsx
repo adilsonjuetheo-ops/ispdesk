@@ -1319,6 +1319,26 @@ export default function Settings() {
               placeholder="Você é o assistente virtual do provedor de internet [nome]. Sua função é ajudar os clientes com dúvidas sobre..." />
           </section>
 
+          {/* comportamento do atendimento */}
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-emerald-500" /> Comportamento do Atendimento
+            </h2>
+            <button type="button"
+              onClick={() => set('encerrarHumanoPorInatividade', !(tenant.encerrarHumanoPorInatividade !== false))}
+              className="w-full flex items-start gap-3 mt-3 text-left">
+              {tenant.encerrarHumanoPorInatividade !== false
+                ? <ToggleRight className="w-9 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                : <ToggleLeft className="w-9 h-5 text-gray-300 shrink-0 mt-0.5" />}
+              <div>
+                <p className="text-sm font-medium text-gray-800">Encerrar atendimento humano por inatividade</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Quando ativado (padrão), uma conversa em atendimento humano é encerrada automaticamente após 4 horas sem mensagens, igual às conversas com o bot. Desative para que ela só feche quando o atendente resolver e encerrar manualmente.
+                </p>
+              </div>
+            </button>
+          </section>
+
           {/* filiais */}
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">

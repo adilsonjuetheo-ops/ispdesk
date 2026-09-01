@@ -54,6 +54,10 @@ export const tenants = pgTable('tenants', {
   // Quando preenchido, substitui o PIX/boleto na variável do template pelo
   // link da central do assinante do provedor — nulo mantém o PIX/boleto.
   lembreteFaturaLinkAssinante: text('lembrete_fatura_link_assinante'),
+  // false = conversa em atendimento humano nunca é encerrada pela varredura de
+  // inatividade (fica aberta até o atendente resolver e fechar manualmente).
+  // Default true preserva o comportamento de sempre pra quem não pediu isso.
+  encerrarHumanoPorInatividade: boolean('encerrar_humano_por_inatividade').default(true),
   criadoEm:           timestamp('criado_em').defaultNow(),
   atualizadoEm:       timestamp('atualizado_em').defaultNow(),
 });

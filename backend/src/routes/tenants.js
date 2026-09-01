@@ -106,6 +106,7 @@ router.put('/me', autenticar, async (req, res) => {
     assinaturaTipo, assinaturaToken, assinaturaExtra,
     lembreteFaturaAtivo, lembreteFaturaTemplatePre, lembreteFaturaTemplatePos, lembreteFaturaIdioma,
     lembreteFaturaLinkAssinante, contratoModelo, desbloqueioPrazo,
+    encerrarHumanoPorInatividade,
   } = req.body;
   const [tenant] = await db.update(tenants)
     .set({
@@ -125,6 +126,7 @@ router.put('/me', autenticar, async (req, res) => {
       lembreteFaturaTemplatePos: lembreteFaturaTemplatePos || null,
       lembreteFaturaIdioma: lembreteFaturaIdioma || 'pt_BR',
       lembreteFaturaLinkAssinante: lembreteFaturaLinkAssinante?.trim() || null,
+      encerrarHumanoPorInatividade: encerrarHumanoPorInatividade !== false,
       atualizadoEm: new Date(),
     })
     .where(eq(tenants.id, req.user.tenantId))
