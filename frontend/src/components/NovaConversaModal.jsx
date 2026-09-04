@@ -77,6 +77,11 @@ export default function NovaConversaModal({ onClose, onCriada, telefoneInicial =
       };
       if (precisaTemplate) {
         if (!templateSel) { setErro('Escolha um template'); setEnviando(false); return; }
+        if (params.some(v => !v.trim())) {
+          setErro('Preencha todas as variáveis do template — a Meta recusa o envio com algum campo vazio.');
+          setEnviando(false);
+          return;
+        }
         corpo.template = templateSel.name;
         corpo.idioma = templateSel.language;
         corpo.parametros = params;
