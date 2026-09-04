@@ -58,6 +58,11 @@ export const tenants = pgTable('tenants', {
   // inatividade (fica aberta até o atendente resolver e fechar manualmente).
   // Default true preserva o comportamento de sempre pra quem não pediu isso.
   encerrarHumanoPorInatividade: boolean('encerrar_humano_por_inatividade').default(true),
+  // false = nunca mostrar PIX na 2ª via/boleto, mesmo que o SGP devolva um
+  // código — alguns provedores não trabalham com PIX e o código que o SGP
+  // gera (híbrido do boleto) não é uma opção real de pagamento pra eles.
+  // Default true preserva o comportamento de sempre pra quem não pediu isso.
+  aceitaPix:          boolean('aceita_pix').default(true),
   criadoEm:           timestamp('criado_em').defaultNow(),
   atualizadoEm:       timestamp('atualizado_em').defaultNow(),
 });

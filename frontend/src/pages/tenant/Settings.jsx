@@ -1337,6 +1337,19 @@ export default function Settings() {
                 </p>
               </div>
             </button>
+            <button type="button"
+              onClick={() => set('aceitaPix', !(tenant.aceitaPix !== false))}
+              className="w-full flex items-start gap-3 mt-4 text-left">
+              {tenant.aceitaPix !== false
+                ? <ToggleRight className="w-9 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                : <ToggleLeft className="w-9 h-5 text-gray-300 shrink-0 mt-0.5" />}
+              <div>
+                <p className="text-sm font-medium text-gray-800">Aceita pagamento via PIX</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Quando ativado (padrão), o bot pode mandar o código PIX que o sistema do provedor devolver junto com o boleto. Desative se o provedor não trabalha com PIX — o bot passa a mandar só o boleto/linha digitável, mesmo que o sistema devolva um código.
+                </p>
+              </div>
+            </button>
           </section>
 
           {/* filiais */}

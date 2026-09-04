@@ -123,7 +123,7 @@ export class MkAuthAdaptador extends SgpAdaptador {
           `Vencimento: ${this.formatarData(f.vencimento)}`,
           `Valor: ${this.formatarMoeda(f.valor)}`,
           f.linha_digitavel ? `\nLinha digitável:\n${f.linha_digitavel}` : '',
-          f.pix ? `\nPIX:\n${f.pix}` : '',
+          f.pix && this.aceitaPix() ? `\nPIX:\n${f.pix}` : '',
         ].filter(Boolean).join('\n');
       }
 

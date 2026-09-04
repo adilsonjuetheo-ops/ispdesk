@@ -62,7 +62,7 @@ export class AtlazAdaptador extends SgpAdaptador {
           `  Vencto ${this.formatarData(f.data_vencimento)} | ` +
           `${this.formatarMoeda(f.valor_com_juros || f.valor)}` +
           (f.linha_digitavel ? ' | Boleto disponível' : '') +
-          (f.pix_brcode       ? ' | PIX disponível'   : '')
+          (f.pix_brcode && this.aceitaPix() ? ' | PIX disponível' : '')
         );
       });
       linhas.push('');
@@ -175,7 +175,7 @@ export class AtlazAdaptador extends SgpAdaptador {
           `Vencimento: ${this.formatarData(f.data_vencimento)}`,
           `Valor: ${this.formatarMoeda(f.valor_com_juros || f.valor)}`,
         ];
-        if (f.pix_brcode)       partes.push(`\nPIX copia e cola:\n${f.pix_brcode}`);
+        if (f.pix_brcode && this.aceitaPix()) partes.push(`\nPIX copia e cola:\n${f.pix_brcode}`);
         else if (f.linha_digitavel) partes.push(`\nLinha digitável:\n${f.linha_digitavel}`);
         else if (f.link)        partes.push(`\nLink do boleto: ${f.link}`);
 

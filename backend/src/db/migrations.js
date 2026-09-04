@@ -166,6 +166,7 @@ export async function runMigrations() {
 
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_link_assinante text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS encerrar_humano_por_inatividade boolean DEFAULT true`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS aceita_pix boolean DEFAULT true`;
 
     console.log('[migrations] OK');
   } catch (err) {

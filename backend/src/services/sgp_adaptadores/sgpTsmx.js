@@ -139,7 +139,10 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
     linhas.push('');
 
     linhas.push('=== AÇÕES AUTOMÁTICAS ===');
-    linhas.push('Chamado técnico ainda não está automatizado para este SGP — transfira para atendente humano quando o cliente precisar. Desbloqueio (liberação por confiança) e 2ª via/PIX já funcionam normalmente.');
+    linhas.push(`Chamado técnico ainda não está automatizado para este SGP — transfira para atendente humano quando o cliente precisar. Desbloqueio (liberação por confiança) e 2ª via de boleto${this.aceitaPix() ? '/PIX' : ''} já funcionam normalmente.`);
+    if (!this.aceitaPix()) {
+      linhas.push('Este provedor NÃO trabalha com PIX. Nunca ofereça, mencione ou envie código PIX ao cliente — envie apenas o boleto/linha digitável.');
+    }
 
     linhas.push('');
     // id_cliente aqui carrega o ID do contrato (é o identificador usado pelas
@@ -264,9 +267,10 @@ export class SgpTsmxAdaptador extends SgpAdaptador {
         `Vencimento: ${this.formatarData(f.dataVencimento)}`,
         `Valor: ${this.formatarMoeda(f.valorCorrigido || f.valor)}`,
       ];
-      if (f.codigoPix)      partes.push(`\nPIX copia e cola:\n${f.codigoPix}`);
+      const pix = this.aceitaPix() ? f.codigoPix : null;
+      if (pix)               partes.push(`\nPIX copia e cola:\n${pix}`);
       if (f.linhaDigitavel) partes.push(`\nLinha digitável:\n${f.linhaDigitavel}`);
-      else if (!f.codigoPix && f.link) partes.push(`\nLink do boleto: ${f.link}`);
+      else if (!pix && f.link) partes.push(`\nLink do boleto: ${f.link}`);
 
       return {
         texto: partes.join('\n'),

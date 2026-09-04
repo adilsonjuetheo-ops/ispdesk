@@ -32,6 +32,12 @@ export class SgpAdaptador {
       : '';
   }
 
+  // false = provedor não trabalha com PIX: nunca incluir o código, mesmo que
+  // o SGP devolva um (costuma ser um híbrido do boleto, não uma chave real).
+  aceitaPix() {
+    return this.tenant?.aceitaPix !== false;
+  }
+
   tools() {
     return TOOLS_PADRAO;
   }

@@ -357,7 +357,7 @@ export class IxcAdaptador extends SgpAdaptador {
         )[0];
 
         const [pix, boleto] = await Promise.all([
-          this.#buscarPix(f.id).catch(() => null),
+          this.aceitaPix() ? this.#buscarPix(f.id).catch(() => null) : Promise.resolve(null),
           this.#baixarBoleto(f.id).catch(err => {
             console.error(`[IXC] Falha ao gerar boleto da fatura ${f.id}:`, err.message);
             return null;
