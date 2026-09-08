@@ -7,7 +7,7 @@ import { useTheme } from '../../hooks/useTheme.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
   Activity, Clock, UserCheck, Archive, MapPin, Zap, AlertTriangle, Star, X, BookUser,
-  PanelLeftClose, PanelLeftOpen, BellRing, Sun, Moon } from 'lucide-react';
+  PanelLeftClose, PanelLeftOpen, BellRing, Sun, Moon, FileSignature } from 'lucide-react';
 import api from '../../lib/api.js';
 import UpdateBanner from '../UpdateBanner.jsx';
 import BottomTabBar from '../BottomTabBar.jsx';
@@ -293,6 +293,9 @@ export default function TenantLayout() {
               </NavLink>
               <NavLink to="/nps" className={navClass} title={colapsado ? 'NPS' : undefined}>
                 <Star /> {!colapsado && 'NPS'}
+              </NavLink>
+              <NavLink to="/contratos" className={navClass} title={colapsado ? 'Contratos' : undefined}>
+                <FileSignature /> {!colapsado && 'Contratos'}
               </NavLink>
               <NavLink to="/agents" className={navClass} title={colapsado ? 'Equipe' : undefined}>
                 <Users /> {!colapsado && 'Equipe'}

@@ -15,6 +15,7 @@ import Lembretes from './pages/tenant/Lembretes.jsx';
 import Contatos from './pages/tenant/Contatos.jsx';
 import Nps from './pages/tenant/Nps.jsx';
 import Incidentes from './pages/tenant/Incidentes.jsx';
+import Contratos from './pages/tenant/Contratos.jsx';
 import SuperAdminLayout from './components/layout/SuperAdminLayout.jsx';
 import TenantLayout from './components/layout/TenantLayout.jsx';
 
@@ -87,6 +88,11 @@ export default function App() {
           <Route path="/incidentes" element={
             <ProtectedRoute roles={['admin']}>
               <Incidentes />
+            </ProtectedRoute>
+          } />
+          <Route path="/contratos" element={
+            <ProtectedRoute roles={['admin']}>
+              <Contratos />
             </ProtectedRoute>
           } />
         </Route>

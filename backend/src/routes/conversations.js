@@ -516,6 +516,26 @@ router.get('/', async (req, res) => {
   res.json([...rows, ...encerradas]);
 });
 
+// Conversa única — usado por deep links de outras telas (Lembretes, Contratos)
+// que abrem uma conversa específica que pode nem estar na lista principal
+// (ex.: encerrada há mais tempo que o limite trazido por GET /).
+router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+  const rows = await db.select(CAMPOS_LISTA)
+    .from(conversas)
+    .innerJoin(clientes, eq(conversas.clienteId, clientes.id))
+    .leftJoin(filiais, eq(conversas.filialId, filiais.id))
+    .leftJoin(tenantUsers, eq(conversas.agenteId, tenantUsers.id))
+    .where(eq(conversas.id, id))
+    .limit(1);
+
+  const conversa = rows[0];
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (!podeAcessarConversa(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
+
+  res.json(conversa);
+});
+
 router.get('/:id/messages', async (req, res) => {
   const { id } = req.params;
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, id)).limit(1);

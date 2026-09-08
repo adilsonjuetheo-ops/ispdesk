@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { conversas, clientes, tenants, filiais, filialWhatsappExtra, mensagens } from '../db/schema.js';
-import { eq, and, ne, or, isNull } from 'drizzle-orm';
+import { conversas, clientes, tenants, filiais, filialWhatsappExtra, mensagens, tenantUsers } from '../db/schema.js';
+import { eq, and, ne, or, isNull, isNotNull, desc } from 'drizzle-orm';
 import { planoTemContrato } from '../config/planos.js';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
 import { enviarContrato, buscarLinkAssinatura } from '../services/assinatura.js';
@@ -49,6 +49,36 @@ async function resolverWConfig(tenant, conversa) {
 
   return tenant;
 }
+
+// Lista os contratos (pendentes e assinados) do provedor, para a tela
+// Contratos — o painel lateral da conversa só mostra um de cada vez.
+router.get('/', autenticar, apenasAdmin, async (req, res) => {
+  const condicoes = [
+    eq(conversas.tenantId, req.user.tenantId),
+    isNotNull(conversas.contratoStatus),
+  ];
+  if (req.user.filialId) condicoes.push(eq(conversas.filialId, req.user.filialId));
+
+  const rows = await db.select({
+    conversaId:        conversas.id,
+    filialId:          conversas.filialId,
+    filialNome:        filiais.nome,
+    agenteNome:        tenantUsers.nome,
+    contratoStatus:    conversas.contratoStatus,
+    contratoEnviadoEm: conversas.contratoEnviadoEm,
+    contratoUuid:      conversas.contratoUuid,
+    clienteNome:       clientes.nome,
+    clienteWhatsapp:   clientes.whatsapp,
+  })
+    .from(conversas)
+    .innerJoin(clientes, eq(conversas.clienteId, clientes.id))
+    .leftJoin(filiais, eq(conversas.filialId, filiais.id))
+    .leftJoin(tenantUsers, eq(conversas.agenteId, tenantUsers.id))
+    .where(and(...condicoes))
+    .orderBy(desc(conversas.contratoEnviadoEm));
+
+  res.json(rows);
+});
 
 // Envia contrato para assinatura digital
 router.post('/:conversaId/send', autenticar, apenasAdmin, async (req, res) => {

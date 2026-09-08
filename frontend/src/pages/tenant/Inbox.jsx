@@ -333,10 +333,24 @@ export default function Inbox() {
 
   const view = searchParams.get('view') || 'todos';
   const filialId = searchParams.get('filial') || null;
+  const conversaParam = searchParams.get('conversa') || null;
 
   useEffect(() => {
     setSelecionada(null);
   }, [view, filialId]);
+
+  // Deep link de outras telas (Lembretes, Contratos): abre direto a conversa
+  // indicada, mesmo que ela não esteja na lista carregada agora — encerradas
+  // mais antigas que o limite trazido por GET /conversations não vêm nela.
+  useEffect(() => {
+    if (!conversaParam) return;
+    const jaCarregada = conversas.find(c => c.id === conversaParam);
+    if (jaCarregada) { setSelecionada(jaCarregada); return; }
+    api.get(`/conversations/${conversaParam}`)
+      .then(r => setSelecionada(r.data))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversaParam]);
 
   useEffect(() => {
     onChatMobileChange?.(!!selecionada);
