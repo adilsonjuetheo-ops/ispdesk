@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { tenants, clientes, conversas, mensagens, webhookLog, filiais, filialWhatsappExtra, incidentes } from '../db/schema.js';
+import { tenants, clientes, conversas, mensagens, webhookLog, filiais, filialWhatsappExtra, incidentes, cobrancaEnvios } from '../db/schema.js';
 import { eq, and, ne, lt, sql as sqlRaw } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { buscarDadosCliente } from '../services/sgp.js';
@@ -105,12 +105,28 @@ router.post('/', async (req, res) => {
         const value = change.value;
         const phoneNumberId = value.metadata?.phone_number_id;
 
-        // Processa atualizações de status (entregue / lida)
+        // Processa atualizações de status (entregue / lida / falhou)
         for (const s of value.statuses || []) {
           if (s.status === 'delivered') {
             await db.update(mensagens).set({ status: 'entregue' }).where(eq(mensagens.wamid, s.id)).catch(() => {});
           } else if (s.status === 'read') {
             await db.update(mensagens).set({ status: 'lida' }).where(eq(mensagens.wamid, s.id)).catch(() => {});
+          }
+
+          // A fatura do ISPDesk sai pelo WhatsApp do próprio provedor, e a Meta
+          // aceita (200) mesmo quando vai falhar: fora da janela de 24h ela
+          // responde ok e só depois manda 'failed' por aqui. Sem ler este
+          // status, o painel dava a fatura como enviada e ela nunca chegava.
+          if (s.status === 'failed' || s.status === 'delivered') {
+            const erroMeta = (s.errors || [])[0];
+            await db.update(cobrancaEnvios)
+              .set(s.status === 'failed'
+                ? { sucesso: false, erro: erroMeta
+                    ? `a Meta não entregou (${erroMeta.code}): ${erroMeta.title || erroMeta.message || ''}`.trim()
+                    : 'a Meta não conseguiu entregar' }
+                : { sucesso: true, erro: null })
+              .where(eq(cobrancaEnvios.wamid, s.id))
+              .catch(() => {});
           }
         }
 

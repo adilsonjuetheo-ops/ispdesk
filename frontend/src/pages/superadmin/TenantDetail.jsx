@@ -599,7 +599,7 @@ export default function TenantDetail() {
                   </span>
                   <span className="text-gray-500 shrink-0">{e.origem === 'automatico' ? 'automática' : 'manual'}</span>
                   <span className={e.sucesso ? 'text-gray-300' : 'text-red-300'}>
-                    {e.sucesso ? `enviada para ${e.numero}` : (e.erro || 'não enviada')}
+                    {e.sucesso ? `entregue em ${e.numero}` : (e.erro || 'não entregue')}
                   </span>
                 </div>
               ))}
@@ -612,8 +612,13 @@ export default function TenantDetail() {
             {/* Isto era fixo: dizia "enviado ✅" mesmo quando nada saía — sem
                 contato cadastrado, sem token, ou com a Meta recusando. O
                 super admin achava que o provedor tinha recebido. */}
+            {/* "aceito pela Meta" não é "entregue": fora da janela de 24h ela
+                responde 200 e falha depois, por webhook. Dizer "enviado" aqui
+                era prometer o que ainda não se sabe. */}
             {pixGerado.whatsappEnviado ? (
-              <p className="text-xs text-emerald-300 mb-2">PIX enviado ao WhatsApp do provedor ✅</p>
+              <p className="text-xs text-gray-300 mb-2">
+                Mensagem aceita pela Meta. A entrega aparece em <strong>Faturas enviadas</strong> em alguns segundos.
+              </p>
             ) : (
               <p className="text-xs text-amber-300 mb-2">
                 Cobrança criada, mas <strong>não foi enviada</strong> ao provedor
