@@ -186,6 +186,10 @@ export default function TenantDetail() {
     setErroCobranca('');
     setPixGerado(null);
     try {
+      // Salva o número antes de gerar. O botão liberava assim que se digitava,
+      // mas quem envia o PIX é o backend, lendo o valor gravado — então um
+      // número só digitado gerava cobrança que não chegava a ninguém.
+      await api.put(`/tenants/${id}`, { ...tenant });
       const { data } = await api.post(`/tenants/${id}/gerar-cobranca`);
       setPixGerado(data);
       setTenant(t => ({ ...t, statusPagamento: 'pendente' }));
@@ -556,6 +560,11 @@ export default function TenantDetail() {
             {gerandoPIX ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
             Gerar cobrança PIX
           </button>
+          {!tenant.whatsappContato && (
+            <span className="text-xs text-amber-300">
+              Preencha o WhatsApp do responsável acima para liberar a cobrança.
+            </span>
+          )}
           {tenant.statusPagamento === 'pendente' && (
             <button
               onClick={handleVerificarPagamento}
@@ -577,7 +586,18 @@ export default function TenantDetail() {
 
         {pixGerado && (
           <div className="bg-gray-900 rounded-lg p-4 border border-indigo-700/50">
-            <p className="text-xs text-gray-400 mb-2">PIX enviado ao WhatsApp do provedor ✅</p>
+            {/* Isto era fixo: dizia "enviado ✅" mesmo quando nada saía — sem
+                contato cadastrado, sem token, ou com a Meta recusando. O
+                super admin achava que o provedor tinha recebido. */}
+            {pixGerado.whatsappEnviado ? (
+              <p className="text-xs text-emerald-300 mb-2">PIX enviado ao WhatsApp do provedor ✅</p>
+            ) : (
+              <p className="text-xs text-amber-300 mb-2">
+                Cobrança criada, mas <strong>não foi enviada</strong> ao provedor
+                {pixGerado.motivoNaoEnviado ? `: ${pixGerado.motivoNaoEnviado}` : '.'}
+                {' '}Copie o código abaixo e mande manualmente.
+              </p>
+            )}
             <p className="text-xs text-gray-400 mb-1">Copia e Cola:</p>
             <div className="flex gap-2 items-start">
               <code className="text-xs text-indigo-300 break-all flex-1 bg-gray-800 p-2 rounded">{pixGerado.pixCopiaECola}</code>

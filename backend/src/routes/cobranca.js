@@ -67,8 +67,19 @@ router.post('/tenants/:id/gerar-cobranca', autenticar, apenasSuper, async (req, 
       })
       .where(eq(tenants.id, id));
 
-    // Envia WhatsApp ao admin do provedor
-    if (tenant.whatsappContato && tenant.whatsappNumberId && tenant.whatsappToken) {
+    // Envia WhatsApp ao admin do provedor.
+    //
+    // Antes este if simplesmente não rodava quando faltava algum dado, e a
+    // resposta saía { ok: true } do mesmo jeito: a cobrança era criada, o
+    // provedor ficava "pendente" e ninguém recebia o PIX. Agora o motivo volta
+    // na resposta, para a tela poder dizer o que aconteceu.
+    let whatsappEnviado = false;
+    let motivoNaoEnviado = null;
+    if (!tenant.whatsappContato)        motivoNaoEnviado = 'WhatsApp do responsável não cadastrado';
+    else if (!tenant.whatsappNumberId)  motivoNaoEnviado = 'provedor sem número de WhatsApp conectado';
+    else if (!tenant.whatsappToken)     motivoNaoEnviado = 'provedor sem token do WhatsApp';
+
+    if (!motivoNaoEnviado) {
       const numero = tenant.whatsappContato.replace(/\D/g, '');
       const valor  = getValorPlano(tenant.plano).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
       const label  = getLabelPlano(tenant.plano);
@@ -84,12 +95,18 @@ router.post('/tenants/:id/gerar-cobranca', autenticar, apenasSuper, async (req, 
         `Ou acesse o link para pagar:\n${ticketUrl}\n\n` +
         `Após o pagamento seu sistema é ativado automaticamente. ✅`;
 
-      enviarMensagem(tenant, numero, msg).catch(e =>
-        console.error('[cobrança] Erro ao enviar WhatsApp:', e.message)
-      );
+      // Esperado, não disparado e esquecido: sem isso a tela dizia "enviado"
+      // mesmo quando a Meta recusava.
+      try {
+        await enviarMensagem(tenant, numero, msg);
+        whatsappEnviado = true;
+      } catch (e) {
+        console.error('[cobrança] Erro ao enviar WhatsApp:', e.message);
+        motivoNaoEnviado = `a Meta recusou o envio: ${e.message}`;
+      }
     }
 
-    res.json({ ok: true, paymentId: pagamento.id, pixCopiaECola, ticketUrl });
+    res.json({ ok: true, paymentId: pagamento.id, pixCopiaECola, ticketUrl, whatsappEnviado, motivoNaoEnviado });
   } catch (err) {
     console.error('[cobrança] Erro ao gerar PIX:', err.message);
     res.status(500).json({ erro: err.message });
