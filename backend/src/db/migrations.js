@@ -168,6 +168,22 @@ export async function runMigrations() {
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS encerrar_humano_por_inatividade boolean DEFAULT true`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS aceita_pix boolean DEFAULT true`;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS cobranca_envios (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        numero text,
+        payment_id text,
+        valor text,
+        origem text,
+        sucesso boolean DEFAULT false,
+        wamid text,
+        erro text,
+        enviado_em timestamp DEFAULT now()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_cobranca_envios_tenant ON cobranca_envios(tenant_id, enviado_em DESC)`;
+
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

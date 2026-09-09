@@ -4,6 +4,7 @@ import { eq, and, lte, isNotNull } from 'drizzle-orm';
 import { criarPIX, consultarPagamento, getValorPlano } from '../services/mercadopago.js';
 import { getLabelPlano } from '../config/planos.js';
 import { enviarMensagem } from '../services/whatsapp.js';
+import { enviarCobranca } from '../services/cobrancaEnvio.js';
 
 async function processarCobrancas() {
   const agora = new Date();
@@ -29,22 +30,25 @@ async function processarCobrancas() {
         .set({ mpPaymentId: String(pagamento.id), statusPagamento: 'pendente', proximoVencimento: pixExpira })
         .where(eq(tenants.id, tenant.id));
 
-      if (tenant.whatsappContato && tenant.whatsappNumberId && tenant.whatsappToken) {
-        const numero = tenant.whatsappContato.replace(/\D/g, '');
-        const valor  = getValorPlano(tenant.plano).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-        const label  = getLabelPlano(tenant.plano);
-        const vencStr = pixExpira.toLocaleDateString('pt-BR');
+      const valor  = getValorPlano(tenant.plano).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+      const label  = getLabelPlano(tenant.plano);
+      const vencStr = pixExpira.toLocaleDateString('pt-BR');
+      const msg =
+        `💳 *ISPDesk — Nova fatura disponível*\n\n` +
+        `Olá, ${tenant.nomeFantasia || tenant.nome}!\n\n` +
+        `Sua mensalidade do *Plano ${label}* está disponível.\n` +
+        `💰 Valor: *R$ ${valor}*\n` +
+        `📅 Vencimento: *${vencStr}*\n\n` +
+        `*PIX Copia e Cola:*\n${pixCopiaECola}\n\n` +
+        `Ou acesse o link:\n${ticketUrl}`;
 
-        const msg =
-          `💳 *ISPDesk — Nova fatura disponível*\n\n` +
-          `Olá, ${tenant.nomeFantasia || tenant.nome}!\n\n` +
-          `Sua mensalidade do *Plano ${label}* está disponível.\n` +
-          `💰 Valor: *R$ ${valor}*\n` +
-          `📅 Vencimento: *${vencStr}*\n\n` +
-          `*PIX Copia e Cola:*\n${pixCopiaECola}\n\n` +
-          `Ou acesse o link:\n${ticketUrl}`;
-
-        enviarMensagem(tenant, numero, msg).catch(() => {});
+      // Aqui era `.catch(() => {})`: a fatura mensal podia falhar para todo
+      // mundo, de madrugada, sem deixar sinal nenhum. Agora fica registrado.
+      const envio = await enviarCobranca(tenant, {
+        mensagem: msg, paymentId: pagamento.id, valor, origem: 'automatico',
+      });
+      if (!envio.sucesso) {
+        console.error(`[cobrança] Fatura de ${tenant.nome} NÃO foi enviada: ${envio.motivo}`);
       }
 
       console.log(`[cobrança] Nova fatura gerada: ${tenant.nome}`);

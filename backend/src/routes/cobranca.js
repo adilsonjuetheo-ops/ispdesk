@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { tenants } from '../db/schema.js';
-import { eq, and, ne, or, isNull } from 'drizzle-orm';
+import { tenants, cobrancaEnvios } from '../db/schema.js';
+import { eq, and, ne, or, isNull, desc } from 'drizzle-orm';
 import { autenticar, apenasSuper } from '../middleware/auth.js';
 import { criarPIX, consultarPagamento, getValorPlano } from '../services/mercadopago.js';
 import { getLabelPlano } from '../config/planos.js';
+import { enviarCobranca } from '../services/cobrancaEnvio.js';
 import { enviarMensagem } from '../services/whatsapp.js';
 import { criarRateLimit } from '../middleware/security.js';
 
@@ -67,46 +68,25 @@ router.post('/tenants/:id/gerar-cobranca', autenticar, apenasSuper, async (req, 
       })
       .where(eq(tenants.id, id));
 
-    // Envia WhatsApp ao admin do provedor.
-    //
-    // Antes este if simplesmente não rodava quando faltava algum dado, e a
-    // resposta saía { ok: true } do mesmo jeito: a cobrança era criada, o
-    // provedor ficava "pendente" e ninguém recebia o PIX. Agora o motivo volta
-    // na resposta, para a tela poder dizer o que aconteceu.
-    let whatsappEnviado = false;
-    let motivoNaoEnviado = null;
-    if (!tenant.whatsappContato)        motivoNaoEnviado = 'WhatsApp do responsável não cadastrado';
-    else if (!tenant.whatsappNumberId)  motivoNaoEnviado = 'provedor sem número de WhatsApp conectado';
-    else if (!tenant.whatsappToken)     motivoNaoEnviado = 'provedor sem token do WhatsApp';
+    const valor  = getValorPlano(tenant.plano).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    const label  = getLabelPlano(tenant.plano);
+    const vencStr = pixExpira.toLocaleDateString('pt-BR');
+    const msg =
+      `💳 *ISPDesk — Fatura disponível*\n\n` +
+      `Olá, ${tenant.nomeFantasia || tenant.nome}!\n\n` +
+      `Sua mensalidade do *Plano ${label}* está disponível.\n` +
+      `💰 Valor: *R$ ${valor}*\n` +
+      `📅 Vencimento: *${vencStr}*\n\n` +
+      `*PIX Copia e Cola:*\n${pixCopiaECola}\n\n` +
+      `Ou acesse o link para pagar:\n${ticketUrl}\n\n` +
+      `Após o pagamento seu sistema é ativado automaticamente. ✅`;
 
-    if (!motivoNaoEnviado) {
-      const numero = tenant.whatsappContato.replace(/\D/g, '');
-      const valor  = getValorPlano(tenant.plano).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-      const label  = getLabelPlano(tenant.plano);
-      const vencStr = pixExpira.toLocaleDateString('pt-BR');
+    const envio = await enviarCobranca(tenant, {
+      mensagem: msg, paymentId: pagamento.id, valor, origem: 'manual',
+    });
 
-      const msg =
-        `💳 *ISPDesk — Fatura disponível*\n\n` +
-        `Olá, ${tenant.nomeFantasia || tenant.nome}!\n\n` +
-        `Sua mensalidade do *Plano ${label}* está disponível.\n` +
-        `💰 Valor: *R$ ${valor}*\n` +
-        `📅 Vencimento: *${vencStr}*\n\n` +
-        `*PIX Copia e Cola:*\n${pixCopiaECola}\n\n` +
-        `Ou acesse o link para pagar:\n${ticketUrl}\n\n` +
-        `Após o pagamento seu sistema é ativado automaticamente. ✅`;
-
-      // Esperado, não disparado e esquecido: sem isso a tela dizia "enviado"
-      // mesmo quando a Meta recusava.
-      try {
-        await enviarMensagem(tenant, numero, msg);
-        whatsappEnviado = true;
-      } catch (e) {
-        console.error('[cobrança] Erro ao enviar WhatsApp:', e.message);
-        motivoNaoEnviado = `a Meta recusou o envio: ${e.message}`;
-      }
-    }
-
-    res.json({ ok: true, paymentId: pagamento.id, pixCopiaECola, ticketUrl, whatsappEnviado, motivoNaoEnviado });
+    res.json({ ok: true, paymentId: pagamento.id, pixCopiaECola, ticketUrl,
+      whatsappEnviado: envio.sucesso, motivoNaoEnviado: envio.motivo });
   } catch (err) {
     console.error('[cobrança] Erro ao gerar PIX:', err.message);
     res.status(500).json({ erro: err.message });
@@ -177,6 +157,17 @@ router.post('/mp/webhook', limitarWebhookPagamento, async (req, res) => {
   } catch (err) {
     console.error('[cobrança webhook] Erro:', err.message);
   }
+});
+
+// Histórico de envio das faturas — responde "será que foi mesmo enviado?"
+// dentro do painel, sem depender de perguntar ao provedor.
+router.get('/tenants/:id/cobrancas-enviadas', autenticar, apenasSuper, async (req, res) => {
+  const rows = await db.select()
+    .from(cobrancaEnvios)
+    .where(eq(cobrancaEnvios.tenantId, req.params.id))
+    .orderBy(desc(cobrancaEnvios.enviadoEm))
+    .limit(20);
+  res.json(rows);
 });
 
 export default router;

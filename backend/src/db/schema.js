@@ -264,3 +264,19 @@ export const lembretes = pgTable('lembretes', {
   criadoPor:     uuid('criado_por').references(() => tenantUsers.id, { onDelete: 'set null' }),
   criadoEm:      timestamp('criado_em').defaultNow(),
 });
+
+// Histórico de envio das faturas do ISPDesk ao responsável de cada provedor.
+// Sem isto o envio não deixava rastro: "será que foi mesmo?" não tinha resposta
+// no painel, e a falha do job automático sumia num catch vazio.
+export const cobrancaEnvios = pgTable('cobranca_envios', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  numero:    text('numero'),
+  paymentId: text('payment_id'),
+  valor:     text('valor'),
+  origem:    text('origem'),   // 'manual' (super admin) | 'automatico' (job)
+  sucesso:   boolean('sucesso').default(false),
+  wamid:     text('wamid'),    // id da mensagem na Meta, quando saiu
+  erro:      text('erro'),
+  enviadoEm: timestamp('enviado_em').defaultNow(),
+});

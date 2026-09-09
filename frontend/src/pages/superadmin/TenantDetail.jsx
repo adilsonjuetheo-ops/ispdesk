@@ -49,6 +49,7 @@ export default function TenantDetail() {
 
   const [gerandoPIX, setGerandoPIX] = useState(false);
   const [pixGerado, setPixGerado] = useState(null); // { pixCopiaECola, ticketUrl }
+  const [envios, setEnvios] = useState([]);
   const [erroCobranca, setErroCobranca] = useState('');
   const [verificandoPIX, setVerificandoPIX] = useState(false);
   const [resultadoVerif, setResultadoVerif] = useState(null);
@@ -65,6 +66,7 @@ export default function TenantDetail() {
 
   const carregarFiliais = () =>
     api.get(`/tenants/${id}/filiais`).then(r => setFiliais(r.data));
+    api.get(`/tenants/${id}/cobrancas-enviadas`).then(r => setEnvios(r.data)).catch(() => setEnvios([]));
 
   const handleAddFilial = async e => {
     e.preventDefault();
@@ -193,6 +195,7 @@ export default function TenantDetail() {
       const { data } = await api.post(`/tenants/${id}/gerar-cobranca`);
       setPixGerado(data);
       setTenant(t => ({ ...t, statusPagamento: 'pendente' }));
+      api.get(`/tenants/${id}/cobrancas-enviadas`).then(r => setEnvios(r.data)).catch(() => {});
     } catch (err) {
       setErroCobranca(err.response?.data?.erro || 'Erro ao gerar cobrança');
     } finally {
@@ -582,6 +585,26 @@ export default function TenantDetail() {
           <p className={`text-xs mb-3 ${resultadoVerif.ok ? 'text-emerald-400' : 'text-amber-400'}`}>
             {resultadoVerif.msg}
           </p>
+        )}
+
+        {envios.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Faturas enviadas</p>
+            <div className="space-y-1">
+              {envios.slice(0, 6).map(e => (
+                <div key={e.id} className="flex items-start gap-2 text-xs">
+                  <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${e.sucesso ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                  <span className="text-gray-400 shrink-0">
+                    {new Date(e.enviadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className="text-gray-500 shrink-0">{e.origem === 'automatico' ? 'automática' : 'manual'}</span>
+                  <span className={e.sucesso ? 'text-gray-300' : 'text-red-300'}>
+                    {e.sucesso ? `enviada para ${e.numero}` : (e.erro || 'não enviada')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {pixGerado && (
