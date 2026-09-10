@@ -4,8 +4,8 @@ import { conversas, clientes, tenants, filiais, filialWhatsappExtra, mensagens, 
 import { eq, and, ne, or, isNull, isNotNull, desc } from 'drizzle-orm';
 import { planoTemContrato } from '../config/planos.js';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
-import { enviarContrato, buscarLinkAssinatura } from '../services/assinatura.js';
-import { enviarMensagem } from '../services/whatsapp.js';
+import { enviarContrato, buscarLinkAssinatura, baixarContratoAssinado } from '../services/assinatura.js';
+import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.js';
 import { enviarPushParaUsuario, enviarPushParaTenant } from '../services/pushNotification.js';
 import { buscarDadosCliente } from '../services/sgp.js';
 import { criarRateLimit } from '../middleware/security.js';
@@ -48,6 +48,39 @@ async function resolverWConfig(tenant, conversa) {
   }
 
   return tenant;
+}
+
+// Baixa o PDF assinado e manda como documento na própria conversa — assim o
+// cliente tem uma cópia sem precisar do painel do D4Sign/ZapSign, e o
+// provedor vê o arquivo ali mesmo, abrindo a conversa (inclusive pela tela
+// Contratos). Falha aqui não pode quebrar o webhook: o status já foi
+// atualizado, e o aviso em texto já vai sair de qualquer forma.
+async function enviarPdfAssinado(tenant, conversa, cliente) {
+  try {
+    const arquivo = await baixarContratoAssinado(tenant, conversa.contratoUuid);
+    if (!arquivo?.buffer) return;
+
+    const wConfig = await resolverWConfig(tenant, conversa);
+    const nomeArquivo = `Contrato assinado - ${cliente?.nome || cliente?.whatsapp || 'cliente'}.pdf`;
+    const { id: mediaId } = await uploadMidia(wConfig, arquivo.buffer, arquivo.mimeType, nomeArquivo);
+    await enviarMidia(wConfig, cliente.whatsapp, mediaId, 'document', nomeArquivo);
+
+    const conteudo = `[Arquivo] ${nomeArquivo}`;
+    await db.insert(mensagens).values({
+      conversaId: conversa.id,
+      origem: 'bot',
+      conteudo,
+      midiaUrl: mediaId,
+      status: 'enviada',
+    });
+    await db.update(conversas).set({
+      ultimaMensagem: conteudo,
+      ultimaMsgEm: new Date(),
+      ultimaMsgOrigem: 'bot',
+    }).where(eq(conversas.id, conversa.id));
+  } catch (err) {
+    console.error('[Contrato] Falha ao enviar PDF assinado:', err.message);
+  }
 }
 
 // Lista os contratos (pendentes e assinados) do provedor, para a tela
@@ -220,6 +253,7 @@ router.post('/webhook/zapsign', limitarWebhookContrato, async (req, res) => {
           tenant, cliente.whatsapp,
           'Seu contrato foi assinado com sucesso! Bem-vindo(a) à nossa rede. Em breve entraremos em contato para agendar a instalação.'
         ).catch(() => {});
+        await enviarPdfAssinado(tenant, conversa, cliente);
       }
     }
   } catch (err) {
@@ -280,6 +314,7 @@ router.post('/webhook/d4sign', limitarWebhookContrato, async (req, res) => {
           tenant, cliente.whatsapp,
           'Seu contrato foi assinado com sucesso! Bem-vindo(a) à nossa rede. Em breve entraremos em contato para agendar a instalação.'
         ).catch(() => {});
+        await enviarPdfAssinado(tenant, conversa, cliente);
       }
     }
   } catch (err) {

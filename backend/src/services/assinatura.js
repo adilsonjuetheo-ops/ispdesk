@@ -623,3 +623,49 @@ export async function buscarLinkAssinatura(tenant, uuid) {
   }
   return null;
 }
+
+// Baixa o PDF final já assinado, para anexar na conversa do WhatsApp — sem
+// isso o cliente só teria acesso ao contrato entrando no painel do D4Sign/
+// ZapSign, e o provedor só veria a assinatura como um status, sem o arquivo.
+export async function baixarContratoAssinado(tenant, uuid) {
+  if (tenant.assinaturaTipo === 'd4sign') {
+    const extra = tenant.assinaturaExtra || {};
+    const qs = `tokenAPI=${tenant.assinaturaToken}${extra.cryptKey ? `&cryptKey=${extra.cryptKey}` : ''}`;
+    try {
+      const res = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${uuid}/download?${qs}`);
+      if (!res.ok) return null;
+      // A API devolve o PDF binário direto, mas por segurança cobrimos também
+      // uma resposta em base64 dentro de JSON, formato usado em outros
+      // endpoints do D4Sign.
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        const b64 = data?.base64_binary_file || data?.file;
+        if (!b64) return null;
+        return { buffer: Buffer.from(b64, 'base64'), mimeType: 'application/pdf' };
+      }
+      return { buffer: Buffer.from(await res.arrayBuffer()), mimeType: 'application/pdf' };
+    } catch (err) {
+      console.error('[assinatura] Falha ao baixar PDF assinado (D4Sign):', err.message);
+      return null;
+    }
+  }
+  if (tenant.assinaturaTipo === 'zapsign') {
+    try {
+      const res = await fetch(`https://api.zapsign.com.br/api/v1/docs/${uuid}/`, {
+        headers: { Authorization: `Bearer ${tenant.assinaturaToken}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const urlArquivo = data?.signed_file || data?.original_file;
+      if (!urlArquivo) return null;
+      const fileRes = await fetch(urlArquivo);
+      if (!fileRes.ok) return null;
+      return { buffer: Buffer.from(await fileRes.arrayBuffer()), mimeType: 'application/pdf' };
+    } catch (err) {
+      console.error('[assinatura] Falha ao baixar PDF assinado (ZapSign):', err.message);
+      return null;
+    }
+  }
+  return null;
+}
