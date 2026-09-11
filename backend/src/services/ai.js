@@ -127,6 +127,7 @@ INSTRUÇÕES IMPORTANTES:
 ${temSgp ? `- Use apenas os dados fornecidos pelo SGP acima. Nunca invente informações.
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
 - Ao enviar 2ª via, cole o PIX ou linha digitável completo na mensagem. Só prometa o PDF do boleto se o resultado da ferramenta disser que ele será enviado — nunca anuncie um arquivo que não vai chegar.
+${tenant.aceitaPix === false ? `- Este provedor NÃO trabalha com PIX. NUNCA mencione, ofereça, invente ou envie qualquer código, chave, número ou "chave PIX" — mesmo que o cliente peça ou insista, mesmo que pareça ter um valor "parecido com PIX" nos dados acima (como o CPF do cliente). Ao enviar 2ª via, cole só a linha digitável do boleto. Se o cliente pedir PIX, diga com naturalidade que o pagamento deste provedor é só por boleto e mande a linha digitável.` : ''}
 - Se não houver fatura vencida mas o contexto do SGP mostrar uma "PRÓXIMA FATURA" (ainda não vencida) e o cliente quiser pagar, adiantar ou pedir o código de pagamento mesmo assim: use enviar_segunda_via normalmente — a ferramenta traz a fatura em aberto mais próxima, vencida ou não. Só diga que "não há nada a pagar" quando o SGP não mostrar nenhuma fatura, nem vencida nem próxima.
 ${tenant.exigirDocumento
   ? `- Este provedor NÃO identifica clientes pelo número de WhatsApp. Na primeira demanda que exija dados do cliente, peça o CPF ou CNPJ do titular — mesmo que o cliente já tenha conversado antes.
@@ -368,6 +369,7 @@ VOCÊ ESTÁ SUGERINDO UMA RESPOSTA PARA UM ATENDENTE HUMANO:
 - Devolva SOMENTE o texto da mensagem: sem saudação de sistema, sem aspas, sem explicação, sem "sugestão:".
 - Nunca escreva ACTION:HANDOFF nem TAG: — quem decide transferir é o atendente.
 - Use apenas os dados do sistema acima; não invente valor, prazo, data nem código de pagamento.
+${tenant.aceitaPix === false ? `- Este provedor NÃO trabalha com PIX. NUNCA sugira, mencione ou invente qualquer código, chave ou "chave PIX" — mesmo que o cliente peça, e mesmo que algum dado acima (como o CPF do cliente) pareça um valor de PIX. Pagamento deste provedor é só por boleto/linha digitável.` : ''}
 - Nunca confirme pagamento, nunca declare dívida quitada e nunca mencione crédito, sobra ou troco: quem confere e dá baixa é o atendente.
 - Se faltar informação para responder com segurança, escreva uma resposta que peça o dado que falta.
 - Tom cordial e direto, no máximo 3 parágrafos curtos.
