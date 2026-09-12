@@ -3,6 +3,7 @@ import { db } from '../db/index.js';
 import { tenants, tenantUsers, conversas } from '../db/schema.js';
 import { eq, count, and } from 'drizzle-orm';
 import { autenticar, apenasSuper } from '../middleware/auth.js';
+import { proximoVencimento } from '../services/vencimento.js';
 import crypto from 'crypto';
 import { getLimite, getUso, getMes } from '../services/limites.js';
 import { buscarContextoSgp, buscarContextoPorDocumentoSgp } from '../services/sgp.js';
@@ -316,7 +317,11 @@ router.post('/:id/ativar-trial', async (req, res) => {
 });
 
 router.post('/:id/renovar', async (req, res) => {
-  const expira = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  // Estica a partir do vencimento atual, não de hoje: senão o dia da cobrança
+  // anda no calendário toda vez que a renovação acontece com atraso.
+  const [atual] = await db.select({ venc: tenants.proximoVencimento })
+    .from(tenants).where(eq(tenants.id, req.params.id)).limit(1);
+  const expira = proximoVencimento(atual?.venc);
   const [tenant] = await db.update(tenants)
     .set({ statusPagamento: 'ativo', proximoVencimento: expira, atualizadoEm: new Date() })
     .where(eq(tenants.id, req.params.id))

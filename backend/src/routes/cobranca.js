@@ -5,6 +5,7 @@ import { eq, and, ne, or, isNull, desc } from 'drizzle-orm';
 import { autenticar, apenasSuper } from '../middleware/auth.js';
 import { criarPIX, consultarPagamento, getValorPlano } from '../services/mercadopago.js';
 import { getLabelPlano } from '../config/planos.js';
+import { proximoVencimento } from '../services/vencimento.js';
 import { enviarCobranca } from '../services/cobrancaEnvio.js';
 import { enviarMensagem } from '../services/whatsapp.js';
 import { criarRateLimit } from '../middleware/security.js';
@@ -37,7 +38,7 @@ router.post('/tenants/:id/baixa-manual', autenticar, apenasSuper, async (req, re
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id)).limit(1);
   if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
 
-  const proxVencimento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const proxVencimento = proximoVencimento(tenant.proximoVencimento);
   await db.update(tenants)
     .set({ statusPagamento: 'ativo', proximoVencimento: proxVencimento })
     .where(eq(tenants.id, id));
@@ -103,7 +104,7 @@ router.post('/tenants/:id/verificar-pagamento', autenticar, apenasSuper, async (
   try {
     const pag = await consultarPagamento(tenant.mpPaymentId);
     if (pag.status === 'approved') {
-      const proxVencimento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const proxVencimento = proximoVencimento(tenant.proximoVencimento);
       await db.update(tenants)
         .set({ statusPagamento: 'ativo', proximoVencimento: proxVencimento })
         .where(eq(tenants.id, id));
@@ -133,7 +134,7 @@ router.post('/mp/webhook', limitarWebhookPagamento, async (req, res) => {
     if (!tenant) return;
     if (tenant.statusPagamento === 'ativo') return;
 
-    const proxVencimento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const proxVencimento = proximoVencimento(tenant.proximoVencimento);
     const [ativado] = await db.update(tenants)
       .set({ statusPagamento: 'ativo', proximoVencimento: proxVencimento })
       .where(and(

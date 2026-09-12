@@ -27,6 +27,15 @@ export async function criarPIX(tenant) {
     },
   };
 
+  // Sem isto o Mercado Pago nunca avisava que o PIX foi pago: a rota
+  // /api/mp/webhook existia e ninguém a chamava. Na prática o pagamento só era
+  // reconhecido se alguém abrisse o painel e clicasse em "Verificar pagamento"
+  // — e enquanto ninguém clicava, o provedor pagava em dia e continuava
+  // marcado como pendente.
+  const baseApi = (process.env.API_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  if (baseApi) body.notification_url = `${baseApi}/api/mp/webhook`;
+  else console.warn('[cobrança] API_PUBLIC_URL ausente — o Mercado Pago não terá para onde avisar o pagamento.');
+
   const res = await fetch(`${MP_BASE}/v1/payments`, {
     method: 'POST',
     headers: {
