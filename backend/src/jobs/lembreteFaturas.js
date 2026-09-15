@@ -76,7 +76,16 @@ async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo) {
     // Com link da central configurado, o provedor pediu pra parar de mandar
     // o PIX ali e mandar o link em vez disso — mesma posição de variável,
     // template não muda.
-    const linkOuPix = tenant.lembreteFaturaLinkAssinante || titulo.codigoPix || titulo.link || '';
+    //
+    // Provedor que não trabalha com PIX não pode ter o código do SGP caindo
+    // aqui: o lembrete mandaria justamente o que a 2ª via já deixou de mandar.
+    const codigoPix = tenant.aceitaPix === false ? null : titulo.codigoPix;
+    const linkOuPix = tenant.lembreteFaturaLinkAssinante || codigoPix || titulo.link || '';
+    // A Meta recusa parâmetro de texto vazio, e o erro que ela devolve não diz
+    // qual variável faltou. Melhor falhar aqui, com motivo que aparece no painel.
+    if (!linkOuPix) {
+      return { enviado: false, motivo: 'Fatura sem forma de pagamento (nem link da central, nem PIX, nem boleto)' };
+    }
     // {{3}} vai sem "R$": os templates aprovados escrevem "no valor de R$ {{3}}",
     // com o cifrão no corpo. Mandar "R$ 89,90" aqui faria o cliente ler
     // "no valor de R$ R$ 89,90".
