@@ -1,4 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { eq } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { atalhos } from '../db/schema.js';
 import { buscarContextoSgp, buscarContextoPorDocumentoSgp, getTools, executarTool } from './sgp.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -24,6 +27,28 @@ function saudacaoAtual() {
   if (hora < 12) return 'Bom dia';
   if (hora < 18) return 'Boa tarde';
   return 'Boa noite';
+}
+
+// As respostas prontas que o provedor escreveu na tela de Atalhos. Só o
+// atendente enxergava isso; o modelo respondia de cabeça sobre plano, preço e
+// cobertura — e inventava. Na Microdata chegou a listar três planos e três
+// preços que não existem.
+async function blocoAtalhos(tenantId) {
+  const lista = await db
+    .select({ titulo: atalhos.titulo, conteudo: atalhos.conteudo })
+    .from(atalhos)
+    .where(eq(atalhos.tenantId, tenantId));
+  if (!lista.length) return '';
+
+  const textos = lista.map(a => `--- ${a.titulo} ---\n${a.conteudo}`).join('\n\n');
+  return `
+RESPOSTAS PRONTAS DO PROVEDOR (escritas pela equipe — é a informação oficial, vale mais que qualquer coisa que você ache que sabe):
+${textos}
+
+- Quando o cliente perguntar sobre um desses assuntos, responda com base no texto correspondente. Valores, velocidades, prazos e condições saem EXATAMENTE como estão escritos: não arredonde, não converta, não acrescente plano, preço ou benefício que não esteja ali.
+- Se o texto trouxer {{nome}}, {{empresa}}, {{contrato}} ou {{filial}}, troque pelo dado real do cliente — e se você não tiver o dado, reescreva a frase sem ele em vez de deixar a marcação aparecer.
+- Se o cliente perguntar sobre planos, preços, promoções ou cobertura e NÃO houver texto acima sobre isso: não invente nada. Diga que vai confirmar com a equipe e transfira.
+`;
 }
 
 function extrairIdsAutorizados(contexto) {
@@ -88,6 +113,8 @@ export async function processarMensagem(tenant, conversa, historico, novaMensage
     ? await buscarContextoPorDocumentoSgp(tenant, documentoValidado)
     : await buscarContextoSgp(tenant, clienteWhatsapp);
 
+  const atalhosProvedor = await blocoAtalhos(tenant.id);
+
   // 2. System prompt com contexto SGP injetado
   const temSgp = !!(tenant.sgpTipo && tenant.sgpApiKey);
   const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' });
@@ -112,7 +139,7 @@ ATENDIMENTO HUMANO INDISPONÍVEL AGORA:
 DATA E HORA ATUAL: ${agora} (horário de Brasília). Use isso para contextualizar qualquer referência a datas. Se for cumprimentar o cliente, use exatamente "${saudacaoAtual()}" — não calcule por conta própria a partir da hora acima.
 
 ${contextoSgp}
-${blocoForaHorario}
+${atalhosProvedor}${blocoForaHorario}
 ABERTURA DA CONVERSA:
 - Boa parte dos clientes abre a conversa só com uma saudação, um emoji ou algo sem pedido nenhum — "oi", "boa noite", "👍". Nesses casos não responda apenas "como posso ajudar?": quem escreve assim quase sempre não sabe o que dá para resolver por aqui.
 - Cumprimente (pelo nome, se você souber), diga numa frase curta o que você resolve na hora e termine perguntando o que a pessoa precisa. Cite apenas o que você realmente consegue fazer com as ferramentas que tem — nunca prometa nada fora do seu alcance.
@@ -355,6 +382,7 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
 // é enviado ao cliente — devolve só o texto, que o atendente edita à vontade.
 export async function sugerirResposta(tenant, conversa, historico, clienteWhatsapp) {
   const contextoSgp = await buscarContextoSgp(tenant, clienteWhatsapp);
+  const atalhosProvedor = await blocoAtalhos(tenant.id);
   const agora = new Date().toLocaleString('pt-BR', {
     timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short',
   });
@@ -364,6 +392,7 @@ export async function sugerirResposta(tenant, conversa, historico, clienteWhatsa
 DATA E HORA ATUAL: ${agora} (horário de Brasília). Se a sugestão abrir com cumprimento, use exatamente "${saudacaoAtual()}" — não calcule por conta própria a partir da hora acima.
 
 ${contextoSgp}
+${atalhosProvedor}
 
 VOCÊ ESTÁ SUGERINDO UMA RESPOSTA PARA UM ATENDENTE HUMANO:
 - Escreva a mensagem pronta para ser enviada ao cliente, na primeira pessoa do provedor.
