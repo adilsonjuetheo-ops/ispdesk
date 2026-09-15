@@ -1277,10 +1277,16 @@ export default function Settings() {
                       placeholder="ex: lembrete_vencimento"
                     />
                     <Field
-                      label="Nome do template — pós-vencimento (D+5)"
+                      label={`Nome do template — pós-vencimento (D+${Number(tenant.lembreteFaturaDiasPos) || 5})`}
                       value={tenant.lembreteFaturaTemplatePos || ''}
                       onChange={v => set('lembreteFaturaTemplatePos', v)}
                       placeholder="ex: lembrete_atraso"
+                    />
+                    <Field
+                      label="Dias após o vencimento para cobrar"
+                      value={tenant.lembreteFaturaDiasPos ?? 5}
+                      onChange={v => set('lembreteFaturaDiasPos', v.replace(/\D/g, ''))}
+                      placeholder="5"
                     />
                     <Field
                       label="Idioma do template"

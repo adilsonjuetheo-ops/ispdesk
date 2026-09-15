@@ -106,9 +106,13 @@ router.put('/me', autenticar, async (req, res) => {
     sgpTipo, sgpApiUrl, sgpApiKey, exigirDocumento,
     assinaturaTipo, assinaturaToken, assinaturaExtra,
     lembreteFaturaAtivo, lembreteFaturaTemplatePre, lembreteFaturaTemplatePos, lembreteFaturaIdioma,
-    lembreteFaturaLinkAssinante, contratoModelo, desbloqueioPrazo,
+    lembreteFaturaLinkAssinante, lembreteFaturaDiasPos, contratoModelo, desbloqueioPrazo,
     encerrarHumanoPorInatividade, aceitaPix,
   } = req.body;
+
+  // Dia 0 seria "no vencimento", que é o que o lembrete pré já cobre, e um
+  // prazo gigante mandaria cobrança de dívida antiga como se fosse recente.
+  const diasPos = Math.min(Math.max(Number(lembreteFaturaDiasPos) || 5, 1), 90);
   const [tenant] = await db.update(tenants)
     .set({
       nome, nomeFantasia, logoUrl, corPrimaria,
@@ -127,6 +131,7 @@ router.put('/me', autenticar, async (req, res) => {
       lembreteFaturaTemplatePos: lembreteFaturaTemplatePos || null,
       lembreteFaturaIdioma: lembreteFaturaIdioma || 'pt_BR',
       lembreteFaturaLinkAssinante: lembreteFaturaLinkAssinante?.trim() || null,
+      lembreteFaturaDiasPos: diasPos,
       encerrarHumanoPorInatividade: encerrarHumanoPorInatividade !== false,
       aceitaPix: aceitaPix !== false,
       atualizadoEm: new Date(),

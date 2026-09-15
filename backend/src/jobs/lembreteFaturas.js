@@ -4,11 +4,14 @@ import { eq, and, ne, inArray } from 'drizzle-orm';
 import { criarSgp } from '../services/sgp.js';
 import { enviarTemplate } from '../services/whatsapp.js';
 
-// Quantos dias pra trás da marca de "5 dias vencido" a busca ainda cobre —
-// dá uma folga pra pegar quem ficou de fora se o cron falhar num dia (SGP
-// fora do ar, deploy no meio da execução, etc.), sem arrastar dívida antiga
-// pra dentro de um lembrete que soa como "acabou de vencer".
-const JANELA_POS_VENCIMENTO_DIAS = 15;
+// Quantos dias pra trás da marca de vencido a busca ainda cobre — dá uma folga
+// pra pegar quem ficou de fora se o cron falhar num dia (SGP fora do ar, deploy
+// no meio da execução, etc.), sem arrastar dívida antiga pra dentro de um
+// lembrete que soa como "acabou de vencer".
+const FOLGA_POS_VENCIMENTO_DIAS = 10;
+
+// Prazo padrão de cobrança, quando o provedor não configurou o dele.
+const DIAS_POS_PADRAO = 5;
 
 function formatarData(dataStr) {
   return new Date(`${dataStr}T00:00:00`).toLocaleDateString('pt-BR');
@@ -140,9 +143,10 @@ export async function processarProvedor(tenant) {
     return { erro: 'Este SGP não tem suporte a lembretes automáticos.' };
   }
 
+  const diasPos = Number(tenant.lembreteFaturaDiasPos) || DIAS_POS_PADRAO;
   const amanha = paraDataISO(1);
-  const ha5dias = paraDataISO(-5);
-  const inicioJanelaPos = paraDataISO(-JANELA_POS_VENCIMENTO_DIAS);
+  const marcaPos = paraDataISO(-diasPos);
+  const inicioJanelaPos = paraDataISO(-(diasPos + FOLGA_POS_VENCIMENTO_DIAS));
 
   const falhasConsulta = [];
   const [venceAmanha, venceu5diasOuMais] = await Promise.all([
@@ -151,9 +155,9 @@ export async function processarProvedor(tenant) {
       falhasConsulta.push(`Consulta D-1 falhou: ${err.message}`);
       return null;
     }),
-    sgp.listarTitulosPorVencimento(inicioJanelaPos, ha5dias).catch(err => {
-      console.error(`[lembretes] Erro ao listar títulos (D+5) de ${tenant.nome}:`, err.message);
-      falhasConsulta.push(`Consulta D+5 falhou: ${err.message}`);
+    sgp.listarTitulosPorVencimento(inicioJanelaPos, marcaPos).catch(err => {
+      console.error(`[lembretes] Erro ao listar títulos (D+${diasPos}) de ${tenant.nome}:`, err.message);
+      falhasConsulta.push(`Consulta D+${diasPos} falhou: ${err.message}`);
       return null;
     }),
   ]);

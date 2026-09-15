@@ -54,6 +54,9 @@ export const tenants = pgTable('tenants', {
   // Quando preenchido, substitui o PIX/boleto na variável do template pelo
   // link da central do assinante do provedor — nulo mantém o PIX/boleto.
   lembreteFaturaLinkAssinante: text('lembrete_fatura_link_assinante'),
+  // Quantos dias depois do vencimento sai o lembrete de cobrança. Era fixo em
+  // 5 para todo mundo; a UaiFibra cobra a partir de 15.
+  lembreteFaturaDiasPos:       integer('lembrete_fatura_dias_pos').default(5),
   // false = conversa em atendimento humano nunca é encerrada pela varredura de
   // inatividade (fica aberta até o atendente resolver e fechar manualmente).
   // Default true preserva o comportamento de sempre pra quem não pediu isso.

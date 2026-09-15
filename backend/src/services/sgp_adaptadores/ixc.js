@@ -315,6 +315,134 @@ export class IxcAdaptador extends SgpAdaptador {
     };
   }
 
+  // --- Lembretes automáticos de fatura ---------------------------------
+  //
+  // O robô de lembretes foi escrito em cima do SGP TSMX e espera títulos num
+  // formato próprio (camelCase, com nome e CPF do cliente embutidos). O IXC
+  // guarda a fatura em fn_areceber com só o id_cliente, então a conversão
+  // acontece aqui: sem estes três métodos o adaptador herda os vazios da base
+  // e o provedor fica sem lembrete nenhum, em silêncio.
+
+  #clientesCache = new Map(); // id_cliente -> registro do cliente
+
+  async #clientePorId(id) {
+    const chave = String(id);
+    if (this.#clientesCache.has(chave)) return this.#clientesCache.get(chave);
+
+    const data = await this.#listar('cliente', {
+      qtype: 'cliente.id', query: chave, oper: '=', rp: '1',
+    }).catch(() => null);
+
+    const cliente = data?.registros?.[0] || null;
+    this.#clientesCache.set(chave, cliente);
+    return cliente;
+  }
+
+  #formatarTelefoneWhatsapp(tel) {
+    let d = (tel || '').replace(/\D/g, '');
+    if (!d) return null;
+    if (d.length === 10 || d.length === 11) d = `55${d}`;
+    return d;
+  }
+
+  // O código PIX exige uma chamada dedicada por fatura. Numa varredura diária
+  // isso multiplica por todos os títulos do dia, então só vale buscar quando o
+  // PIX realmente vai parar na mensagem.
+  #lembreteUsaPix() {
+    return this.tenant?.aceitaPix !== false && !this.tenant?.lembreteFaturaLinkAssinante;
+  }
+
+  async #titulosParaLembrete(faturas) {
+    const titulos = [];
+    for (const f of faturas) {
+      const cliente = await this.#clientePorId(f.id_cliente);
+      if (!cliente) continue;
+
+      titulos.push({
+        id: f.id,
+        clienteNome: cliente.razao || null,
+        clienteCpfcnpj: cliente.cnpj_cpf || null,
+        valor: f.valor,
+        // O IXC às vezes devolve a data com hora junto; o robô monta
+        // `${data}T00:00:00` e uma hora extra viraria Invalid Date.
+        dataVencimento: String(f.data_vencimento || '').slice(0, 10),
+        codigoPix: this.#lembreteUsaPix()
+          ? await this.#buscarPix(f.id).catch(() => null)
+          : null,
+        link: f.gateway_link || null,
+      });
+    }
+    return titulos;
+  }
+
+  async listarTitulosPorVencimento(dataInicio, dataFim = dataInicio) {
+    const rp = 200;
+    let page = 1;
+    let faturas = [];
+
+    while (true) {
+      const data = await this.#listar('fn_areceber', {
+        qtype: 'fn_areceber.status',
+        query: 'A',
+        oper: '=',
+        page: String(page),
+        rp: String(rp),
+        sortname: 'fn_areceber.data_vencimento',
+        sortorder: 'asc',
+        grid_param: JSON.stringify([
+          { TB: 'fn_areceber.data_vencimento', OP: '>=', P: dataInicio },
+          { TB: 'fn_areceber.data_vencimento', OP: '<=', P: dataFim },
+        ]),
+      });
+
+      const pagina = data?.registros || [];
+      faturas = faturas.concat(pagina);
+
+      const total = Number(data?.total ?? faturas.length);
+      if (pagina.length === 0 || faturas.length >= total) break;
+      page++;
+    }
+
+    return this.#titulosParaLembrete(faturas);
+  }
+
+  async buscarTelefonePorDocumento(doc) {
+    // A varredura já carregou o cliente para montar o título; reaproveita em
+    // vez de consultar o IXC de novo pelo mesmo cadastro.
+    const digitos = String(doc).replace(/\D/g, '');
+    for (const c of this.#clientesCache.values()) {
+      if (c && String(c.cnpj_cpf || '').replace(/\D/g, '') === digitos) {
+        return this.#formatarTelefoneWhatsapp(c.telefone_celular || c.whatsapp);
+      }
+    }
+
+    const cliente = await this.#buscarClientePorDocumento(doc).catch(() => null);
+    if (!cliente) return null;
+    return this.#formatarTelefoneWhatsapp(cliente.telefone_celular || cliente.whatsapp);
+  }
+
+  async buscarTituloAbertoPorDocumento(doc) {
+    const cliente = await this.#buscarClientePorDocumento(doc).catch(() => null);
+    if (!cliente) return null;
+
+    const data = await this.#listar('fn_areceber', {
+      qtype: 'fn_areceber.id_cliente',
+      query: cliente.id,
+      oper: '=',
+      rp: '10',
+      sortname: 'fn_areceber.data_vencimento',
+      sortorder: 'asc',
+      grid_param: JSON.stringify([{ TB: 'fn_areceber.status', OP: '=', P: 'A' }]),
+    }).catch(() => null);
+
+    const fatura = (data?.registros || [])[0];
+    if (!fatura) return null;
+
+    this.#clientesCache.set(String(cliente.id), cliente);
+    const [titulo] = await this.#titulosParaLembrete([fatura]);
+    return titulo || null;
+  }
+
   async executarTool(toolName, toolInput) {
     switch (toolName) {
 
