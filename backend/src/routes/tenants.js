@@ -316,6 +316,30 @@ router.post('/:id/ativar-trial', async (req, res) => {
   res.json(tenant);
 });
 
+// Ajuste manual do vencimento. Trial e renovação só sabem somar 30 dias a
+// partir de uma base; quando o combinado com o provedor é um dia fixo do mês,
+// não havia como acertar a data sem esperar os ciclos caírem no dia certo.
+router.patch('/:id/vencimento', async (req, res) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(req.body.data || '').trim());
+  if (!m) return res.status(400).json({ erro: 'Informe a data no formato AAAA-MM-DD.' });
+
+  const [, ano, mes, dia] = m.map(Number);
+  // Meio-dia em UTC: data pura vira meia-noite UTC e, em fuso negativo, o
+  // painel mostraria o dia anterior. Também evita que 31/02 passe batido —
+  // o Date rola para março e a conferência abaixo pega.
+  const venc = new Date(Date.UTC(ano, mes - 1, dia, 12, 0, 0));
+  if (venc.getUTCMonth() !== mes - 1 || venc.getUTCDate() !== dia) {
+    return res.status(400).json({ erro: 'Data inválida.' });
+  }
+
+  const [tenant] = await db.update(tenants)
+    .set({ proximoVencimento: venc, atualizadoEm: new Date() })
+    .where(eq(tenants.id, req.params.id))
+    .returning({ statusPagamento: tenants.statusPagamento, proximoVencimento: tenants.proximoVencimento });
+  if (!tenant) return res.status(404).json({ erro: 'Provedor não encontrado' });
+  res.json(tenant);
+});
+
 router.post('/:id/renovar', async (req, res) => {
   // Estica a partir do vencimento atual, não de hoje: senão o dia da cobrança
   // anda no calendário toda vez que a renovação acontece com atraso.

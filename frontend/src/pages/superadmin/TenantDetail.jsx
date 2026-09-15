@@ -4,6 +4,16 @@ import api from '../../lib/api.js';
 import { ORDEM_PLANOS, labelPlano, precoPlano } from '../../lib/planos.js';
 import { ArrowLeft, Plus, X, Loader2, Pencil, Trash2, Save, Upload, Building2, MapPin, AlertTriangle, ToggleLeft, ToggleRight, KeyRound, QrCode, CheckCircle, Clock, Ban } from 'lucide-react';
 
+// Data no formato do <input type="date">, lida no fuso de Brasília: o
+// vencimento é um timestamp, e converter pelo fuso do navegador devolveria o
+// dia anterior para quem estiver a oeste.
+const paraInputDate = (iso) => {
+  if (!iso) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(iso));
+};
+
 const COR_PLANO = {
   basic: 'text-gray-300', exclusivo: 'text-emerald-400',
   pro: 'text-blue-400',   enterprise: 'text-amber-400',
@@ -55,6 +65,8 @@ export default function TenantDetail() {
   const [resultadoVerif, setResultadoVerif] = useState(null);
   const [ativandoTrial, setAtivandoTrial] = useState(false);
   const [renovando, setRenovando] = useState(false);
+  const [novoVenc, setNovoVenc] = useState('');
+  const [salvandoVenc, setSalvandoVenc] = useState(false);
 
   const handleLogoUpload = e => {
     const file = e.target.files?.[0];
@@ -221,6 +233,19 @@ export default function TenantDetail() {
     } catch (err) {
       setErro(err.response?.data?.erro || 'Erro ao renovar');
     } finally { setRenovando(false); }
+  };
+
+  const handleAjustarVenc = async () => {
+    const data = novoVenc || paraInputDate(tenant.proximoVencimento);
+    if (!data) return;
+    setSalvandoVenc(true);
+    try {
+      const { data: r } = await api.patch(`/tenants/${id}/vencimento`, { data });
+      setTenant(t => ({ ...t, proximoVencimento: r.proximoVencimento }));
+      setNovoVenc('');
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Erro ao ajustar vencimento');
+    } finally { setSalvandoVenc(false); }
   };
 
   const handleExcluirDefinitivo = async () => {
@@ -521,6 +546,24 @@ export default function TenantDetail() {
           >
             {renovando ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
             Renovar 30 dias
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 mb-5">
+          <label className="text-xs text-gray-400">Ajustar vencimento para:</label>
+          <input
+            type="date"
+            value={novoVenc || paraInputDate(tenant.proximoVencimento)}
+            onChange={e => setNovoVenc(e.target.value)}
+            className="bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          <button
+            onClick={handleAjustarVenc}
+            disabled={salvandoVenc}
+            className="flex items-center gap-2 bg-gray-700/60 hover:bg-gray-700 border border-gray-600 disabled:opacity-50 text-gray-200 px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            {salvandoVenc ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Ajustar
           </button>
         </div>
 
