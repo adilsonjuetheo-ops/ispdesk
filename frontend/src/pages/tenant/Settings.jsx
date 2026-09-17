@@ -541,6 +541,11 @@ function TestarLembreteCliente() {
 
 const CORES_TAGS = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6'];
 
+// Adaptadores que sabem varrer faturas por data de vencimento. Nos outros o
+// robô herda os métodos vazios da base e não envia nada, então a seção some em
+// vez de deixar configurar algo que nunca vai rodar.
+const SGP_COM_LEMBRETES = ['tsmx', 'ixc'];
+
 function TagsSection() {
   const [catalogo, setCatalogo] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1254,11 +1259,11 @@ export default function Settings() {
 
               {tenant.sgpTipo && <TestarSgp />}
 
-              {tenant.sgpTipo === 'tsmx' && (
+              {SGP_COM_LEMBRETES.includes(tenant.sgpTipo) && (
                 <div className="mt-4 border-t border-gray-100 pt-4">
                   <h3 className="text-sm font-medium text-gray-700 mb-1">Lembretes automáticos de fatura</h3>
                   <p className="text-xs text-gray-500 mb-3">
-                    Envia um template do WhatsApp 1 dia antes do vencimento e outro 5 dias depois do vencimento.
+                    Envia um template do WhatsApp 1 dia antes do vencimento e outro {Number(tenant.lembreteFaturaDiasPos) || 5} dias depois do vencimento.
                     Requer templates já aprovados pela Meta (categoria "Utilidade") no WhatsApp Manager do provedor.
                   </p>
                   <label className="flex items-center gap-2 text-sm text-gray-700 mb-3">
