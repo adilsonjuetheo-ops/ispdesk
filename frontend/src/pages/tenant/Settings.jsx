@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
 import { planoTemContrato } from '../../lib/planos.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2, Stethoscope, CircleCheck, TriangleAlert, CircleX, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight, ArrowRightLeft } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Stethoscope, CircleCheck, TriangleAlert, CircleX, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight, ArrowRightLeft, Smartphone } from 'lucide-react';
 
 function carregarFbSdk() {
   return new Promise((resolve) => {
@@ -40,7 +40,11 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
 
   useEffect(() => { carregarStatus(); }, []);
 
-  const handleConectar = async () => {
+  // featureType vazio = número novo, criado do zero na Cloud API.
+  // 'whatsapp_business_app_onboarding' = coexistência: o número já roda no app
+  // WhatsApp Business do provedor e passa a valer nos dois lugares. A Meta
+  // mostra um QR code no fim do fluxo, que ele lê pelo aparelho.
+  const handleConectar = async (featureType = '') => {
     setErro(''); setSucesso('');
     if (!import.meta.env.VITE_META_APP_ID) {
       setErro('VITE_META_APP_ID não configurado. Adicione essa variável de ambiente no Coolify.');
@@ -74,7 +78,7 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
         override_default_response_type: true,
         extras: {
           setup: {},
-          featureType: '',
+          featureType,
           sessionInfoVersion: '3',
         },
       });
@@ -143,15 +147,36 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={handleConectar}
-        disabled={conectando}
-        className="flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe5d] disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
-      >
-        {conectando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wifi className="w-4 h-4" />}
-        {status?.conectado ? 'Reconectar WhatsApp' : 'Conectar WhatsApp'}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        {/* onClick={() => handleConectar()} e não onClick={handleConectar}: o
+            React passa o evento do clique como primeiro argumento, que viraria
+            o featureType e quebraria o fluxo padrão. */}
+        <button
+          type="button"
+          onClick={() => handleConectar()}
+          disabled={conectando}
+          className="flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe5d] disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          {conectando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wifi className="w-4 h-4" />}
+          {status?.conectado ? 'Reconectar WhatsApp' : 'Conectar WhatsApp'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleConectar('whatsapp_business_app_onboarding')}
+          disabled={conectando}
+          className="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          <Smartphone className="w-4 h-4" />
+          Já uso esse número no celular
+        </button>
+      </div>
+
+      <p className="mt-2 text-xs text-gray-500">
+        Use a segunda opção se o número já está no app WhatsApp Business. Ele continua
+        funcionando no celular e passa a aparecer aqui também — a Meta mostra um QR code
+        no fim do cadastro, que você lê pelo aparelho.
+      </p>
 
       {sucesso && (
         <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5 text-emerald-700 text-sm">

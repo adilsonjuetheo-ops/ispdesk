@@ -78,6 +78,50 @@ function assinaturaMetaValida(req) {
     && crypto.timingSafeEqual(recebidaBuffer, esperadaBuffer);
 }
 
+// Descobre o provedor dono do número que recebeu a mensagem — primeiro pelo
+// número principal, depois por número de filial (principal ou adicional — uma
+// filial pode ter mais de um número).
+async function resolverTenant(phoneNumberId) {
+  let tenant = null;
+  let filialEntrada = null;
+
+  const [tenantDireto] = await db.select().from(tenants)
+    .where(and(eq(tenants.whatsappNumberId, phoneNumberId), eq(tenants.ativo, true)))
+    .limit(1);
+
+  if (tenantDireto) {
+    tenant = tenantDireto;
+  } else {
+    const [filialWpp] = await db.select().from(filiais)
+      .where(eq(filiais.whatsappNumberId, phoneNumberId))
+      .limit(1);
+    if (filialWpp) {
+      filialEntrada = filialWpp;
+    } else {
+      const [extra] = await db.select().from(filialWhatsappExtra)
+        .where(eq(filialWhatsappExtra.whatsappNumberId, phoneNumberId))
+        .limit(1);
+      if (extra) {
+        const [filialDoExtra] = await db.select().from(filiais)
+          .where(eq(filiais.id, extra.filialId))
+          .limit(1);
+        if (filialDoExtra) {
+          filialEntrada = { ...filialDoExtra, whatsappNumberId: extra.whatsappNumberId, whatsappToken: extra.whatsappToken };
+        }
+      }
+    }
+    if (filialEntrada) {
+      const [tenantDaFilial] = await db.select().from(tenants)
+        .where(and(eq(tenants.id, filialEntrada.tenantId), eq(tenants.ativo, true)))
+        .limit(1);
+      if (tenantDaFilial) tenant = tenantDaFilial;
+      else filialEntrada = null;
+    }
+  }
+
+  return { tenant, filialEntrada };
+}
+
 router.get('/', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -101,9 +145,34 @@ router.post('/', async (req, res) => {
 
     for (const entry of body.entry || []) {
       for (const change of entry.changes || []) {
-        if (change.field !== 'messages') continue;
         const value = change.value;
-        const phoneNumberId = value.metadata?.phone_number_id;
+        const phoneNumberId = value?.metadata?.phone_number_id;
+
+        // Modo coexistência: o número atende no app do celular e na Cloud API ao
+        // mesmo tempo, e a Meta espelha por aqui o que o atendente manda pelo
+        // aparelho. Sem este ramo, a resposta dada no celular não chegava ao
+        // painel e o bot respondia por cima dela.
+        if (change.field === 'smb_message_echoes') {
+          const ecos = value?.message_echoes;
+          if (!ecos?.length) continue;
+          const { tenant, filialEntrada } = await resolverTenant(phoneNumberId);
+          if (!tenant) continue;
+          for (const eco of ecos) {
+            try {
+              await processarEcho(tenant, filialEntrada, eco);
+            } catch (err) {
+              console.error('[Webhook] Erro ao processar mensagem enviada pelo celular:', err.message);
+            }
+          }
+          continue;
+        }
+
+        // A coexistência também manda `history` (as conversas que já existiam no
+        // aparelho) e `smb_app_state_sync` (a agenda de contatos). Nenhum dos
+        // dois entra no painel hoje — ignorar é decisão, não esquecimento.
+        if (change.field === 'history' || change.field === 'smb_app_state_sync') continue;
+
+        if (change.field !== 'messages') continue;
 
         // Processa atualizações de status (entregue / lida / falhou)
         for (const s of value.statuses || []) {
@@ -133,44 +202,7 @@ router.post('/', async (req, res) => {
         const msgs = value.messages;
         if (!msgs?.length) continue;
 
-        // Resolve tenant — primeiro pelo número principal, depois por número de
-        // filial (principal ou adicional — uma filial pode ter mais de um número)
-        let tenant = null;
-        let filialEntrada = null;
-
-        const [tenantDireto] = await db.select().from(tenants)
-          .where(and(eq(tenants.whatsappNumberId, phoneNumberId), eq(tenants.ativo, true)))
-          .limit(1);
-
-        if (tenantDireto) {
-          tenant = tenantDireto;
-        } else {
-          const [filialWpp] = await db.select().from(filiais)
-            .where(eq(filiais.whatsappNumberId, phoneNumberId))
-            .limit(1);
-          if (filialWpp) {
-            filialEntrada = filialWpp;
-          } else {
-            const [extra] = await db.select().from(filialWhatsappExtra)
-              .where(eq(filialWhatsappExtra.whatsappNumberId, phoneNumberId))
-              .limit(1);
-            if (extra) {
-              const [filialDoExtra] = await db.select().from(filiais)
-                .where(eq(filiais.id, extra.filialId))
-                .limit(1);
-              if (filialDoExtra) {
-                filialEntrada = { ...filialDoExtra, whatsappNumberId: extra.whatsappNumberId, whatsappToken: extra.whatsappToken };
-              }
-            }
-          }
-          if (filialEntrada) {
-            const [tenantDaFilial] = await db.select().from(tenants)
-              .where(and(eq(tenants.id, filialEntrada.tenantId), eq(tenants.ativo, true)))
-              .limit(1);
-            if (tenantDaFilial) tenant = tenantDaFilial;
-            else filialEntrada = null;
-          }
-        }
+        const { tenant, filialEntrada } = await resolverTenant(phoneNumberId);
         if (!tenant) continue;
 
         // Config efetiva de envio — usa token/número da filial se ela tiver o próprio
@@ -295,6 +327,94 @@ async function atualizarUltMsg(conversaId, conteudo, origem, nome = null) {
     ultimaMsgOrigem: origem,
     ultimaMsgNome: nome,
   }).where(eq(conversas.id, conversaId));
+}
+
+// Como a mensagem enviada pelo celular aparece no painel. Não dá para saber
+// quem digitou — o aparelho é da equipe, não de um usuário do sistema —, então
+// o painel diz de onde veio em vez de inventar um responsável.
+const ORIGEM_CELULAR = 'Celular';
+
+function textoDoEco(eco) {
+  switch (eco.type) {
+    case 'text':     return eco.text?.body || null;
+    case 'image':    return `[Imagem]${eco.image?.caption ? ` — "${eco.image.caption}"` : ''}`;
+    case 'video':    return `[Vídeo]${eco.video?.caption ? ` — "${eco.video.caption}"` : ''}`;
+    case 'audio':    return '[Áudio]';
+    case 'document': return `[Documento] ${eco.document?.filename || 'documento'}`;
+    default:         return null; // sticker, reação, localização: fora do painel
+  }
+}
+
+function midiaDoEco(eco) {
+  return eco.image?.id || eco.video?.id || eco.audio?.id || eco.document?.id || null;
+}
+
+// Grava no painel uma mensagem que o atendente mandou pelo app do celular.
+async function processarEcho(tenant, filialEntrada, eco) {
+  const destinatario = eco.to;
+  const texto = textoDoEco(eco);
+  if (!destinatario || !texto) return;
+
+  // O mesmo webhook pode devolver o que o próprio painel acabou de enviar pela
+  // Cloud API. Guardamos o wamid do que sai daqui, então wamid repetido quer
+  // dizer que a mensagem já está na conversa — sem isso o balão sairia dobrado.
+  const [jaGravada] = await db.select({ id: mensagens.id }).from(mensagens)
+    .where(eq(mensagens.wamid, eco.id))
+    .limit(1);
+  if (jaGravada) return;
+
+  const numeroRecebido = filialEntrada?.whatsappNumberId || tenant.whatsappNumberId || null;
+
+  let [cliente] = await db.select().from(clientes)
+    .where(and(eq(clientes.tenantId, tenant.id), eq(clientes.whatsapp, destinatario)))
+    .limit(1);
+
+  if (!cliente) {
+    [cliente] = await db.insert(clientes).values({
+      tenantId: tenant.id,
+      whatsapp: destinatario,
+      nome: destinatario,
+    }).returning();
+  }
+
+  let [conversa] = await db.select().from(conversas)
+    .where(and(
+      eq(conversas.tenantId, tenant.id),
+      eq(conversas.clienteId, cliente.id),
+      ne(conversas.status, 'encerrada')
+    ))
+    .limit(1);
+
+  if (!conversa) {
+    [conversa] = await db.insert(conversas).values({
+      tenantId: tenant.id,
+      clienteId: cliente.id,
+      status: 'humano',
+      filialId: filialEntrada?.id || null,
+      numeroRecebidoId: numeroRecebido,
+    }).returning();
+  }
+
+  await db.insert(mensagens).values({
+    conversaId: conversa.id,
+    origem: 'agente',
+    conteudo: texto,
+    wamid: eco.id,
+    status: 'enviada',
+    agenteNome: ORIGEM_CELULAR,
+    midiaUrl: midiaDoEco(eco),
+  });
+  await atualizarUltMsg(conversa.id, texto, 'agente', ORIGEM_CELULAR);
+
+  // Quem respondeu pelo celular assumiu a conversa, igual a quem responde pelo
+  // painel — e o bot só se cala em 'humano'/'aguardando'. Sem agenteId de
+  // propósito: nenhum usuário do painel é dono dela, e fingir que é faria a
+  // conversa sumir da fila de quem deveria acompanhá-la.
+  if (conversa.status !== 'humano') {
+    await db.update(conversas).set({ status: 'humano' }).where(eq(conversas.id, conversa.id));
+  }
+
+  registrarAtividade();
 }
 
 async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false, midiaUrl = null, nomeWa = null, filialEntrada = null, midiaData = null) {
