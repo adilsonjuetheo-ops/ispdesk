@@ -1214,7 +1214,7 @@ export default function Settings() {
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">
                     {tenant.sgpTipo === 'atlaz'    && 'Token Atlaz'}
-                    {tenant.sgpTipo === 'ixc'      && 'Credencial IXC — usuário:token (ex: admin:abc123)'}
+                    {tenant.sgpTipo === 'ixc'      && 'Credencial IXC — ID do token : token (ex: 12:a1b2c3...)'}
                     {tenant.sgpTipo === 'mkauth'   && 'Auth token MK-Auth'}
                     {tenant.sgpTipo === 'tsmx'     && 'Credencial SGP — app:token (o "app" é o valor em Aplicações ao editar o token, ex: Bia)'}
                     {tenant.sgpTipo === 'generico' && 'Token de autenticação'}
@@ -1223,7 +1223,7 @@ export default function Settings() {
                     type="password"
                     value={tenant.sgpApiKey || ''}
                     onChange={e => set('sgpApiKey', e.target.value)}
-                    placeholder="Token de acesso à API"
+                    placeholder={tenant.sgpTipo === 'ixc' ? '12:a1b2c3d4...' : 'Token de acesso à API'}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
