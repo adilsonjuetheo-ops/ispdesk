@@ -4,7 +4,7 @@ import { conversas, clientes, tenants, filiais, filialWhatsappExtra, mensagens, 
 import { eq, and, ne, or, isNull, isNotNull, desc } from 'drizzle-orm';
 import { planoTemContrato } from '../config/planos.js';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
-import { enviarContrato, buscarLinkAssinatura, baixarContratoAssinado } from '../services/assinatura.js';
+import { enviarContrato, buscarLinkAssinatura, baixarContratoAssinado, consultarStatusAssinatura } from '../services/assinatura.js';
 import { enviarMensagem, uploadMidia, enviarMidia } from '../services/whatsapp.js';
 import { enviarPushParaUsuario, enviarPushParaTenant } from '../services/pushNotification.js';
 import { buscarDadosCliente } from '../services/sgp.js';
@@ -81,6 +81,55 @@ async function enviarPdfAssinado(tenant, conversa, cliente) {
   } catch (err) {
     console.error('[Contrato] Falha ao enviar PDF assinado:', err.message);
   }
+}
+
+// Tudo que acontece quando a assinatura se confirma: marca a conversa,
+// registra no histórico, avisa o painel, agradece o cliente e manda o PDF.
+// Fica separado porque agora há duas formas de descobrir isso — o webhook da
+// plataforma e a verificação manual — e as duas precisam terminar igual.
+//
+// Devolve false quando outra via chegou primeiro: o UPDATE condicional é o que
+// impede o cliente de receber a mensagem e o PDF duas vezes.
+async function concluirAssinatura(conversa) {
+  const [atualizada] = await db.update(conversas)
+    .set({ contratoStatus: 'assinado' })
+    .where(and(
+      eq(conversas.id, conversa.id),
+      or(isNull(conversas.contratoStatus), ne(conversas.contratoStatus, 'assinado')),
+    ))
+    .returning({ id: conversas.id });
+  if (!atualizada) return false;
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+
+  await db.insert(mensagens).values({
+    conversaId: conversa.id,
+    origem: 'bot',
+    conteudo: '[Sistema] Contrato assinado digitalmente com sucesso!',
+  });
+
+  const nomeCliente = cliente?.nome || cliente?.whatsapp || 'Cliente';
+  const pushPayload = {
+    title: '✅ Contrato assinado!',
+    body: `${nomeCliente} assinou o contrato digital.`,
+    tag: `contrato-${conversa.id}`,
+  };
+  if (conversa.agenteId) {
+    enviarPushParaUsuario(conversa.agenteId, conversa.tenantId, pushPayload).catch(() => {});
+  } else {
+    enviarPushParaTenant(conversa.tenantId, pushPayload).catch(() => {});
+  }
+
+  if (tenant?.whatsappToken && cliente?.whatsapp) {
+    await enviarMensagem(
+      tenant, cliente.whatsapp,
+      'Seu contrato foi assinado com sucesso! Bem-vindo(a) à nossa rede. Em breve entraremos em contato para agendar a instalação.'
+    ).catch(() => {});
+    await enviarPdfAssinado(tenant, conversa, cliente);
+  }
+
+  return true;
 }
 
 // Lista os contratos (pendentes e assinados) do provedor, para a tela
@@ -218,43 +267,7 @@ router.post('/webhook/zapsign', limitarWebhookContrato, async (req, res) => {
     if (conversa.contratoStatus === 'assinado') return;
 
     if (status === 'signed' || payload?.event_action === 'all_signed') {
-      const [atualizada] = await db.update(conversas)
-        .set({ contratoStatus: 'assinado' })
-        .where(and(
-          eq(conversas.id, conversa.id),
-          or(isNull(conversas.contratoStatus), ne(conversas.contratoStatus, 'assinado')),
-        ))
-        .returning({ id: conversas.id });
-      if (!atualizada) return;
-
-      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
-      const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
-
-      await db.insert(mensagens).values({
-        conversaId: conversa.id,
-        origem: 'bot',
-        conteudo: '[Sistema] Contrato assinado digitalmente com sucesso!',
-      });
-
-      const nomeCliente = cliente?.nome || cliente?.whatsapp || 'Cliente';
-      const pushPayload = {
-        title: '✅ Contrato assinado!',
-        body: `${nomeCliente} assinou o contrato digital.`,
-        tag: `contrato-${conversa.id}`,
-      };
-      if (conversa.agenteId) {
-        enviarPushParaUsuario(conversa.agenteId, conversa.tenantId, pushPayload).catch(() => {});
-      } else {
-        enviarPushParaTenant(conversa.tenantId, pushPayload).catch(() => {});
-      }
-
-      if (tenant?.whatsappToken && cliente?.whatsapp) {
-        await enviarMensagem(
-          tenant, cliente.whatsapp,
-          'Seu contrato foi assinado com sucesso! Bem-vindo(a) à nossa rede. Em breve entraremos em contato para agendar a instalação.'
-        ).catch(() => {});
-        await enviarPdfAssinado(tenant, conversa, cliente);
-      }
+      await concluirAssinatura(conversa);
     }
   } catch (err) {
     console.error('[Webhook ZapSign]', err.message);
@@ -278,48 +291,35 @@ router.post('/webhook/d4sign', limitarWebhookContrato, async (req, res) => {
     if (conversa.contratoStatus === 'assinado') return;
 
     if (type === '1' || payload?.type === '1') {
-      const [atualizada] = await db.update(conversas)
-        .set({ contratoStatus: 'assinado' })
-        .where(and(
-          eq(conversas.id, conversa.id),
-          or(isNull(conversas.contratoStatus), ne(conversas.contratoStatus, 'assinado')),
-        ))
-        .returning({ id: conversas.id });
-      if (!atualizada) return;
-
-      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
-      const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
-
-      await db.insert(mensagens).values({
-        conversaId: conversa.id,
-        origem: 'bot',
-        conteudo: '[Sistema] Contrato assinado digitalmente com sucesso!',
-      });
-
-      // Push para o agente responsável (ou broadcast para o tenant)
-      const nomeCliente = cliente?.nome || cliente?.whatsapp || 'Cliente';
-      const pushPayload = {
-        title: '✅ Contrato assinado!',
-        body: `${nomeCliente} assinou o contrato digital.`,
-        tag: `contrato-${conversa.id}`,
-      };
-      if (conversa.agenteId) {
-        enviarPushParaUsuario(conversa.agenteId, conversa.tenantId, pushPayload).catch(() => {});
-      } else {
-        enviarPushParaTenant(conversa.tenantId, pushPayload).catch(() => {});
-      }
-
-      if (tenant?.whatsappToken && cliente?.whatsapp) {
-        await enviarMensagem(
-          tenant, cliente.whatsapp,
-          'Seu contrato foi assinado com sucesso! Bem-vindo(a) à nossa rede. Em breve entraremos em contato para agendar a instalação.'
-        ).catch(() => {});
-        await enviarPdfAssinado(tenant, conversa, cliente);
-      }
+      await concluirAssinatura(conversa);
     }
   } catch (err) {
     console.error('[Webhook D4Sign]', err.message);
   }
+});
+
+// Verificação sob demanda: pergunta à plataforma se o documento já foi
+// assinado. É a saída para quando o webhook não chega — até aqui ele era a
+// única via, e bastava ele falhar uma vez para a conversa ficar em
+// "aguardando assinatura" para sempre, mesmo com o contrato assinado.
+router.post('/:conversaId/verificar-assinatura', autenticar, apenasAdmin, async (req, res) => {
+  const [conversa] = await db.select().from(conversas)
+    .where(eq(conversas.id, req.params.conversaId)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (!podeAcessarContrato(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
+  if (!conversa.contratoUuid) return res.status(400).json({ erro: 'Não há contrato enviado nesta conversa.' });
+  if (conversa.contratoStatus === 'assinado') return res.json({ status: 'assinado' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  const status = await consultarStatusAssinatura(tenant, conversa.contratoUuid);
+
+  if (!status) {
+    return res.status(502).json({ erro: 'Não foi possível consultar a plataforma de assinatura agora. Tente de novo em instantes.' });
+  }
+  if (status !== 'assinado') return res.json({ status });
+
+  await concluirAssinatura(conversa);
+  res.json({ status: 'assinado' });
 });
 
 // Reenviar link do contrato pendente via WhatsApp

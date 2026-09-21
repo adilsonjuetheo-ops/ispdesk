@@ -241,6 +241,8 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
   const [transferindo, setTransferindo] = useState(false);
   const [reenviando, setReenviando] = useState(false);
   const [erroReenvio, setErroReenvio] = useState('');
+  const [verificando, setVerificando] = useState(false);
+  const [avisoVerificacao, setAvisoVerificacao] = useState('');
   const temAssinatura = planoTemContrato(user?.plano);
 
   // Lembretes em aberto deste cliente. Recarrega quando algum é concluído em
@@ -321,6 +323,22 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
     }
   }, [conversa?.id, reenviando]);
 
+  const verificarAssinatura = useCallback(async () => {
+    if (verificando) return;
+    setVerificando(true);
+    setErroReenvio('');
+    setAvisoVerificacao('');
+    try {
+      const { data } = await api.post(`/contracts/${conversa.id}/verificar-assinatura`);
+      if (data.status === 'assinado') onAtualizar?.();
+      else setAvisoVerificacao('A plataforma ainda não registrou a assinatura deste contrato.');
+    } catch (err) {
+      setErroReenvio(err.response?.data?.erro || 'Erro ao verificar a assinatura.');
+    } finally {
+      setVerificando(false);
+    }
+  }, [conversa?.id, verificando, onAtualizar]);
+
   if (!conversa) return null;
 
   const tags = Array.isArray(conversa.tags) ? conversa.tags : [];
@@ -400,6 +418,15 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
                   <RefreshCw className={`w-3 h-3 ${reenviando ? 'animate-spin' : ''}`} />
                   {reenviando ? 'Reenviando...' : 'Reenviar link ao cliente'}
                 </button>
+                <button
+                  onClick={verificarAssinatura}
+                  disabled={verificando}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs text-amber-700 hover:text-amber-900 py-1.5 rounded-lg hover:bg-amber-50 dark:text-amber-300 dark:hover:text-amber-100 dark:hover:bg-amber-950 transition-colors disabled:text-gray-500 dark:disabled:text-gray-500 disabled:hover:bg-transparent"
+                >
+                  <CheckCircle2 className={`w-3 h-3 ${verificando ? 'animate-pulse' : ''}`} />
+                  {verificando ? 'Verificando...' : 'Já assinou? Verificar agora'}
+                </button>
+                {avisoVerificacao && <p className="text-[10px] text-amber-700 dark:text-amber-300 text-center">{avisoVerificacao}</p>}
                 {erroReenvio && <p className="text-[10px] text-red-600 text-center">{erroReenvio}</p>}
               </div>
             )}

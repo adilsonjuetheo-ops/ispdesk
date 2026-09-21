@@ -624,6 +624,66 @@ export async function buscarLinkAssinatura(tenant, uuid) {
   return null;
 }
 
+// Pergunta à plataforma se o documento já foi assinado. Existe porque o aviso
+// de assinatura chega por webhook, e webhook falha: não registrado (provedor
+// sem API_PUBLIC_URL), deploy no momento errado, corpo que o servidor não
+// soube ler. Sem esta consulta, a conversa fica presa em "aguardando" para
+// sempre — foi o que aconteceu com um contrato assinado da StaNet.
+//
+// Devolve 'assinado', 'pendente', ou null quando não deu para saber (a
+// diferença importa: null não pode virar "ainda não assinou" na tela).
+export async function consultarStatusAssinatura(tenant, uuid) {
+  if (tenant.assinaturaTipo === 'd4sign') {
+    const extra = tenant.assinaturaExtra || {};
+    const qs = `tokenAPI=${tenant.assinaturaToken}${extra.cryptKey ? `&cryptKey=${extra.cryptKey}` : ''}`;
+    try {
+      const res = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${uuid}?${qs}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const doc = Array.isArray(data) ? data[0] : data;
+
+      // O D4Sign identifica o documento finalizado pelo nome do status, e o
+      // número por trás dele já mudou de significado entre versões — por isso
+      // olhamos o texto, e conferimos os signatários como segunda evidência.
+      const statusNome = String(doc?.statusName || doc?.status_name || '').toLowerCase();
+      if (/finaliz|assinad|conclu/.test(statusNome)) return 'assinado';
+
+      const listRes = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${uuid}/list?${qs}`);
+      if (listRes.ok) {
+        const signatarios = Object.values(await listRes.json()).flatMap(v => Array.isArray(v) ? v : [v]);
+        const relevantes = signatarios.filter(s => s && (s.email || s.key_signer));
+        if (relevantes.length && relevantes.every(s => String(s.signed) === '1' || s.signed_date)) {
+          return 'assinado';
+        }
+      }
+
+      if (statusNome) return 'pendente';
+      console.warn(`[assinatura] D4Sign não informou status do documento ${uuid}:`, JSON.stringify(data).slice(0, 500));
+      return null;
+    } catch (err) {
+      console.error('[assinatura] Falha ao consultar status (D4Sign):', err.message);
+      return null;
+    }
+  }
+
+  if (tenant.assinaturaTipo === 'zapsign') {
+    try {
+      const res = await fetch(`https://api.zapsign.com.br/api/v1/docs/${uuid}/`, {
+        headers: { Authorization: `Bearer ${tenant.assinaturaToken}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data?.status) return null;
+      return data.status === 'signed' ? 'assinado' : 'pendente';
+    } catch (err) {
+      console.error('[assinatura] Falha ao consultar status (ZapSign):', err.message);
+      return null;
+    }
+  }
+
+  return null;
+}
+
 // Baixa o PDF final já assinado, para anexar na conversa do WhatsApp — sem
 // isso o cliente só teria acesso ao contrato entrando no painel do D4Sign/
 // ZapSign, e o provedor só veria a assinatura como um status, sem o arquivo.

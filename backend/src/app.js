@@ -61,6 +61,11 @@ app.use(express.json({
   },
 }));
 
+// O D4Sign avisa a assinatura como formulário, não como JSON. Sem este parser
+// o corpo chegava vazio, o handler não achava o uuid e saía calado — o
+// documento era assinado e o painel seguia em "aguardando assinatura".
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+
 app.use('/api/auth', criarRateLimit({
   janelaMs: 15 * 60_000,
   limite: 100,
