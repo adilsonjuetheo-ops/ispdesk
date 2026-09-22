@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { usePolling } from '../../hooks/usePolling.js';
 import { usePushNotifications } from '../../hooks/usePushNotifications.js';
 import { useTheme } from '../../hooks/useTheme.js';
+import { usePresencaStatus, STATUS } from '../../hooks/usePresencaStatus.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
   Activity, Clock, UserCheck, Archive, MapPin, Zap, AlertTriangle, Star, X, BookUser,
@@ -54,6 +55,7 @@ export default function TenantLayout() {
   const [online, setOnline] = useState([]);
   const [usoIa, setUsoIa] = useState(null);
   const [chatMobileAberto, setChatMobileAberto] = useState(false);
+  const { status: statusPresenca, escolhido: statusEscolhido, setEscolhido: setStatusEscolhido, ocioso } = usePresencaStatus();
 
   // Recarrega tenant periodicamente para detectar suspensão
   usePolling(() => {
@@ -100,8 +102,15 @@ export default function TenantLayout() {
   // requisição, um painel esquecido aberto mantinha o Neon acordado a noite
   // inteira — seis consultas por minuto sem ninguém usando o sistema.
   usePolling(() => {
-    api.post('/presence/ping').catch(() => {});
+    api.post('/presence/ping', { status: statusPresenca }).catch(() => {});
   }, 30000, !!user?.id);
+
+  // Mudou de status: avisa na hora, sem esperar o ciclo de 30s — quem trocou
+  // para "ocupado" espera que os colegas vejam agora, não daqui a meio minuto.
+  useEffect(() => {
+    if (!user?.id) return;
+    api.post('/presence/ping', { status: statusPresenca }).catch(() => {});
+  }, [statusPresenca, user?.id]);
 
   usePolling(() => {
     api.get('/presence').then(r => setOnline(r.data)).catch(() => {});
@@ -381,6 +390,23 @@ export default function TenantLayout() {
             <div className="px-3 py-2">
               <p className="text-xs font-medium text-gray-800 dark:text-gray-100 truncate">{user?.nome}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">{user?.role}</p>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS[statusPresenca].cor}`} />
+                <select
+                  value={statusEscolhido}
+                  onChange={e => setStatusEscolhido(e.target.value)}
+                  className="flex-1 min-w-0 bg-transparent text-xs text-gray-600 dark:text-gray-300 border-none p-0 focus:outline-none cursor-pointer"
+                >
+                  {Object.values(STATUS).map(s => (
+                    <option key={s.valor} value={s.valor}>{s.rotulo}</option>
+                  ))}
+                </select>
+              </div>
+              {ocioso && statusEscolhido === 'disponivel' && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
+                  Sem atividade — aparecendo como ausente
+                </p>
+              )}
             </div>
           )}
           <button onClick={handleLogout}

@@ -4,6 +4,7 @@ import { differenceInMinutes } from 'date-fns';
 import clsx from 'clsx';
 import { Search, Check, User, Menu, MapPin, Phone, PenSquare, Clock } from 'lucide-react';
 import NovaConversaModal from './NovaConversaModal.jsx';
+import { STATUS } from '../hooks/usePresencaStatus.js';
 import { useAuth } from '../hooks/useAuth.js';
 
 const AVATAR_COLORS = [
@@ -394,9 +395,11 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                 >
                   {u.nome[0].toUpperCase()}
                 </div>
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+                <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                  (STATUS[u.status] || STATUS.disponivel).cor
+                }`} />
                 <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded-lg px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-lg">
-                  {u.nome}{u.id === (currentUser?.id || user?.id) ? ' (você)' : ''}
+                  {u.nome}{u.id === (currentUser?.id || user?.id) ? ' (você)' : ''} · {(STATUS[u.status] || STATUS.disponivel).rotulo}
                 </div>
               </div>
             ))}
