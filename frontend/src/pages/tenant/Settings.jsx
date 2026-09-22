@@ -24,6 +24,35 @@ function carregarFbSdk() {
   });
 }
 
+// O que de fato acontece dentro do popup da Meta chega por postMessage, não pelo
+// callback do FB.login — esse só sabe dizer que não voltou código. Sem ler isto,
+// todo erro do fluxo (número preso em outro parceiro, recurso indisponível para
+// o app, etapa que a Meta barrou) virava a mesma frase genérica de "cancelado",
+// que não diz o que fazer a seguir.
+function ouvirSignup(aoReceber) {
+  const ouvinte = (evento) => {
+    let host;
+    try { host = new URL(evento.origin).hostname; } catch { return; }
+    if (!/(^|\.)facebook\.com$/.test(host)) return;
+    let msg;
+    try { msg = JSON.parse(evento.data); } catch { return; }
+    if (msg?.type === 'WA_EMBEDDED_SIGNUP') aoReceber(msg);
+  };
+  window.addEventListener('message', ouvinte);
+  return () => window.removeEventListener('message', ouvinte);
+}
+
+// Devolve null quando a Meta não contou nada — aí o chamador mantém a mensagem
+// antiga, em vez de inventar um motivo que não veio de lugar nenhum.
+function motivoDaFalha(evento) {
+  const dados = evento?.data || {};
+  if (dados.error_message) return `A Meta recusou: ${dados.error_message}`;
+  if (evento?.event === 'CANCEL' && dados.current_step) {
+    return `Cadastro interrompido na etapa "${dados.current_step}". Se não foi você que fechou a janela, foi a Meta que barrou aí.`;
+  }
+  return null;
+}
+
 function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
   const [status, setStatus] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -63,12 +92,18 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
         sessionInfo = data;
       });
 
+      let ultimoEvento = null;
+      const pararDeOuvir = ouvirSignup((msg) => { ultimoEvento = msg; });
+
       window.FB.login((response) => {
+        pararDeOuvir();
         if (response.authResponse?.code) {
           enviarCodigo(response.authResponse.code, sessionInfo);
         } else {
           setConectando(false);
-          if (response.status !== 'connected') {
+          const motivo = motivoDaFalha(ultimoEvento);
+          if (motivo) setErro(motivo);
+          else if (response.status !== 'connected') {
             setErro('Fluxo cancelado ou permissões negadas.');
           }
         }
