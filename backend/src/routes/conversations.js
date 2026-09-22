@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { conversas, mensagens, clientes, tenantUsers, filiais, filialWhatsappExtra, tenants } from '../db/schema.js';
-import { eq, and, desc, ne, count, inArray, isNotNull, sql as sqlRaw } from 'drizzle-orm';
+import { eq, and, desc, ne, count, isNotNull, sql as sqlRaw } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia, enviarTemplate } from '../services/whatsapp.js';
@@ -450,25 +450,31 @@ router.get('/counts', async (req, res) => {
   if (!tenantId) return res.json({ todos: 0, mine: 0, fila: 0, porFilial: {} });
   const escopo = [eq(conversas.tenantId, tenantId), ne(conversas.status, 'encerrada')];
 
-  const [r1] = await db.select({ total: count() }).from(conversas)
-    .where(and(...escopo));
-
-  const [r2] = await db.select({ total: count() }).from(conversas)
-    .where(and(...escopo, eq(conversas.agenteId, req.user.id), eq(conversas.status, 'humano')));
-
-  const [r3] = await db.select({ total: count() }).from(conversas)
-    .where(and(...escopo, inArray(conversas.status, ['aguardando', 'aguardando_filial'])));
-
-  const filialRows = await db.select({ filialId: conversas.filialId, total: count() }).from(conversas)
+  // Eram quatro consultas para responder um contador que cada atendente pede
+  // de 15 em 15 segundos. Uma só, agregando por filial e somando os totais
+  // aqui, entrega o mesmo resultado — o banco varre a tabela uma vez em vez
+  // de quatro.
+  const linhas = await db.select({
+    filialId: conversas.filialId,
+    total: count(),
+    mine: sqlRaw`count(*) filter (where ${conversas.agenteId} = ${req.user.id} and ${conversas.status} = 'humano')`,
+    fila: sqlRaw`count(*) filter (where ${conversas.status} in ('aguardando', 'aguardando_filial'))`,
+  })
+    .from(conversas)
     .where(and(...escopo))
     .groupBy(conversas.filialId);
 
   const porFilial = {};
-  for (const r of filialRows) {
-    if (r.filialId) porFilial[r.filialId] = Number(r.total);
+  let todos = 0, mine = 0, fila = 0;
+  for (const r of linhas) {
+    const total = Number(r.total);
+    todos += total;
+    mine += Number(r.mine);
+    fila += Number(r.fila);
+    if (r.filialId) porFilial[r.filialId] = total;
   }
 
-  res.json({ todos: Number(r1.total), mine: Number(r2.total), fila: Number(r3.total), porFilial });
+  res.json({ todos, mine, fila, porFilial });
 });
 
 router.get('/', async (req, res) => {

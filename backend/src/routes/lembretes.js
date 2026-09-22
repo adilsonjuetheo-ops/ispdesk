@@ -3,6 +3,7 @@ import { db } from '../db/index.js';
 import { lembretes, tenantUsers, clientes, conversas } from '../db/schema.js';
 import { eq, and, isNull, isNotNull, or, desc, asc, sql } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
+import { registrarLembrete } from '../jobs/lembretesVencendo.js';
 
 const router = Router();
 router.use(autenticar);
@@ -110,6 +111,10 @@ router.post('/', async (req, res) => {
     venceEm: venceEm ? new Date(venceEm) : null,
     criadoPor: req.user.id,
   }).returning();
+
+  // Adianta o horizonte da varredura: sem isso um lembrete criado para daqui a
+  // 10 minutos só seria percebido na varredura de segurança, horas depois.
+  registrarLembrete(criado.venceEm);
 
   res.status(201).json(criado);
 });

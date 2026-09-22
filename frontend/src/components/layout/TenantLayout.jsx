@@ -95,21 +95,17 @@ export default function TenantLayout() {
     return () => window.removeEventListener('ispdesk:lembretes-updated', buscarLembretes);
   }, []);
 
-  useEffect(() => {
-    if (!user?.id) return;
+  // Estes dois estavam fora do usePolling, então continuavam batendo no servidor
+  // com a aba escondida. Como o autenticar revalida o usuário no banco a cada
+  // requisição, um painel esquecido aberto mantinha o Neon acordado a noite
+  // inteira — seis consultas por minuto sem ninguém usando o sistema.
+  usePolling(() => {
+    api.post('/presence/ping').catch(() => {});
+  }, 30000, !!user?.id);
 
-    const ping = () => api.post('/presence/ping').catch(() => {});
-    const fetchOnline = () =>
-      api.get('/presence').then(r => setOnline(r.data)).catch(() => {});
-
-    ping();
-    fetchOnline();
-
-    const pingId = setInterval(ping, 30000);
-    const pollId = setInterval(fetchOnline, 15000);
-
-    return () => { clearInterval(pingId); clearInterval(pollId); };
-  }, [user?.id]);
+  usePolling(() => {
+    api.get('/presence').then(r => setOnline(r.data)).catch(() => {});
+  }, 15000, !!user?.id);
 
   // Fecha sidebar ao navegar no mobile
   useEffect(() => { setSidebarOpen(false); }, [location.pathname, location.search]);
