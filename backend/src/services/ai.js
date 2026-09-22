@@ -51,6 +51,22 @@ ${textos}
 `;
 }
 
+// Quanto cada chamada realmente consome. Existe para decidir, com dado e não
+// com estimativa, se vale ligar cache de prompt: o que decide é o tamanho do
+// prefixo (o Haiku só cacheia a partir de 4096 tokens) e a frequência com que
+// chamadas parecidas se repetem. Os campos de cache vêm zerados enquanto não
+// pedimos cache — quando pedirmos, são a única prova de que está funcionando.
+function registrarUso(etapa, modelo, usage) {
+  if (!usage) return;
+  const entrada = usage.input_tokens ?? 0;
+  const cacheEscrito = usage.cache_creation_input_tokens ?? 0;
+  const cacheLido = usage.cache_read_input_tokens ?? 0;
+  console.log(
+    `[ia:uso] ${etapa} modelo=${modelo} entrada=${entrada} saida=${usage.output_tokens ?? 0} ` +
+    `cache_escrito=${cacheEscrito} cache_lido=${cacheLido} prompt_total=${entrada + cacheEscrito + cacheLido}`
+  );
+}
+
 function extrairIdsAutorizados(contexto) {
   const idsCliente = new Set();
   const idsContrato = new Set();
@@ -237,13 +253,17 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
   // qualquer tool já executada) continua no Sonnet — sem refazer nada.
   let modelo = MODELO_RAPIDO;
   let jaEscalou = false;
-  const chamarModelo = () => anthropic.messages.create({
-    model: modelo,
-    max_tokens: 1024,
-    system: systemPrompt,
-    ...(tools.length > 0 && { tools }),
-    messages: conversaAcumulada,
-  });
+  const chamarModelo = async () => {
+    const resposta = await anthropic.messages.create({
+      model: modelo,
+      max_tokens: 1024,
+      system: systemPrompt,
+      ...(tools.length > 0 && { tools }),
+      messages: conversaAcumulada,
+    });
+    registrarUso('atendimento', modelo, resposta.usage);
+    return resposta;
+  };
 
   let response = await chamarModelo();
 
@@ -436,6 +456,7 @@ PROVEDOR: ${tenant.nome}`;
     system: systemPrompt,
     messages: conversaAcumulada,
   });
+  registrarUso('sugestao', 'claude-sonnet-4-6', resposta.usage);
 
   const texto = resposta.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
 
