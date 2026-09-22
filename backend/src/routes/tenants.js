@@ -219,8 +219,15 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { slug, nome, logoUrl, corPrimaria, whatsappNumberId, whatsappToken,
-          systemPrompt, nomeAssistente, sgpApiUrl, sgpApiKey, plano } = req.body;
+  // A lista aqui precisa acompanhar a do PUT. Enquanto sgpTipo faltava, provedor
+  // criado já com o SGP preenchido nascia sem tipo — e sem tipo o ai.js trata o
+  // provedor como se não tivesse SGP: some o contexto do cliente, somem as
+  // ferramentas e some a ordem de pedir CPF. O bot passa a improvisar.
+  const { slug, nome, nomeFantasia, logoUrl, corPrimaria,
+          cnpj, telefone, whatsappContato, email, website,
+          endereco, cidade, uf, cep,
+          whatsappNumberId, whatsappToken,
+          systemPrompt, nomeAssistente, sgpTipo, sgpApiUrl, sgpApiKey, plano } = req.body;
 
   if (!slug || !nome || !systemPrompt) {
     return res.status(400).json({ erro: 'slug, nome e systemPrompt são obrigatórios' });
@@ -230,10 +237,12 @@ router.post('/', async (req, res) => {
 
   try {
     const [tenant] = await db.insert(tenants).values({
-      slug, nome, logoUrl, corPrimaria,
+      slug, nome, nomeFantasia, logoUrl, corPrimaria,
+      cnpj, telefone, whatsappContato, email, website,
+      endereco, cidade, uf, cep,
       whatsappNumberId: whatsappNumberId || null,
       whatsappToken: whatsappToken || null,
-      webhookVerifyToken, systemPrompt, nomeAssistente, sgpApiUrl, sgpApiKey, plano,
+      webhookVerifyToken, systemPrompt, nomeAssistente, sgpTipo, sgpApiUrl, sgpApiKey, plano,
     }).returning();
 
     res.status(201).json(tenant);

@@ -178,7 +178,9 @@ ${tenant.exigirDocumento
   : '- Se o cliente NÃO for encontrado pelo número de WhatsApp: peça APENAS o CPF ou CNPJ para localizá-lo no sistema.'}
 - Ao receber o CPF ou CNPJ: use a ferramenta buscar_por_documento imediatamente.
 - Se o cliente NÃO for encontrado mesmo com CPF/CNPJ (cliente novo): informe que vai transferir para um atendente realizar o cadastro e escreva ACTION:HANDOFF:cliente novo — encaminhar para cadastro
-- NUNCA envie formulários de cadastro — isso é responsabilidade exclusiva do atendente humano.` : ''}
+- NUNCA envie formulários de cadastro — isso é responsabilidade exclusiva do atendente humano.` : `- O sistema de gestão deste provedor ainda NÃO está conectado. Você não consegue consultar cliente, contrato, fatura nem fazer desbloqueio, e não adianta pedir CPF ou CNPJ: não há onde consultar.
+- Nunca invente um jeito de contornar isso. Não prometa enviar nada por e-mail, não peça endereço de e-mail, não invente link, código, QR Code, prazo ou procedimento — nada disso existe aqui.
+- Assim que o pedido depender de dado do cliente, diga que vai passar para a equipe e escreva ACTION:HANDOFF:sistema de gestão não conectado — atendente precisa consultar`}
 
 IMAGENS E DOCUMENTOS:
 - Quando o cliente enviar uma imagem ou PDF, você consegue visualizar o conteúdo diretamente.
