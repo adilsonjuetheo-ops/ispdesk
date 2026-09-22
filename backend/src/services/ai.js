@@ -11,7 +11,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // próprio modelo sinaliza que o caso é incomum (ACTION:ESCALATE), a mesma
 // conversa — já com qualquer tool já executada — continua no Sonnet.
 const MODELO_RAPIDO = 'claude-haiku-4-5-20251001';
-const MODELO_COMPLETO = 'claude-sonnet-4-6';
+const MODELO_COMPLETO = 'claude-sonnet-5';
 
 // clienteWhatsapp: número do remetente vindo direto do payload do webhook
 const TAGS_VALIDAS = ['Financeiro','Sem Conexão','Lentidão','Mudança de Endereço','Cancelamento','Nova Contratação','Problema no Roteador','Segunda Via','Outros'];
@@ -258,6 +258,13 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
       model: modelo,
       max_tokens: 1024,
       system: systemPrompt,
+      // O Sonnet 5 raciocina por padrão (o 4.6 não), e o raciocínio sai do
+      // mesmo max_tokens da resposta: com 1024 o cliente receberia mensagem
+      // cortada, e o raciocínio ainda é cobrado como saída. Desligado, o
+      // comportamento é o de sempre — só que 33% mais barato por token.
+      // Só vai para o Sonnet: o Haiku não raciocina por padrão e usa outro
+      // formato deste campo.
+      ...(modelo === MODELO_COMPLETO && { thinking: { type: 'disabled' } }),
       ...(tools.length > 0 && { tools }),
       messages: conversaAcumulada,
     });
@@ -451,12 +458,13 @@ PROVEDOR: ${tenant.nome}`;
   }
 
   const resposta = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: MODELO_COMPLETO,
     max_tokens: 700,
     system: systemPrompt,
+    thinking: { type: 'disabled' },
     messages: conversaAcumulada,
   });
-  registrarUso('sugestao', 'claude-sonnet-4-6', resposta.usage);
+  registrarUso('sugestao', MODELO_COMPLETO, resposta.usage);
 
   const texto = resposta.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
 
