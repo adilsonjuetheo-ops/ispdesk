@@ -243,6 +243,8 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
   const [erroReenvio, setErroReenvio] = useState('');
   const [verificando, setVerificando] = useState(false);
   const [avisoVerificacao, setAvisoVerificacao] = useState('');
+  const [abrindoPdf, setAbrindoPdf] = useState(false);
+  const [erroContrato, setErroContrato] = useState('');
   const temAssinatura = planoTemContrato(user?.plano);
 
   // Lembretes em aberto deste cliente. Recarrega quando algum é concluído em
@@ -339,6 +341,27 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
     }
   }, [conversa?.id, verificando, onAtualizar]);
 
+  const abrirContrato = useCallback(async () => {
+    if (abrindoPdf) return;
+    // A aba precisa nascer no gesto do clique: aberta depois do await, o
+    // bloqueador de pop-up do navegador barra.
+    const aba = window.open('', '_blank');
+    setAbrindoPdf(true);
+    setErroContrato('');
+    try {
+      const { data } = await api.get(`/contracts/${conversa.id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      if (aba) aba.location = url;
+      else window.location.assign(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      aba?.close();
+      setErroContrato('Não foi possível abrir o contrato agora.');
+    } finally {
+      setAbrindoPdf(false);
+    }
+  }, [conversa?.id, abrindoPdf]);
+
   if (!conversa) return null;
 
   const tags = Array.isArray(conversa.tags) ? conversa.tags : [];
@@ -432,9 +455,20 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
             )}
 
             {conversa.contratoStatus === 'assinado' && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950 dark:border-emerald-900 rounded-lg">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span className="text-xs text-emerald-700 dark:text-emerald-300">Contrato assinado</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950 dark:border-emerald-900 rounded-lg">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span className="text-xs text-emerald-700 dark:text-emerald-300">Contrato assinado</span>
+                </div>
+                <button
+                  onClick={abrirContrato}
+                  disabled={abrindoPdf}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs text-emerald-700 hover:text-emerald-900 py-1.5 rounded-lg hover:bg-emerald-50 dark:text-emerald-300 dark:hover:text-emerald-100 dark:hover:bg-emerald-950 transition-colors disabled:text-gray-500 dark:disabled:text-gray-500"
+                >
+                  <FileSignature className="w-3 h-3" />
+                  {abrindoPdf ? 'Abrindo...' : 'Ver contrato assinado'}
+                </button>
+                {erroContrato && <p className="text-[10px] text-red-600 text-center">{erroContrato}</p>}
               </div>
             )}
           </div>
@@ -446,9 +480,20 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
               Atendimento encerrado
             </span>
             {conversa.contratoStatus === 'assinado' && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950 dark:border-emerald-900 rounded-lg">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span className="text-xs text-emerald-700 dark:text-emerald-300">Contrato assinado</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950 dark:border-emerald-900 rounded-lg">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span className="text-xs text-emerald-700 dark:text-emerald-300">Contrato assinado</span>
+                </div>
+                <button
+                  onClick={abrirContrato}
+                  disabled={abrindoPdf}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs text-emerald-700 hover:text-emerald-900 py-1.5 rounded-lg hover:bg-emerald-50 dark:text-emerald-300 dark:hover:text-emerald-100 dark:hover:bg-emerald-950 transition-colors disabled:text-gray-500 dark:disabled:text-gray-500"
+                >
+                  <FileSignature className="w-3 h-3" />
+                  {abrindoPdf ? 'Abrindo...' : 'Ver contrato assinado'}
+                </button>
+                {erroContrato && <p className="text-[10px] text-red-600 text-center">{erroContrato}</p>}
               </div>
             )}
           </div>

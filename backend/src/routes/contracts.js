@@ -298,6 +298,34 @@ router.post('/webhook/d4sign', limitarWebhookContrato, async (req, res) => {
   }
 });
 
+// O PDF do contrato, para o provedor abrir pelo painel. Antes, assinado o
+// contrato, o painel só dizia "assinado" — para ver o documento era preciso
+// entrar na conta do D4Sign. O arquivo é buscado na hora e servido por aqui
+// porque a URL do D4Sign leva o token da conta na query: mandá-la para o
+// navegador entregaria a credencial do provedor junto.
+router.get('/:conversaId/pdf', autenticar, apenasAdmin, async (req, res) => {
+  const [conversa] = await db.select().from(conversas)
+    .where(eq(conversas.id, req.params.conversaId)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (!podeAcessarContrato(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
+  if (!conversa.contratoUuid) return res.status(404).json({ erro: 'Não há contrato nesta conversa.' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  const arquivo = await baixarContratoAssinado(tenant, conversa.contratoUuid);
+  if (!arquivo?.buffer) {
+    return res.status(502).json({ erro: 'Não foi possível obter o contrato na plataforma de assinatura agora.' });
+  }
+
+  const [cliente] = await db.select({ nome: clientes.nome, whatsapp: clientes.whatsapp })
+    .from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+  const nome = `Contrato - ${cliente?.nome || cliente?.whatsapp || 'cliente'}.pdf`;
+
+  res.setHeader('Content-Type', arquivo.mimeType || 'application/pdf');
+  // inline: abre numa aba em vez de baixar direto — quem quiser salvar, salva.
+  res.setHeader('Content-Disposition', `inline; filename="${nome.replace(/"/g, '')}"`);
+  res.send(arquivo.buffer);
+});
+
 // Verificação sob demanda: pergunta à plataforma se o documento já foi
 // assinado. É a saída para quando o webhook não chega — até aqui ele era a
 // única via, e bastava ele falhar uma vez para a conversa ficar em

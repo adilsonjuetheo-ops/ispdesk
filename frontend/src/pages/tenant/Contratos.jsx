@@ -22,7 +22,27 @@ export default function Contratos() {
   const [lista, setLista] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('todos');
+  const [abrindo, setAbrindo] = useState(null);
   const navigate = useNavigate();
+
+  const abrirContrato = async (conversaId) => {
+    if (abrindo) return;
+    // Aba aberta no clique, antes do await: depois dele o navegador bloqueia.
+    const aba = window.open('', '_blank');
+    setAbrindo(conversaId);
+    try {
+      const { data } = await api.get(`/contracts/${conversaId}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      if (aba) aba.location = url;
+      else window.location.assign(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      aba?.close();
+      alert('Não foi possível abrir o contrato agora.');
+    } finally {
+      setAbrindo(null);
+    }
+  };
 
   useEffect(() => {
     api.get('/contracts').then(r => setLista(r.data || [])).finally(() => setLoading(false));
@@ -105,6 +125,16 @@ export default function Contratos() {
                     </p>
                   </div>
                   <BadgeStatus status={c.contratoStatus} />
+                  {c.contratoStatus === 'assinado' && (
+                    <button
+                      onClick={() => abrirContrato(c.conversaId)}
+                      disabled={abrindo === c.conversaId}
+                      className="flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-900 disabled:text-gray-400 shrink-0"
+                    >
+                      <FileSignature className="w-3 h-3" />
+                      {abrindo === c.conversaId ? 'Abrindo...' : 'Ver contrato'}
+                    </button>
+                  )}
                   <button
                     onClick={() => navigate(`/inbox?conversa=${c.conversaId}`)}
                     className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 shrink-0"

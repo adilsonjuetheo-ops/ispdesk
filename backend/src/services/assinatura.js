@@ -589,9 +589,7 @@ async function enviarD4Sign(tenant, clienteWhatsapp, dados) {
   try {
     const listRes = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${docUuid}/list?${qs}`);
     if (listRes.ok) {
-      const listData = await listRes.json();
-      const signers = Object.values(listData);
-      linkAssinatura = signers[0]?.link_shortner || null;
+      linkAssinatura = linkDeAssinaturaD4Sign(await listRes.json(), docUuid);
     }
   } catch {
     // link não crítico — contrato já foi enviado por e-mail
@@ -607,8 +605,7 @@ export async function buscarLinkAssinatura(tenant, uuid) {
     try {
       const res = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${uuid}/list?${qs}`);
       if (!res.ok) return null;
-      const data = await res.json();
-      return Object.values(data)[0]?.link_shortner || null;
+      return linkDeAssinaturaD4Sign(await res.json(), uuid);
     } catch { return null; }
   }
   if (tenant.assinaturaTipo === 'zapsign') {
@@ -632,6 +629,28 @@ export async function buscarLinkAssinatura(tenant, uuid) {
 //
 // Devolve 'assinado', 'pendente', ou null quando não deu para saber (a
 // diferença importa: null não pode virar "ainda não assinou" na tela).
+// O /list do D4Sign não tem forma fixa: ora devolve um array de signatários,
+// ora um objeto cujo primeiro item é o documento e os signatários vêm dentro
+// de uma chave. Pegar `Object.values(data)[0]` deu no que se via em produção —
+// link nulo, e o cliente recebendo "verifique seu e-mail" em vez do link.
+function extrairSignatariosD4Sign(data) {
+  const brutos = Array.isArray(data) ? data : Object.values(data || {});
+  return brutos
+    .flatMap(v => (Array.isArray(v) ? v : [v]))
+    .filter(s => s && typeof s === 'object');
+}
+
+function linkDeAssinaturaD4Sign(data, uuid) {
+  for (const s of extrairSignatariosD4Sign(data)) {
+    const candidato = s.link_shortner || s.link_signer || s.url_signer || s.link;
+    if (typeof candidato === 'string' && candidato.startsWith('http')) return candidato;
+  }
+  // Sem log fica impossível descobrir por que o cliente não recebeu o link:
+  // a resposta é a única pista do formato que aquela conta devolve.
+  console.warn(`[assinatura] D4Sign não devolveu link de assinatura para ${uuid}:`, JSON.stringify(data).slice(0, 600));
+  return null;
+}
+
 export async function consultarStatusAssinatura(tenant, uuid) {
   if (tenant.assinaturaTipo === 'd4sign') {
     const extra = tenant.assinaturaExtra || {};
@@ -650,8 +669,8 @@ export async function consultarStatusAssinatura(tenant, uuid) {
 
       const listRes = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${uuid}/list?${qs}`);
       if (listRes.ok) {
-        const signatarios = Object.values(await listRes.json()).flatMap(v => Array.isArray(v) ? v : [v]);
-        const relevantes = signatarios.filter(s => s && (s.email || s.key_signer));
+        const signatarios = extrairSignatariosD4Sign(await listRes.json());
+        const relevantes = signatarios.filter(s => s.email || s.key_signer);
         if (relevantes.length && relevantes.every(s => String(s.signed) === '1' || s.signed_date)) {
           return 'assinado';
         }
