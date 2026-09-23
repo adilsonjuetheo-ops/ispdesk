@@ -3,6 +3,7 @@ import { Fingerprint, ChevronDown, User, X, Plus, MapPin, FileSignature, CheckCi
 import { formatDistanceToNowStrict, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '../lib/api.js';
+import { motivoDoErroBlob } from '../lib/erroArquivo.js';
 import { planoTemContrato } from '../lib/planos.js';
 import { useAuth } from '../hooks/useAuth.js';
 
@@ -354,9 +355,9 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
       if (aba) aba.location = url;
       else window.location.assign(url);
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch {
+    } catch (err) {
       aba?.close();
-      setErroContrato('Não foi possível abrir o contrato agora.');
+      setErroContrato(await motivoDoErroBlob(err, 'Não foi possível abrir o contrato agora.'));
     } finally {
       setAbrindoPdf(false);
     }

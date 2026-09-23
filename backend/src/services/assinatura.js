@@ -703,6 +703,14 @@ export async function consultarStatusAssinatura(tenant, uuid) {
   return null;
 }
 
+// Todo PDF válido começa com "%PDF". Sem conferir isso, uma página de erro
+// devolvida com status 200 seguia para o navegador rotulada como contrato: a
+// aba abria no visualizador de PDF do Chrome com "Falha ao carregar documento
+// PDF" e nenhuma pista de onde estava o problema.
+function ehPdf(buffer) {
+  return buffer?.length > 4 && buffer.subarray(0, 4).toString('latin1') === '%PDF';
+}
+
 // Baixa o PDF final já assinado, para anexar na conversa do WhatsApp — sem
 // isso o cliente só teria acesso ao contrato entrando no painel do D4Sign/
 // ZapSign, e o provedor só veria a assinatura como um status, sem o arquivo.
@@ -711,19 +719,45 @@ export async function baixarContratoAssinado(tenant, uuid) {
     const extra = tenant.assinaturaExtra || {};
     const qs = `tokenAPI=${tenant.assinaturaToken}${extra.cryptKey ? `&cryptKey=${extra.cryptKey}` : ''}`;
     try {
-      const res = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${uuid}/download?${qs}`);
-      if (!res.ok) return null;
-      // A API devolve o PDF binário direto, mas por segurança cobrimos também
-      // uma resposta em base64 dentro de JSON, formato usado em outros
-      // endpoints do D4Sign.
+      // POST, não GET: o /download do D4Sign só atende POST. Em GET ele
+      // responde com uma página de erro — e como vinha com status 200, esses
+      // bytes eram servidos ao painel como se fossem o contrato.
+      const res = await fetch(`https://secure.d4sign.com.br/api/v1/documents/${uuid}/download?${qs}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'pdf', language: 'pt' }),
+      });
+      if (!res.ok) {
+        console.error(`[assinatura] D4Sign recusou o download do contrato ${uuid}: HTTP ${res.status}`);
+        return null;
+      }
+
       const contentType = res.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
         const data = await res.json();
         const b64 = data?.base64_binary_file || data?.file;
-        if (!b64) return null;
-        return { buffer: Buffer.from(b64, 'base64'), mimeType: 'application/pdf' };
+        if (b64) {
+          const buffer = Buffer.from(b64, 'base64');
+          return ehPdf(buffer) ? { buffer, mimeType: 'application/pdf' } : null;
+        }
+        // Parte das contas recebe um link temporário em vez do arquivo.
+        const urlArquivo = data?.url || data?.link;
+        if (urlArquivo) {
+          const arquivo = await fetch(urlArquivo);
+          if (!arquivo.ok) return null;
+          const buffer = Buffer.from(await arquivo.arrayBuffer());
+          return ehPdf(buffer) ? { buffer, mimeType: 'application/pdf' } : null;
+        }
+        console.error('[assinatura] D4Sign devolveu JSON sem arquivo no download:', JSON.stringify(data).slice(0, 300));
+        return null;
       }
-      return { buffer: Buffer.from(await res.arrayBuffer()), mimeType: 'application/pdf' };
+
+      const buffer = Buffer.from(await res.arrayBuffer());
+      if (!ehPdf(buffer)) {
+        console.error(`[assinatura] D4Sign devolveu algo que não é PDF (${contentType}):`, buffer.subarray(0, 200).toString('latin1'));
+        return null;
+      }
+      return { buffer, mimeType: 'application/pdf' };
     } catch (err) {
       console.error('[assinatura] Falha ao baixar PDF assinado (D4Sign):', err.message);
       return null;
@@ -740,7 +774,12 @@ export async function baixarContratoAssinado(tenant, uuid) {
       if (!urlArquivo) return null;
       const fileRes = await fetch(urlArquivo);
       if (!fileRes.ok) return null;
-      return { buffer: Buffer.from(await fileRes.arrayBuffer()), mimeType: 'application/pdf' };
+      const buffer = Buffer.from(await fileRes.arrayBuffer());
+      if (!ehPdf(buffer)) {
+        console.error('[assinatura] ZapSign devolveu algo que não é PDF em', urlArquivo);
+        return null;
+      }
+      return { buffer, mimeType: 'application/pdf' };
     } catch (err) {
       console.error('[assinatura] Falha ao baixar PDF assinado (ZapSign):', err.message);
       return null;

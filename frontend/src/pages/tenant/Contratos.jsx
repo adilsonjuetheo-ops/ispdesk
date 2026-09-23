@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../lib/api.js';
+import { motivoDoErroBlob } from '../../lib/erroArquivo.js';
 import { FileSignature, Clock, CheckCircle2, ExternalLink } from 'lucide-react';
 
 function BadgeStatus({ status }) {
@@ -36,9 +37,9 @@ export default function Contratos() {
       if (aba) aba.location = url;
       else window.location.assign(url);
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch {
+    } catch (err) {
       aba?.close();
-      alert('Não foi possível abrir o contrato agora.');
+      alert(await motivoDoErroBlob(err, 'Não foi possível abrir o contrato agora.'));
     } finally {
       setAbrindo(null);
     }
