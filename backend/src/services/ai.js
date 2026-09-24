@@ -56,6 +56,34 @@ ${textos}
 // prefixo (o Haiku só cacheia a partir de 4096 tokens) e a frequência com que
 // chamadas parecidas se repetem. Os campos de cache vêm zerados enquanto não
 // pedimos cache — quando pedirmos, são a única prova de que está funcionando.
+// Para marcar onde termina o prefixo reaproveitável, o system precisa ir em
+// blocos em vez de uma string só. O cache_control no primeiro cobre as
+// ferramentas e esse bloco — a ordem que a API monta é tools, system, messages.
+//
+// Bloco de texto vazio é recusado pela API, então a parte volátil só entra
+// quando tem conteúdo.
+//
+// O SDK instalado (0.20.9) é anterior ao cache de prompt: tipa system como
+// string e não conhece cache_control. Em JavaScript isso não impede nada — o
+// corpo vai como montamos aqui —, mas não dá para apostar o atendimento nisso,
+// daí a rede em chamarModelo e este interruptor.
+let cacheDePromptIndisponivel = false;
+
+function pareceRecusaDeFormato(err) {
+  if (err?.status !== 400) return false;
+  const texto = String(err?.message || '').toLowerCase();
+  return texto.includes('system') || texto.includes('cache_control');
+}
+
+function sistemaEmBlocos(estavel, volatil) {
+  const volatilLimpo = volatil?.trim() ? volatil : '';
+  if (cacheDePromptIndisponivel) return `${estavel}\n${volatilLimpo}`;
+
+  const blocos = [{ type: 'text', text: estavel, cache_control: { type: 'ephemeral' } }];
+  if (volatilLimpo) blocos.push({ type: 'text', text: volatilLimpo });
+  return blocos;
+}
+
 function registrarUso(etapa, modelo, usage) {
   if (!usage) return;
   const entrada = usage.input_tokens ?? 0;
@@ -150,12 +178,17 @@ ATENDIMENTO HUMANO INDISPONÍVEL AGORA:
 - Orientação do provedor para este período: ${instrucaoForaHorario}` : ''}
 ` : '';
 
-  const systemPrompt = `${tenant.systemPrompt || ''}
+  // O prompt vai partido em duas metades de propósito.
+  //
+  // A primeira é igual em toda conversa deste provedor, e é o que o cache de
+  // prompt consegue reaproveitar — inclusive entre clientes diferentes, que é
+  // onde está o ganho: o mesmo prefixo serve as milhares de conversas do
+  // mesmo provedor. Cache é por prefixo idêntico byte a byte, e a data ficava
+  // na segunda linha: ela invalidava todo o resto a cada minuto.
+  //
+  // A segunda junta o que muda a cada chamada e fica depois do ponto de corte.
+  const parteEstavel = `${tenant.systemPrompt || ''}
 
-DATA E HORA ATUAL: ${agora} (horário de Brasília). Use isso para contextualizar qualquer referência a datas. Se for cumprimentar o cliente, use exatamente "${saudacaoAtual()}" — não calcule por conta própria a partir da hora acima.
-
-${contextoSgp}
-${atalhosProvedor}${blocoForaHorario}
 ABERTURA DA CONVERSA:
 - Boa parte dos clientes abre a conversa só com uma saudação, um emoji ou algo sem pedido nenhum — "oi", "boa noite", "👍". Nesses casos não responda apenas "como posso ajudar?": quem escreve assim quase sempre não sabe o que dá para resolver por aqui.
 - Cumprimente (pelo nome, se você souber), diga numa frase curta o que você resolve na hora e termine perguntando o que a pessoa precisa. Cite apenas o que você realmente consegue fazer com as ferramentas que tem — nunca prometa nada fora do seu alcance.
@@ -206,10 +239,18 @@ FLUXO DE NOVA ADESÃO (contrato):
 - Após confirmação do cliente, diga "Estou transferindo agora!" e escreva na última linha: ACTION:HANDOFF:CONTRATO|plano:[nome do plano]|valor:[valor sem R$]|email:[email]|download:[velocidade download em Mbps]|upload:[velocidade upload em Mbps]
 - Exemplo: ACTION:HANDOFF:CONTRATO|plano:FIBRA 300MB|valor:89,90|email:cliente@email.com|download:300|upload:150
 - Se não souber a velocidade de upload, use metade do download como estimativa.
-${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclua ao final da sua resposta (linha separada): TAG:categoria — onde categoria é exatamente uma de: ${TAGS_VALIDAS.join(', ')}.` : ''}
 
 PROVEDOR: ${tenant.nome}
-ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
+ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}
+${atalhosProvedor}`;
+
+  // Tudo que varia: a hora, os dados do cliente da vez, se há atendente de
+  // plantão e se esta conversa ainda precisa de etiqueta. Vem por último
+  // também porque é o mais recente que o modelo lê antes de responder.
+  const parteVolatil = `DATA E HORA ATUAL: ${agora} (horário de Brasília). Use isso para contextualizar qualquer referência a datas. Se for cumprimentar o cliente, use exatamente "${saudacaoAtual()}" — não calcule por conta própria a partir da hora acima.
+
+${contextoSgp}${blocoForaHorario}
+${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclua ao final da sua resposta (linha separada): TAG:categoria — onde categoria é exatamente uma de: ${TAGS_VALIDAS.join(', ')}.` : ''}`;
 
   // 3. Histórico das últimas 10 mensagens (exclui mensagens de sistema)
   const msgs = historico
@@ -256,10 +297,10 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
   let modelo = MODELO_RAPIDO;
   let jaEscalou = false;
   const chamarModelo = async () => {
-    const resposta = await anthropic.messages.create({
+    const corpo = () => ({
       model: modelo,
       max_tokens: 1024,
-      system: systemPrompt,
+      system: sistemaEmBlocos(parteEstavel, parteVolatil),
       // O Sonnet 5 raciocina por padrão (o 4.6 não), e o raciocínio sai do
       // mesmo max_tokens da resposta: com 1024 o cliente receberia mensagem
       // cortada, e o raciocínio ainda é cobrado como saída. Desligado, o
@@ -270,6 +311,20 @@ ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}`;
       ...(tools.length > 0 && { tools }),
       messages: conversaAcumulada,
     });
+
+    let resposta;
+    try {
+      resposta = await anthropic.messages.create(corpo());
+    } catch (err) {
+      // Se a API recusar o system em blocos, o atendimento dos quatro
+      // provedores cairia junto. Na primeira recusa desse tipo o cache é
+      // desligado para o processo inteiro e a chamada é refeita com o prompt
+      // numa string só — perde-se a economia, não o atendimento.
+      if (cacheDePromptIndisponivel || !pareceRecusaDeFormato(err)) throw err;
+      cacheDePromptIndisponivel = true;
+      console.warn('[ia] system em blocos recusado pela API; seguindo sem cache de prompt:', err.message);
+      resposta = await anthropic.messages.create(corpo());
+    }
     registrarUso('atendimento', modelo, resposta.usage);
     return resposta;
   };
