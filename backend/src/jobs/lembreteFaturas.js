@@ -65,7 +65,10 @@ async function registrarMensagemBot(tenant, telefone, texto) {
   }).where(eq(conversas.id, conversa.id));
 }
 
-async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo) {
+// simular: faz tudo menos mandar a mensagem — consulta o SGP, resolve telefone
+// e monta as variáveis. É o único jeito de conferir se a busca de faturas por
+// vencimento está devolvendo o que deveria sem usar cliente real como teste.
+async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo, { simular = false } = {}) {
   if (!nomeTemplate) return { enviado: false, motivo: 'Template não configurado' };
 
   try {
@@ -99,6 +102,20 @@ async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo) {
       formatarData(titulo.dataVencimento),
       linkOuPix,
     ];
+
+    if (simular) {
+      return {
+        enviado: false,
+        simulado: true,
+        cliente: titulo.clienteNome,
+        telefone,
+        valor,
+        vencimento: formatarData(titulo.dataVencimento),
+        // Só o começo: o PIX copia e cola tem 200 caracteres e o que importa
+        // aqui é ver que veio algo, e se é PIX ou link.
+        pagamento: String(linkOuPix).slice(0, 40),
+      };
+    }
 
     await enviarTemplate(tenant, telefone, nomeTemplate, tenant.lembreteFaturaIdioma || 'pt_BR', parametros);
 
@@ -137,7 +154,7 @@ export async function testarClienteEspecifico(tenant, documento, tipo) {
   };
 }
 
-export async function processarProvedor(tenant) {
+export async function processarProvedor(tenant, { simular = false } = {}) {
   const sgp = criarSgp(tenant);
   if (!sgp || typeof sgp.listarTitulosPorVencimento !== 'function') {
     return { erro: 'Este SGP não tem suporte a lembretes automáticos.' };
@@ -163,10 +180,12 @@ export async function processarProvedor(tenant) {
   ]);
 
   const resultado = {
+    simulacao: simular,
     preEncontradas: venceAmanha?.length ?? null, // null = a consulta falhou, não "achou zero"
     preEnviadas: 0,
     posEncontradas: venceu5diasOuMais?.length ?? null,
     posEnviadas: 0,
+    previa: simular ? [] : undefined,
     falhas: [...falhasConsulta],
   };
 
@@ -188,14 +207,19 @@ export async function processarProvedor(tenant) {
   const listaVenceu5diasNovas = listaVenceu5diasOuMais.filter(t => !jaEnviados.has(String(t.id)));
 
   for (const titulo of listaVenceAmanha) {
-    const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePre, 'pré-vencimento');
-    if (r.enviado) resultado.preEnviadas++;
+    const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePre, 'pré-vencimento', { simular });
+    if (r.simulado) resultado.previa.push({ tipo: 'pré-vencimento', ...r });
+    else if (r.enviado) resultado.preEnviadas++;
     else resultado.falhas.push(`${titulo.clienteNome} (pré-vencimento): ${r.motivo}`);
   }
   for (const titulo of listaVenceu5diasNovas) {
-    const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePos, 'pós-vencimento');
-    if (r.enviado) {
+    const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePos, 'pós-vencimento', { simular });
+    if (r.simulado) {
+      resultado.previa.push({ tipo: 'pós-vencimento', ...r });
+    } else if (r.enviado) {
       resultado.posEnviadas++;
+      // Só marca como enviado quando enviou de verdade: na simulação isso
+      // faria o cliente nunca mais receber o lembrete de verdade.
       await db.insert(lembreteFaturaEnviados)
         .values({ tenantId: tenant.id, tituloId: String(titulo.id), tipo: 'pos' })
         .onConflictDoNothing();

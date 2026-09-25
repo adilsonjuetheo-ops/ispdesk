@@ -180,7 +180,10 @@ router.post('/me/testar-lembretes', autenticar, async (req, res) => {
   }
 
   try {
-    const resultado = await processarLembretesProvedor(tenant);
+    // simular: roda as duas consultas de vencimento de verdade e monta as
+    // variáveis, mas não envia nada. É o que permite conferir se o SGP está
+    // devolvendo os títulos certos sem usar cliente real como cobaia.
+    const resultado = await processarLembretesProvedor(tenant, { simular: req.body?.simular === true });
     res.json({ ok: true, resultado });
   } catch (err) {
     res.status(502).json({ ok: false, erro: err.message });

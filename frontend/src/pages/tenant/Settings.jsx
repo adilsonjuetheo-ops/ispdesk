@@ -454,17 +454,19 @@ function TestarLembretes() {
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState('');
 
-  async function testar() {
-    const confirmado = window.confirm(
-      'Isso vai enviar lembretes REAIS agora para todos os clientes com fatura vencendo amanhã ou vencida há 5 dias. Não é uma simulação. Confirma?'
-    );
-    if (!confirmado) return;
+  async function testar(simular) {
+    if (!simular) {
+      const confirmado = window.confirm(
+        'Isso vai enviar lembretes REAIS agora para todos os clientes com fatura vencendo amanhã ou já vencida. Não é uma simulação. Confirma?'
+      );
+      if (!confirmado) return;
+    }
 
     setCarregando(true);
     setResultado(null);
     setErro('');
     try {
-      const { data } = await api.post('/tenants/me/testar-lembretes');
+      const { data } = await api.post('/tenants/me/testar-lembretes', { simular });
       setResultado(data.resultado);
     } catch (err) {
       setErro(err.response?.data?.erro || err.message || 'Erro ao testar');
@@ -475,16 +477,29 @@ function TestarLembretes() {
 
   return (
     <div className="mt-3 border border-dashed border-amber-300 bg-amber-50 rounded-lg p-3 space-y-2">
-      <p className="text-xs text-amber-700">Isso dispara o processo real agora — envia mensagem de verdade para os clientes elegíveis hoje, não é uma simulação.</p>
-      <button
-        type="button"
-        onClick={testar}
-        disabled={carregando}
-        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
-      >
-        {carregando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-        Testar agora (envio real)
-      </button>
+      <p className="text-xs text-amber-700">
+        A simulação consulta o SGP de verdade e mostra quem receberia, sem enviar nada. O envio real dispara agora para todos os clientes elegíveis hoje.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => testar(true)}
+          disabled={carregando}
+          className="px-4 py-2 bg-white border border-amber-300 hover:bg-amber-100 disabled:opacity-50 text-amber-700 text-sm rounded-lg transition-colors flex items-center gap-2"
+        >
+          {carregando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          Simular (não envia)
+        </button>
+        <button
+          type="button"
+          onClick={() => testar(false)}
+          disabled={carregando}
+          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+        >
+          {carregando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          Testar agora (envio real)
+        </button>
+      </div>
       {erro && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 whitespace-pre-wrap">{erro}</div>
       )}
@@ -494,8 +509,29 @@ function TestarLembretes() {
             <p className="text-red-600">{resultado.erro}</p>
           ) : (
             <>
-              <p>Pré-vencimento: {resultado.preEncontradas === null ? 'erro na consulta' : `${resultado.preEnviadas}/${resultado.preEncontradas} enviados`}</p>
-              <p>Pós-vencimento: {resultado.posEncontradas === null ? 'erro na consulta' : `${resultado.posEnviadas}/${resultado.posEncontradas} enviados`}</p>
+              {resultado.simulacao && (
+                <p className="font-medium text-amber-700">Simulação — nada foi enviado.</p>
+              )}
+              <p>Pré-vencimento: {resultado.preEncontradas === null
+                ? 'erro na consulta'
+                : resultado.simulacao
+                  ? `${resultado.preEncontradas} fatura(s) encontrada(s)`
+                  : `${resultado.preEnviadas}/${resultado.preEncontradas} enviados`}</p>
+              <p>Pós-vencimento: {resultado.posEncontradas === null
+                ? 'erro na consulta'
+                : resultado.simulacao
+                  ? `${resultado.posEncontradas} fatura(s) encontrada(s)`
+                  : `${resultado.posEnviadas}/${resultado.posEncontradas} enviados`}</p>
+              {resultado.previa?.length > 0 && (
+                <div className="mt-2 border-t border-gray-100 pt-2 space-y-1">
+                  <p className="font-medium text-gray-600">Receberiam:</p>
+                  {resultado.previa.map((p, i) => (
+                    <p key={i} className="font-mono text-[11px]">
+                      {p.tipo} · {p.cliente} · {p.telefone} · R$ {p.valor} · venc. {p.vencimento} · {p.pagamento}…
+                    </p>
+                  ))}
+                </div>
+              )}
               {resultado.falhas?.length > 0 && (
                 <div className="text-red-600 mt-1">
                   <p className="font-medium">Falhas:</p>
