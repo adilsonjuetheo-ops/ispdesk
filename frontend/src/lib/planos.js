@@ -9,11 +9,12 @@ export const PLANOS = {
   basic:      { label: 'Basic',      valor: 149.90, limiteIa: 3000,  contrato: false },
   exclusivo:  { label: 'Exclusivo',  valor: 199.90, limiteIa: 6000,  contrato: true  },
   pro:        { label: 'Pro',        valor: 249.90, limiteIa: 10000, contrato: true  },
+  personalizado: { label: 'Personalizado', valor: 349.90, limiteIa: 10000, contrato: true },
   enterprise: { label: 'Enterprise', valor: 549.90, limiteIa: 10000, contrato: true  },
 };
 
 // Ordem de exibição — do mais barato ao mais caro, que é como a pessoa compara.
-export const ORDEM_PLANOS = ['basic', 'exclusivo', 'pro', 'enterprise'];
+export const ORDEM_PLANOS = ['basic', 'exclusivo', 'pro', 'personalizado', 'enterprise'];
 
 export function getPlano(p) {
   return PLANOS[p] || PLANOS.basic;

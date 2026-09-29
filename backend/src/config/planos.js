@@ -27,6 +27,12 @@ export const PLANOS = {
     limiteIa: 10000,
     contrato: true,
   },
+  personalizado: {
+    label: 'Personalizado',
+    valor: 349.90,
+    limiteIa: 10000,
+    contrato: true,
+  },
   enterprise: {
     label: 'Enterprise',
     valor: 549.90,

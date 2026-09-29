@@ -8,6 +8,7 @@ const PLANO_BADGE = {
   basic:      'bg-gray-700/60 text-gray-300',
   exclusivo:  'bg-emerald-900/50 text-emerald-300 border border-emerald-800',
   pro:        'bg-blue-900/50 text-blue-300 border border-blue-800',
+  personalizado: 'bg-violet-900/50 text-violet-300 border border-violet-800',
   enterprise: 'bg-amber-900/50 text-amber-300 border border-amber-800',
 };
 

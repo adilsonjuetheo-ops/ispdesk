@@ -16,7 +16,8 @@ const paraInputDate = (iso) => {
 
 const COR_PLANO = {
   basic: 'text-gray-300', exclusivo: 'text-emerald-400',
-  pro: 'text-blue-400',   enterprise: 'text-amber-400',
+  pro: 'text-blue-400',   personalizado: 'text-violet-400',
+  enterprise: 'text-amber-400',
 };
 const PLANOS = ORDEM_PLANOS.map(value => ({
   value,
@@ -29,6 +30,7 @@ const PLANO_BADGE = {
   basic:      'bg-gray-700 text-gray-300',
   exclusivo:  'bg-emerald-900/50 text-emerald-300 border border-emerald-700',
   pro:        'bg-blue-900/50 text-blue-300 border border-blue-700',
+  personalizado: 'bg-violet-900/50 text-violet-300 border border-violet-700',
   enterprise: 'bg-amber-900/50 text-amber-300 border border-amber-700',
 };
 
