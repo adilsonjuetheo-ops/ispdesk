@@ -417,7 +417,29 @@ async function processarEcho(tenant, filialEntrada, eco) {
   registrarAtividade();
 }
 
-async function processarWebhookMsg(tenant, remetente, texto, wamid, isAudio = false, midiaUrl = null, nomeWa = null, filialEntrada = null, midiaData = null) {
+// Cada mensagem chega num POST separado da Meta, e quem manda "Bom dia" e
+// "Oi" em seguida gera dois processamentos em paralelo. Os dois procuravam a
+// conversa aberta, nenhum achava (a outra ainda não tinha sido criada — entre
+// uma coisa e outra há uma consulta ao SGP de alguns segundos) e os dois
+// criavam: o cliente aparecia duplicado na fila, com o bot respondendo duas
+// vezes. Enfileirar por remetente resolve na origem e ainda garante que o bot
+// responda as mensagens na ordem em que chegaram.
+//
+// Vale porque o backend roda num processo só. Se um dia houver mais de uma
+// instância, isto precisa virar trava no banco.
+const filasPorRemetente = new Map();
+
+function processarWebhookMsg(tenant, remetente, ...resto) {
+  const chave = `${tenant.id}:${remetente}`;
+  const anterior = filasPorRemetente.get(chave) || Promise.resolve();
+  const atual = anterior.catch(() => {}).then(() => processarMensagemRecebida(tenant, remetente, ...resto));
+  filasPorRemetente.set(chave, atual);
+  const limpar = () => { if (filasPorRemetente.get(chave) === atual) filasPorRemetente.delete(chave); };
+  atual.then(limpar, limpar);
+  return atual;
+}
+
+async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudio = false, midiaUrl = null, nomeWa = null, filialEntrada = null, midiaData = null) {
   registrarAtividade();
   // Config efetiva de envio — usa número/token da filial se ela tiver o próprio
   const wConfig = (filialEntrada?.whatsappToken && filialEntrada?.whatsappNumberId)
