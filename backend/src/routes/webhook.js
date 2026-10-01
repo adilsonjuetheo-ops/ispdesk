@@ -12,6 +12,7 @@ import { dentroDoHorario, proximoAtendimento } from '../services/horarios.js';
 import { getLimite, getUso, incrementarUso } from '../services/limites.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { processarRespostaNps } from '../services/nps.js';
+import { dispensaIa } from '../services/mensagemCurta.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -620,6 +621,38 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
   const historico = await db.select().from(mensagens)
     .where(eq(mensagens.conversaId, conversa.id))
     .orderBy(mensagens.enviadaEm);
+
+  // "Obrigado", "ok", "👍" no fim do atendimento não precisam de IA — cada um
+  // custava uma chamada completa, com prompt, contexto do SGP e histórico.
+  // Áudio e mídia sempre vão para a IA: a transcrição pode ter errado, e uma
+  // foto com "ok" é um comprovante, não um agradecimento.
+  if (!isAudio && !midiaData) {
+    const ultimaDoAtendimento = [...historico].reverse().find(m =>
+      m.origem !== 'cliente' && !/^\[(Sistema|Arquivo|Template)\]/.test(m.conteudo || '')
+    );
+    const dispensa = dispensaIa(texto, ultimaDoAtendimento?.conteudo);
+    if (dispensa) {
+      console.log(`[ia:dispensada] ${tenant.nome} — "${texto.slice(0, 40)}"${dispensa.responder ? ' (respondida sem IA)' : ''}`);
+      if (dispensa.responder) {
+        let wamidResposta = null;
+        try {
+          const apiRes = await enviarMensagem(wConfig, remetente, dispensa.responder);
+          wamidResposta = apiRes?.messages?.[0]?.id || null;
+        } catch (err) {
+          console.error('[ia:dispensada] Falha ao responder:', err.message);
+        }
+        await db.insert(mensagens).values({
+          conversaId: conversa.id,
+          origem: 'bot',
+          conteudo: dispensa.responder,
+          wamid: wamidResposta,
+          status: 'enviada',
+        });
+        await atualizarUltMsg(conversa.id, dispensa.responder, 'bot');
+      }
+      return;
+    }
+  }
 
   // Fora do horário o assistente continua atendendo — só precisa saber que não
   // há atendente humano para assumir e quando a equipe retorna.
