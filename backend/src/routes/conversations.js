@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { conversas, mensagens, clientes, tenantUsers, filiais, filialWhatsappExtra, tenants } from '../db/schema.js';
-import { eq, and, desc, ne, count, isNotNull, sql as sqlRaw } from 'drizzle-orm';
+import { eq, and, desc, ne, count, isNotNull, inArray, sql as sqlRaw } from 'drizzle-orm';
 import { autenticar } from '../middleware/auth.js';
 import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia, enviarTemplate } from '../services/whatsapp.js';
@@ -491,7 +491,14 @@ router.get('/', async (req, res) => {
     conditions.push(eq(conversas.agenteId, req.user.id));
   }
 
-  const rows = await db.select(CAMPOS_LISTA)
+  // escopo=abertas | encerradas permite à tela buscar cada parte no seu ritmo:
+  // as abertas mudam o tempo todo, as encerradas quase nunca, e vinham as 150
+  // junto em toda consulta de 5 segundos. Sem escopo, vêm as duas, como antes.
+  const escopo = req.query.escopo;
+  const querAbertas = escopo !== 'encerradas';
+  const querEncerradas = escopo !== 'abertas';
+
+  const rows = !querAbertas ? [] : await db.select(CAMPOS_LISTA)
   .from(conversas)
   .innerJoin(clientes, eq(conversas.clienteId, clientes.id))
   .leftJoin(filiais, eq(conversas.filialId, filiais.id))
@@ -510,7 +517,7 @@ router.get('/', async (req, res) => {
   //
   // A aba Histórico lê desta mesma resposta, então elas não podem sumir; só
   // deixam de vir todas. Relatório de período é outra tela.
-  const encerradas = await db.select(CAMPOS_LISTA)
+  const encerradas = !querEncerradas ? [] : await db.select(CAMPOS_LISTA)
     .from(conversas)
     .innerJoin(clientes, eq(conversas.clienteId, clientes.id))
     .leftJoin(filiais, eq(conversas.filialId, filiais.id))
@@ -549,6 +556,38 @@ router.get('/:id/messages', async (req, res) => {
 
   if (!podeAcessarConversa(req, conversa)) {
     return res.status(403).json({ erro: 'Acesso negado' });
+  }
+
+  // Modo incremental. A tela consulta a conversa aberta de 5 em 5 segundos e
+  // recebia o histórico inteiro toda vez — 80 mensagens a cada ciclo, por
+  // atendente, quase sempre sem nada novo. Com `depois`, vem só o que chegou
+  // desde a última leva.
+  const depois = req.query.depois ? new Date(String(req.query.depois)) : null;
+  if (depois && !Number.isNaN(depois.getTime())) {
+    // Dez segundos de sobreposição: duas gravações quase simultâneas (resposta
+    // do bot e envio do atendente) podem ficar visíveis fora da ordem do
+    // horário, e sem a folga a que entrou "atrasada" nunca seria buscada. A
+    // tela descarta o que já tem pelo id.
+    const desde = new Date(depois.getTime() - 10_000);
+    const novas = await db.select().from(mensagens)
+      .where(and(eq(mensagens.conversaId, id), sqlRaw`${mensagens.enviadaEm} > ${desde}`))
+      .orderBy(mensagens.enviadaEm);
+
+    // Os tiques de entregue/lida mudam numa mensagem já gravada, então só as
+    // novas deixariam o status congelado. A tela manda os ids que ainda podem
+    // mudar (enviadas e não lidas) e recebe o status atual de cada um — quando
+    // vira "lida", ela para de perguntar.
+    const acompanhar = String(req.query.acompanhar || '')
+      .split(',')
+      .filter(x => /^[0-9a-f-]{36}$/i.test(x))
+      .slice(0, 100);
+    const status = acompanhar.length
+      ? await db.select({ id: mensagens.id, status: mensagens.status })
+        .from(mensagens)
+        .where(and(eq(mensagens.conversaId, id), inArray(mensagens.id, acompanhar)))
+      : [];
+
+    return res.json({ novas, status });
   }
 
   const msgs = await db.select().from(mensagens)

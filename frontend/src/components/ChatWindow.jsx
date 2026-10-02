@@ -25,6 +25,35 @@ function mesmasMsgs(a, b) {
   return a.every((m, i) => m.id === b[i].id && m.status === b[i].status);
 }
 
+// Mensagem enviada que ainda pode ganhar tique de entregue ou lida.
+const statusPodeMudar = m =>
+  m.origem !== 'cliente' && m.wamid && (m.status === 'enviada' || m.status === 'entregue');
+
+// Junta a leva incremental na lista que a tela já tem. As novas entram — ou
+// substituem a versão anterior, já que o servidor reenvia os últimos 10
+// segundos de propósito — e os status acompanhados são atualizados. Devolve a
+// própria lista quando nada mudou, para não re-renderizar à toa.
+function mesclarMsgs(atuais, { novas = [], status = [] }) {
+  const porId = new Map(atuais.map(m => [m.id, m]));
+  let mudou = false;
+  for (const m of novas) {
+    const antes = porId.get(m.id);
+    if (!antes || antes.status !== m.status || antes.conteudo !== m.conteudo) {
+      porId.set(m.id, m);
+      mudou = true;
+    }
+  }
+  for (const s of status) {
+    const antes = porId.get(s.id);
+    if (antes && antes.status !== s.status) {
+      porId.set(s.id, { ...antes, status: s.status });
+      mudou = true;
+    }
+  }
+  if (!mudou) return atuais;
+  return [...porId.values()].sort((a, b) => new Date(a.enviadaEm) - new Date(b.enviadaEm));
+}
+
 // Uma definição só do que é mídia. Havia duas listas soltas, em pontos
 // distantes do arquivo, e "[Documento]" faltava nas duas — o PDF do cliente
 // nem chegava no balão de mídia, aparecia como texto cru na conversa. Separadas,
@@ -778,6 +807,9 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const fileRef = useRef(null);
   const textareaRef = useRef(null);
   const msgIdsRef = useRef(new Set());
+  // Cópia de `msgs` para montar a próxima busca incremental sem depender do
+  // fechamento do render em que o polling foi agendado.
+  const msgsRef = useRef([]);
   const inicialRef = useRef(false);
   const atBottomRef = useRef(true);
   // true até a primeira leva de mensagens da conversa aberta — evita rolar
@@ -801,12 +833,24 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
 
   const carregarMsgs = () => {
     const idAlvo = conversa.id;
-    return api.get(`/conversations/${idAlvo}/messages`).then(r => {
+    // Primeira leva da conversa: o histórico inteiro. Depois, só o que chegou
+    // desde a última mensagem e o status das que ainda aguardam tique — antes
+    // a conversa inteira voltava a cada 5 segundos.
+    const atuais = msgsRef.current;
+    const incremental = inicialRef.current && atuais.length > 0;
+    const params = incremental
+      ? {
+          depois: atuais[atuais.length - 1].enviadaEm,
+          acompanhar: atuais.filter(statusPodeMudar).map(m => m.id).join(',') || undefined,
+        }
+      : undefined;
+    return api.get(`/conversations/${idAlvo}/messages`, { params }).then(r => {
       // A resposta pode chegar depois de o atendente já ter trocado de conversa;
       // sem isto as mensagens de uma caíam na tela da outra.
       if (idAlvo !== conversaIdRef.current) return;
+      const recebidas = incremental ? r.data.novas : r.data;
       if (inicialRef.current) {
-        const temNovaCliente = r.data.some(
+        const temNovaCliente = recebidas.some(
           m => m.origem === 'cliente' && !msgIdsRef.current.has(m.id)
         );
         if (temNovaCliente) {
@@ -817,9 +861,14 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
           if (!atBottomRef.current) setTemNovas(true);
         }
       }
-      msgIdsRef.current = new Set(r.data.map(m => m.id));
       inicialRef.current = true;
-      setMsgs(prev => (mesmasMsgs(prev, r.data) ? prev : r.data));
+      // A mescla acontece sobre `prev`, e não sobre `atuais`: um envio do
+      // atendente pode ter entrado na lista enquanto esta busca estava no ar.
+      setMsgs(prev => {
+        const proxima = incremental ? mesclarMsgs(prev, r.data) : r.data;
+        msgIdsRef.current = new Set(proxima.map(m => m.id));
+        return mesmasMsgs(prev, proxima) ? prev : proxima;
+      });
       setCarregando(false);
       setFalhou(false);
     }).catch(() => {
@@ -831,8 +880,11 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
     });
   };
 
+  useEffect(() => { msgsRef.current = msgs; }, [msgs]);
+
   useEffect(() => {
     conversaIdRef.current = conversa.id;
+    msgsRef.current = [];
     setMsgs([]);
     // Balão otimista é da conversa em que foi digitado. Sem limpar, ele
     // aparecia na conversa seguinte como se fosse dela.

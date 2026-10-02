@@ -357,8 +357,28 @@ export default function Inbox() {
     return () => onChatMobileChange?.(false);
   }, [selecionada, onChatMobileChange]);
 
+  // As abertas mudam o tempo todo; as encerradas quase nunca. Vinham juntas a
+  // cada 5 segundos — as 150 encerradas mais recentes em toda consulta. Agora
+  // cada parte tem o seu ritmo e a lista exibida é a junção das duas.
+  const abertasRef = useRef([]);
+  const encerradasRef = useRef([]);
+  const juntarListas = () => {
+    const idsAbertas = new Set(abertasRef.current.map(c => c.id));
+    // Reaberta há pouco ainda pode estar na lista de encerradas antiga: a
+    // versão aberta é a que vale.
+    return [...abertasRef.current, ...encerradasRef.current.filter(c => !idsAbertas.has(c.id))];
+  };
+
+  const carregarEncerradas = useCallback(async () => {
+    const { data } = await api.get('/conversations', { params: { escopo: 'encerradas' } });
+    encerradasRef.current = data;
+    const todas = juntarListas();
+    setConversas(todas);
+    setSelecionada(prev => (prev ? todas.find(c => c.id === prev.id) || prev : prev));
+  }, []);
+
   const carregarConversas = useCallback(async () => {
-    const { data } = await api.get('/conversations');
+    const { data } = await api.get('/conversations', { params: { escopo: 'abertas' } });
 
     // Conversa recém-iniciada pelo atendente: abre assim que entrar na lista
     if (novaIdRef.current) {
@@ -372,17 +392,33 @@ export default function Inbox() {
     }
     convIdsRef.current = new Set(data.map(c => c.id));
 
-    setConversas(data);
+    abertasRef.current = data;
+    const todas = juntarListas();
+    setConversas(todas);
 
     // Pela forma funcional, de propósito. Antes isto lia `selecionada` do
     // fechamento de quando a busca começou: clicar noutra conversa enquanto uma
     // requisição estava no ar fazia a resposta antiga chegar depois e devolver a
     // seleção para a conversa anterior — a tela "voltava" sozinha. `prev` é
     // sempre a conversa aberta agora, não a de quando a busca saiu.
-    setSelecionada(prev => (prev ? data.find(c => c.id === prev.id) || prev : prev));
+    setSelecionada(prev => (prev ? todas.find(c => c.id === prev.id) || prev : prev));
   }, [tocarNotificacao]);
 
   usePolling(carregarConversas, 5000);
+  usePolling(carregarEncerradas, 60000);
+
+  // Ação do atendente (encerrar, transferir, assumir) pode mover a conversa de
+  // uma lista para a outra — aí as duas atualizam na hora, sem esperar o ciclo.
+  const atualizarTudo = useCallback(() => {
+    carregarConversas();
+    carregarEncerradas();
+  }, [carregarConversas, carregarEncerradas]);
+
+  // Quem abre o Histórico quer ver o que acabou de encerrar, não a lista de
+  // até um minuto atrás.
+  useEffect(() => {
+    if (view === 'historico') carregarEncerradas();
+  }, [view, carregarEncerradas]);
 
   return (
     <div className="flex h-full md:gap-3">
@@ -409,7 +445,7 @@ export default function Inbox() {
             <div className="flex-1 overflow-hidden">
               <ChatWindow
                 conversa={selecionada}
-                onAtualizar={carregarConversas}
+                onAtualizar={atualizarTudo}
                 onVoltar={() => setSelecionada(null)}
                 painelAberto={painelAberto}
                 onTogglePainel={() => setPainelAberto(v => { gravarPreferencia(PREF, !v); return !v; })}
@@ -417,7 +453,7 @@ export default function Inbox() {
             </div>
             {painelAberto && (
               <div className="hidden md:block">
-                <ClientInfoPanel conversa={selecionada} onAtualizar={carregarConversas} conversas={conversas} />
+                <ClientInfoPanel conversa={selecionada} onAtualizar={atualizarTudo} conversas={conversas} />
               </div>
             )}
           </>

@@ -1,11 +1,25 @@
 import { db } from '../db/index.js';
-import { mensagens, conversas } from '../db/schema.js';
+import { mensagens, conversas, webhookLog } from '../db/schema.js';
 import { and, lt, isNotNull, inArray } from 'drizzle-orm';
 
 const DIAS_RETENCAO = 90;
 const LOTE = 200;
 
+// O webhook_log ganha uma linha por mensagem recebida e nada o apagava. Ele só
+// existe para não processar duas vezes a mesma mensagem que a Meta reentrega,
+// e as reentregas dela acontecem em minutos ou horas — 30 dias sobra.
+const DIAS_WEBHOOK_LOG = 30;
+
+async function limparWebhookLog() {
+  const corte = new Date(Date.now() - DIAS_WEBHOOK_LOG * 24 * 60 * 60 * 1000);
+  // Sem returning: na primeira vez seriam milhares de linhas trazidas de volta
+  // só para contar.
+  await db.delete(webhookLog).where(lt(webhookLog.recebidoEm, corte));
+}
+
 export async function executarLimpeza() {
+  await limparWebhookLog().catch(e => console.error('[Limpeza] Erro no webhook_log:', e.message));
+
   const corte = new Date();
   corte.setDate(corte.getDate() - DIAS_RETENCAO);
 
