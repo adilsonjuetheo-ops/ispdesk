@@ -75,22 +75,35 @@ function pareceRecusaDeFormato(err) {
   return texto.includes('system') || texto.includes('cache_control');
 }
 
-function sistemaEmBlocos(estavel, volatil) {
-  const volatilLimpo = volatil?.trim() ? volatil : '';
-  if (cacheDePromptIndisponivel) return `${estavel}\n${volatilLimpo}`;
+// Dois pontos de corte, cada um pegando um tipo de repetição diferente:
+//
+//   1. depois da parte estável — vale entre todas as conversas simultâneas do
+//      mesmo provedor, porque o prefixo é o mesmo para todas;
+//   2. depois do bloco do cliente — vale entre as rodadas do laço de
+//      ferramentas da mesma mensagem, que é onde o prompt é reenviado inteiro
+//      duas ou três vezes seguidas, com segundos de diferença.
+//
+// O mínimo do modelo conta do início da requisição até cada corte, não por
+// trecho. Por isso o segundo corte pode cachear mesmo quando o primeiro é curto
+// demais — provável no Haiku 4.5, que exige 4.096 tokens.
+function sistemaEmBlocos(estavel, conversa, agora) {
+  const texto = p => (p?.trim() ? p : '');
+  const partes = [texto(estavel), texto(conversa), texto(agora)];
+  if (cacheDePromptIndisponivel) return partes.filter(Boolean).join('\n');
 
-  const blocos = [{ type: 'text', text: estavel, cache_control: { type: 'ephemeral' } }];
-  if (volatilLimpo) blocos.push({ type: 'text', text: volatilLimpo });
+  const blocos = [{ type: 'text', text: partes[0], cache_control: { type: 'ephemeral' } }];
+  if (partes[1]) blocos.push({ type: 'text', text: partes[1], cache_control: { type: 'ephemeral' } });
+  if (partes[2]) blocos.push({ type: 'text', text: partes[2] });
   return blocos;
 }
 
-function registrarUso(etapa, modelo, usage) {
+function registrarUso(etapa, provedor, modelo, usage) {
   if (!usage) return;
   const entrada = usage.input_tokens ?? 0;
   const cacheEscrito = usage.cache_creation_input_tokens ?? 0;
   const cacheLido = usage.cache_read_input_tokens ?? 0;
   console.log(
-    `[ia:uso] ${etapa} modelo=${modelo} entrada=${entrada} saida=${usage.output_tokens ?? 0} ` +
+    `[ia:uso] ${etapa} provedor=${String(provedor || '?').replace(/\s+/g, '_')} modelo=${modelo} entrada=${entrada} saida=${usage.output_tokens ?? 0} ` +
     `cache_escrito=${cacheEscrito} cache_lido=${cacheLido} prompt_total=${entrada + cacheEscrito + cacheLido}`
   );
 }
@@ -244,13 +257,16 @@ PROVEDOR: ${tenant.nome}
 ASSISTENTE: ${tenant.nomeAssistente || 'Assistente'}
 ${atalhosProvedor}`;
 
-  // Tudo que varia: a hora, os dados do cliente da vez, se há atendente de
-  // plantão e se esta conversa ainda precisa de etiqueta. Vem por último
-  // também porque é o mais recente que o modelo lê antes de responder.
-  const parteVolatil = `DATA E HORA ATUAL: ${agora} (horário de Brasília). Use isso para contextualizar qualquer referência a datas. Se for cumprimentar o cliente, use exatamente "${saudacaoAtual()}" — não calcule por conta própria a partir da hora acima.
-
-${contextoSgp}${blocoForaHorario}
+  // O cliente da vez: muda de conversa para conversa, mas é idêntico nas várias
+  // rodadas do laço de ferramentas da mesma mensagem — e é ali que está o
+  // desperdício. Uma mensagem que precisa identificar por CPF e depois puxar a
+  // 2ª via reenvia o prompt inteiro três vezes, com este bloco igual nas três.
+  const parteConversa = `${contextoSgp}${blocoForaHorario}
 ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclua ao final da sua resposta (linha separada): TAG:categoria — onde categoria é exatamente uma de: ${TAGS_VALIDAS.join(', ')}.` : ''}`;
+
+  // A hora fica sozinha no fim e fora do cache: ela muda a cada minuto, e
+  // qualquer coisa depois dela herdaria essa volatilidade.
+  const parteAgora = `DATA E HORA ATUAL: ${agora} (horário de Brasília). Use isso para contextualizar qualquer referência a datas. Se for cumprimentar o cliente, use exatamente "${saudacaoAtual()}" — não calcule por conta própria a partir da hora acima.`;
 
   // 3. Histórico das últimas 10 mensagens (exclui mensagens de sistema)
   const msgs = historico
@@ -300,7 +316,7 @@ ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclu
     const corpo = () => ({
       model: modelo,
       max_tokens: 1024,
-      system: sistemaEmBlocos(parteEstavel, parteVolatil),
+      system: sistemaEmBlocos(parteEstavel, parteConversa, parteAgora),
       // O Sonnet 5 raciocina por padrão (o 4.6 não), e o raciocínio sai do
       // mesmo max_tokens da resposta: com 1024 o cliente receberia mensagem
       // cortada, e o raciocínio ainda é cobrado como saída. Desligado, o
@@ -325,7 +341,7 @@ ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclu
       console.warn('[ia] system em blocos recusado pela API; seguindo sem cache de prompt:', err.message);
       resposta = await anthropic.messages.create(corpo());
     }
-    registrarUso('atendimento', modelo, resposta.usage);
+    registrarUso('atendimento', tenant.nome, modelo, resposta.usage);
     return resposta;
   };
 
@@ -521,7 +537,7 @@ PROVEDOR: ${tenant.nome}`;
     thinking: { type: 'disabled' },
     messages: conversaAcumulada,
   });
-  registrarUso('sugestao', MODELO_COMPLETO, resposta.usage);
+  registrarUso('sugestao', tenant.nome, MODELO_COMPLETO, resposta.usage);
 
   const texto = resposta.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
 
