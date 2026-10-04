@@ -15,6 +15,62 @@ function tokenDaRequisicao(req) {
   return null;
 }
 
+// Cache curto da revalidação de sessão.
+//
+// Com o painel aberto são ~40 requisições por minuto por aba (lista de
+// conversas e mensagens a cada 5s, contadores, presença, filiais...), e cada
+// uma rodava este JOIN para buscar sempre a mesma linha. Era a consulta mais
+// repetida do sistema e a principal razão de o Neon nunca suspender.
+//
+// O preço é que desativar um usuário ou suspender um provedor leva até
+// SESSAO_TTL_MS para valer. Por isso os dois caminhos que importam —
+// desativação e logout — limpam a entrada na hora; o TTL só cobre o que mudar
+// direto no banco, por fora do painel.
+const SESSAO_TTL_MS = 30_000;
+const TETO_SESSOES = 500;
+const sessoes = new Map();
+
+export function invalidarSessao(id) {
+  if (id) sessoes.delete(`tenant:${id}`);
+  if (id) sessoes.delete(`super:${id}`);
+}
+
+// O logout não passa pelo autenticar — token expirado também precisa conseguir
+// sair —, então a invalidação lê o token por conta própria.
+export function invalidarSessaoDaRequisicao(req) {
+  const token = tokenDaRequisicao(req);
+  if (!token) return;
+  try {
+    invalidarSessao(jwt.verify(token, process.env.JWT_SECRET)?.id);
+  } catch {
+    // Token inválido ou expirado: não há sessão em cache que ele alcance.
+  }
+}
+
+// Suspender um provedor precisa derrubar todo mundo dele, não só quem pediu.
+export function invalidarSessoesDoTenant(tenantId) {
+  if (!tenantId) return;
+  for (const [chave, valor] of sessoes) {
+    if (valor?.user?.tenantId === tenantId) sessoes.delete(chave);
+  }
+}
+
+function doCache(chave) {
+  const achado = sessoes.get(chave);
+  if (!achado) return null;
+  if (Date.now() > achado.expira) {
+    sessoes.delete(chave);
+    return null;
+  }
+  return achado.user;
+}
+
+function guardar(chave, user) {
+  // Map cresce na ordem de inserção, então o primeiro é o mais antigo.
+  if (sessoes.size >= TETO_SESSOES) sessoes.delete(sessoes.keys().next().value);
+  sessoes.set(chave, { user, expira: Date.now() + SESSAO_TTL_MS });
+}
+
 export async function autenticar(req, res, next) {
   const token = tokenDaRequisicao(req);
   if (!token) {
@@ -22,6 +78,13 @@ export async function autenticar(req, res, next) {
   }
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
+
+    const chave = `${payload.role === 'superadmin' ? 'super' : 'tenant'}:${payload.id}`;
+    const emCache = doCache(chave);
+    if (emCache) {
+      req.user = emCache;
+      return next();
+    }
 
     if (payload.role === 'superadmin') {
       const [admin] = await db.select({
@@ -31,7 +94,9 @@ export async function autenticar(req, res, next) {
       }).from(superAdmins).where(eq(superAdmins.id, payload.id)).limit(1);
 
       if (!admin) return res.status(401).json({ erro: 'Usuário não está mais ativo' });
-      req.user = { ...payload, ...admin, role: 'superadmin' };
+      const userSuper = { ...payload, ...admin, role: 'superadmin' };
+      guardar(chave, userSuper);
+      req.user = userSuper;
       return next();
     }
 
@@ -58,6 +123,7 @@ export async function autenticar(req, res, next) {
     }
 
     const { ativo, tenantAtivo, ...userAtual } = usuario;
+    guardar(chave, userAtual);
     req.user = userAtual;
     next();
   } catch (err) {

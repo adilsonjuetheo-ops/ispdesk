@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { db } from '../db/index.js';
 import { superAdmins, tenantUsers, tenants } from '../db/schema.js';
 import { eq, count } from 'drizzle-orm';
-import { autenticar } from '../middleware/auth.js';
+import { autenticar, invalidarSessaoDaRequisicao } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -69,6 +69,8 @@ router.post('/login', async (req, res) => {
 router.post('/logout', (req, res) => {
   const { maxAge, ...opcoes } = opcoesCookie(req);
   res.clearCookie('ispdesk_session', opcoes);
+  // Sem isto, a sessao em cache seguiria valida por ate 30s depois do logout.
+  invalidarSessaoDaRequisicao(req);
   res.json({ ok: true });
 });
 

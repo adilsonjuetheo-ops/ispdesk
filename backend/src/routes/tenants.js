@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db/index.js';
 import { tenants, tenantUsers, conversas, usoTokensIa } from '../db/schema.js';
 import { eq, count, and, gte } from 'drizzle-orm';
-import { autenticar, apenasSuper } from '../middleware/auth.js';
+import { autenticar, apenasSuper, invalidarSessoesDoTenant } from '../middleware/auth.js';
 import { proximoVencimento } from '../services/vencimento.js';
 import { custoDolares, custoSemCacheDolares } from '../config/precosIa.js';
 import crypto from 'crypto';
@@ -371,6 +371,8 @@ router.delete('/:id', async (req, res) => {
   await db.update(tenants)
     .set({ ativo: false, atualizadoEm: new Date() })
     .where(eq(tenants.id, req.params.id));
+  // Suspender provedor derruba todos os usuarios dele, nao so quem pediu.
+  invalidarSessoesDoTenant(req.params.id);
   res.json({ mensagem: 'Provedor desativado' });
 });
 

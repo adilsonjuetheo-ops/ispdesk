@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import { db } from '../db/index.js';
 import { tenantUsers, filiais } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
-import { autenticar, apenasAdmin, mesmotenant } from '../middleware/auth.js';
+import { autenticar, apenasAdmin, mesmotenant, invalidarSessao } from '../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
 router.use(autenticar, apenasAdmin, mesmotenant);
@@ -103,6 +103,8 @@ router.delete('/:id', async (req, res) => {
   await db.update(tenantUsers)
     .set({ ativo: false })
     .where(and(eq(tenantUsers.id, req.params.id), eq(tenantUsers.tenantId, req.params.tenantId)));
+  // O middleware guarda a sessao por 30s; desativar tem que valer agora.
+  invalidarSessao(req.params.id);
   res.json({ mensagem: 'Agente desativado' });
 });
 
