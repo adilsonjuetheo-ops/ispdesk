@@ -136,6 +136,19 @@ export async function runMigrations() {
       )
     `;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_lembrete_enviado_unico ON lembrete_fatura_enviados(tenant_id, titulo_id, tipo)`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS uso_tokens_ia (
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        dia text NOT NULL,
+        modelo text NOT NULL,
+        chamadas integer DEFAULT 0,
+        entrada integer DEFAULT 0,
+        saida integer DEFAULT 0,
+        cache_escrito integer DEFAULT 0,
+        cache_lido integer DEFAULT 0,
+        PRIMARY KEY (tenant_id, dia, modelo)
+      )
+    `;
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS numero_recebido_id text`;
     await sql`
       CREATE TABLE IF NOT EXISTS lembretes (

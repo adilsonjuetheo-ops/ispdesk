@@ -239,6 +239,28 @@ export const lembreteFaturaEnviados = pgTable('lembrete_fatura_enviados', {
   unico: uniqueIndex('idx_lembrete_enviado_unico').on(t.tenantId, t.tituloId, t.tipo),
 }));
 
+// Consumo de tokens da API de IA, somado por provedor/dia/modelo.
+//
+// Agregado, e não uma linha por chamada: o laço de ferramentas faz duas ou três
+// chamadas por mensagem do cliente, e guardar cada uma encheria a tabela sem
+// responder nada que o total do dia já não responda. Assim são ~5 provedores ×
+// 2 modelos × 365 dias por ano, e não precisa de job de limpeza.
+//
+// Diferente de uso_ia logo abaixo, que conta mensagens contra o limite do
+// plano. Esta aqui é sobre dinheiro gasto na API.
+export const usoTokensIa = pgTable('uso_tokens_ia', {
+  tenantId:     uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  dia:          text('dia').notNull(),    // AAAA-MM-DD no horário de Brasília
+  modelo:       text('modelo').notNull(),
+  chamadas:     integer('chamadas').default(0),
+  entrada:      integer('entrada').default(0),
+  saida:        integer('saida').default(0),
+  cacheEscrito: integer('cache_escrito').default(0),
+  cacheLido:    integer('cache_lido').default(0),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.tenantId, t.dia, t.modelo] }),
+}));
+
 export const usoIa = pgTable('uso_ia', {
   tenantId:        uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   mes:             text('mes').notNull(), // YYYY-MM

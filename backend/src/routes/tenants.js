@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { tenants, tenantUsers, conversas } from '../db/schema.js';
-import { eq, count, and } from 'drizzle-orm';
+import { tenants, tenantUsers, conversas, usoTokensIa } from '../db/schema.js';
+import { eq, count, and, gte } from 'drizzle-orm';
 import { autenticar, apenasSuper } from '../middleware/auth.js';
 import { proximoVencimento } from '../services/vencimento.js';
+import { custoDolares, custoSemCacheDolares } from '../config/precosIa.js';
 import crypto from 'crypto';
 import { getLimite, getUso, getMes } from '../services/limites.js';
 import { buscarContextoSgp, buscarContextoPorDocumentoSgp } from '../services/sgp.js';
@@ -219,6 +220,61 @@ router.use(autenticar, apenasSuper);
 router.get('/', async (req, res) => {
   const rows = await db.select(CAMPOS_TENANT_SEGUROS).from(tenants).orderBy(tenants.criadoEm);
   res.json(rows);
+});
+
+// Consumo da API de IA por provedor. Precisa vir antes de '/:id', senão o
+// Express casa 'consumo-ia' como se fosse um id de provedor.
+//
+// Devolve o custo real e o que teria custado sem cache: o total sozinho sobe
+// junto com o movimento, e sem a comparação não dá para saber se a separação
+// do prompt está economizando ou se só entrou mais gente conversando.
+router.get('/consumo-ia', async (req, res) => {
+  const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 180);
+  const corte = new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
+    .toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+
+  const linhas = await db
+    .select({
+      tenantId: usoTokensIa.tenantId,
+      nome: tenants.nome,
+      plano: tenants.plano,
+      modelo: usoTokensIa.modelo,
+      chamadas: usoTokensIa.chamadas,
+      entrada: usoTokensIa.entrada,
+      saida: usoTokensIa.saida,
+      cacheEscrito: usoTokensIa.cacheEscrito,
+      cacheLido: usoTokensIa.cacheLido,
+    })
+    .from(usoTokensIa)
+    .leftJoin(tenants, eq(tenants.id, usoTokensIa.tenantId))
+    .where(gte(usoTokensIa.dia, corte));
+
+  const porProvedor = new Map();
+  for (const l of linhas) {
+    const atual = porProvedor.get(l.tenantId) || {
+      tenantId: l.tenantId, nome: l.nome || '(removido)', plano: l.plano,
+      chamadas: 0, entrada: 0, saida: 0, cacheEscrito: 0, cacheLido: 0,
+      custo: 0, custoSemCache: 0, modelos: [],
+    };
+    atual.chamadas += l.chamadas || 0;
+    atual.entrada += l.entrada || 0;
+    atual.saida += l.saida || 0;
+    atual.cacheEscrito += l.cacheEscrito || 0;
+    atual.cacheLido += l.cacheLido || 0;
+    atual.custo += custoDolares(l) || 0;
+    atual.custoSemCache += custoSemCacheDolares(l) || 0;
+    if (!atual.modelos.includes(l.modelo)) atual.modelos.push(l.modelo);
+    porProvedor.set(l.tenantId, atual);
+  }
+
+  const provedores = [...porProvedor.values()].sort((a, b) => b.custo - a.custo);
+  const total = provedores.reduce((acc, p) => ({
+    custo: acc.custo + p.custo,
+    custoSemCache: acc.custoSemCache + p.custoSemCache,
+    chamadas: acc.chamadas + p.chamadas,
+  }), { custo: 0, custoSemCache: 0, chamadas: 0 });
+
+  res.json({ dias, desde: corte, provedores, total });
 });
 
 router.post('/', async (req, res) => {

@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { atalhos } from '../db/schema.js';
+import { atalhos, usoTokensIa } from '../db/schema.js';
 import { buscarContextoSgp, buscarContextoPorDocumentoSgp, getTools, executarTool } from './sgp.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -97,15 +97,48 @@ function sistemaEmBlocos(estavel, conversa, agora) {
   return blocos;
 }
 
-function registrarUso(etapa, provedor, modelo, usage) {
+// Soma o consumo no acumulado do dia. Um UPSERT em vez de uma linha por
+// chamada: o laço de ferramentas faz duas ou três chamadas por mensagem, e o
+// que interessa é o total por provedor, não o detalhe de cada ida ao modelo.
+async function somarUsoDoDia(tenantId, modelo, usage) {
+  if (!tenantId) return;
+  // 'en-CA' porque é o locale que formata como AAAA-MM-DD. O fuso é o de
+  // Brasília para o dia virar à meia-noite daqui, não à meia-noite em UTC.
+  const dia = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  const valores = {
+    entrada: usage.input_tokens ?? 0,
+    saida: usage.output_tokens ?? 0,
+    cacheEscrito: usage.cache_creation_input_tokens ?? 0,
+    cacheLido: usage.cache_read_input_tokens ?? 0,
+  };
+
+  await db.insert(usoTokensIa)
+    .values({ tenantId, dia, modelo, chamadas: 1, ...valores })
+    .onConflictDoUpdate({
+      target: [usoTokensIa.tenantId, usoTokensIa.dia, usoTokensIa.modelo],
+      set: {
+        chamadas: sql`${usoTokensIa.chamadas} + 1`,
+        entrada: sql`${usoTokensIa.entrada} + ${valores.entrada}`,
+        saida: sql`${usoTokensIa.saida} + ${valores.saida}`,
+        cacheEscrito: sql`${usoTokensIa.cacheEscrito} + ${valores.cacheEscrito}`,
+        cacheLido: sql`${usoTokensIa.cacheLido} + ${valores.cacheLido}`,
+      },
+    });
+}
+
+function registrarUso(etapa, tenant, modelo, usage) {
   if (!usage) return;
   const entrada = usage.input_tokens ?? 0;
   const cacheEscrito = usage.cache_creation_input_tokens ?? 0;
   const cacheLido = usage.cache_read_input_tokens ?? 0;
   console.log(
-    `[ia:uso] ${etapa} provedor=${String(provedor || '?').replace(/\s+/g, '_')} modelo=${modelo} entrada=${entrada} saida=${usage.output_tokens ?? 0} ` +
+    `[ia:uso] ${etapa} provedor=${String(tenant?.nome || '?').replace(/\s+/g, '_')} modelo=${modelo} entrada=${entrada} saida=${usage.output_tokens ?? 0} ` +
     `cache_escrito=${cacheEscrito} cache_lido=${cacheLido} prompt_total=${entrada + cacheEscrito + cacheLido}`
   );
+  // Sem await: contabilidade não pode segurar a resposta ao cliente, e se o
+  // banco engasgar é melhor perder a estatística do que o atendimento.
+  somarUsoDoDia(tenant?.id, modelo, usage)
+    .catch(err => console.error('[ia:uso] Falha ao gravar consumo:', err.message));
 }
 
 function extrairIdsAutorizados(contexto) {
@@ -341,7 +374,7 @@ ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclu
       console.warn('[ia] system em blocos recusado pela API; seguindo sem cache de prompt:', err.message);
       resposta = await anthropic.messages.create(corpo());
     }
-    registrarUso('atendimento', tenant.nome, modelo, resposta.usage);
+    registrarUso('atendimento', tenant, modelo, resposta.usage);
     return resposta;
   };
 
@@ -537,7 +570,7 @@ PROVEDOR: ${tenant.nome}`;
     thinking: { type: 'disabled' },
     messages: conversaAcumulada,
   });
-  registrarUso('sugestao', tenant.nome, MODELO_COMPLETO, resposta.usage);
+  registrarUso('sugestao', tenant, MODELO_COMPLETO, resposta.usage);
 
   const texto = resposta.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
 
