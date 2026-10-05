@@ -261,6 +261,18 @@ export const usoTokensIa = pgTable('uso_tokens_ia', {
   pk: primaryKey({ columns: [t.tenantId, t.dia, t.modelo] }),
 }));
 
+// O que o assistente resolveu sozinho no sistema do provedor — segunda via
+// entregue, desbloqueio feito. Antes isso só existia diluído no texto das
+// conversas, e a tela de Resultados não tinha como contar. Só entra o que deu
+// certo: é o que conta como trabalho poupado.
+export const acoesBot = pgTable('acoes_bot', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  tenantId:   uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  conversaId: uuid('conversa_id').references(() => conversas.id, { onDelete: 'set null' }),
+  acao:       text('acao').notNull(), // 'segunda_via' | 'desbloqueio'
+  criadoEm:   timestamp('criado_em').defaultNow(),
+});
+
 export const usoIa = pgTable('uso_ia', {
   tenantId:        uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   mes:             text('mes').notNull(), // YYYY-MM

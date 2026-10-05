@@ -149,6 +149,16 @@ export async function runMigrations() {
         PRIMARY KEY (tenant_id, dia, modelo)
       )
     `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS acoes_bot (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        conversa_id uuid REFERENCES conversas(id) ON DELETE SET NULL,
+        acao text NOT NULL,
+        criado_em timestamp DEFAULT now()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_acoes_bot_tenant ON acoes_bot(tenant_id, criado_em)`;
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS numero_recebido_id text`;
     await sql`
       CREATE TABLE IF NOT EXISTS lembretes (

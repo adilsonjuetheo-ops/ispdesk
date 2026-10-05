@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { atalhos, usoTokensIa } from '../db/schema.js';
+import { atalhos, usoTokensIa, acoesBot } from '../db/schema.js';
 import { buscarContextoSgp, buscarContextoPorDocumentoSgp, getTools, executarTool } from './sgp.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -139,6 +139,29 @@ function registrarUso(etapa, tenant, modelo, usage) {
   // banco engasgar é melhor perder a estatística do que o atendimento.
   somarUsoDoDia(tenant?.id, modelo, usage)
     .catch(err => console.error('[ia:uso] Falha ao gravar consumo:', err.message));
+}
+
+// Os adaptadores de SGP devolvem sucesso e falha no mesmo canal (texto ou
+// objeto), então o sucesso é reconhecido pelo que cada um responde quando dá
+// certo: a 2ª via volta como objeto com o arquivo, ou como texto com linha
+// digitável / PIX / link; o desbloqueio, com "desbloqueio ... realizado".
+function acaoBemSucedida(tool, resultado) {
+  const texto = typeof resultado === 'object' ? resultado?.texto || '' : String(resultado || '');
+  if (tool === 'enviar_segunda_via') {
+    return typeof resultado === 'object' || /linha digit|pix copia|link do boleto/i.test(texto);
+  }
+  if (tool === 'desbloquear_cliente') return /desbloqueio.{0,20}realizado/i.test(texto);
+  return false;
+}
+
+const ACAO_POR_TOOL = { enviar_segunda_via: 'segunda_via', desbloquear_cliente: 'desbloqueio' };
+
+function registrarAcaoBot(tenant, conversa, tool, resultado) {
+  const acao = ACAO_POR_TOOL[tool];
+  if (!acao || !tenant?.id || !acaoBemSucedida(tool, resultado)) return;
+  // Sem await, como a contabilidade de tokens: estatística não segura resposta.
+  db.insert(acoesBot).values({ tenantId: tenant.id, conversaId: conversa?.id || null, acao })
+    .catch(err => console.error('[ia] Falha ao registrar ação do bot:', err.message));
 }
 
 function extrairIdsAutorizados(contexto) {
@@ -406,6 +429,7 @@ ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclu
         } else {
           console.log(`[IA] Executando tool autorizada: ${toolBlock.name}`);
           resultado = await executarTool(toolBlock.name, toolBlock.input, tenant);
+          registrarAcaoBot(tenant, conversa, toolBlock.name, resultado);
           if (toolBlock.name === 'buscar_por_documento') {
             const novosIds = extrairIdsAutorizados(typeof resultado === 'object' ? resultado.texto : resultado);
             novosIds.idsCliente.forEach(id => idsAutorizados.idsCliente.add(id));

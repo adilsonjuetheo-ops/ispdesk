@@ -4,16 +4,19 @@ const DIAS_NOME = [
   'quinta-feira', 'sexta-feira', 'sábado',
 ];
 
-function agoraBrasilia() {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+function agoraBrasilia(data = new Date()) {
+  return new Date(data.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
 }
 
 // Os horários configurados definem quando existe ATENDENTE HUMANO disponível.
 // Fora deles o assistente continua atendendo, apenas ciente de que não há
 // ninguém da equipe para assumir a conversa no momento.
-export function dentroDoHorario(horarios) {
+//
+// `data` existe para a tela de Resultados contar quantos atendimentos caíram
+// fora do expediente; no atendimento ao vivo vale sempre o agora.
+export function dentroDoHorario(horarios, data = new Date()) {
   if (!horarios?.dias) return true;
-  const agora = agoraBrasilia();
+  const agora = agoraBrasilia(data);
   const cfg = horarios.dias[DIAS_KEYS[agora.getDay()]];
   if (!cfg?.ativo) return false;
 

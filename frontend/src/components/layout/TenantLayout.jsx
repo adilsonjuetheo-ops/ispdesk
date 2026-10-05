@@ -8,7 +8,7 @@ import { usePresencaStatus, STATUS } from '../../hooks/usePresencaStatus.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
   Activity, Clock, UserCheck, Archive, MapPin, Zap, AlertTriangle, Star, X, BookUser,
-  PanelLeftClose, PanelLeftOpen, BellRing, Sun, Moon, FileSignature } from 'lucide-react';
+  PanelLeftClose, PanelLeftOpen, BellRing, Sun, Moon, FileSignature, TrendingUp } from 'lucide-react';
 import api from '../../lib/api.js';
 import UpdateBanner from '../UpdateBanner.jsx';
 import BottomTabBar from '../BottomTabBar.jsx';
@@ -293,6 +293,9 @@ export default function TenantLayout() {
           {/* Admin */}
           {user?.role === 'admin' && (
             <div className="pt-2 mt-1 border-t border-gray-100 dark:border-gray-800 space-y-0.5">
+              <NavLink to="/resultados" className={navClass} title={colapsado ? 'Resultados' : undefined}>
+                <TrendingUp /> {!colapsado && 'Resultados'}
+              </NavLink>
               <NavLink to="/relatorio" className={navClass} title={colapsado ? 'Relatório' : undefined}>
                 <BarChart2 /> {!colapsado && 'Relatório'}
               </NavLink>
