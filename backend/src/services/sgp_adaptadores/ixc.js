@@ -4,6 +4,10 @@ import { SgpAdaptador } from './base.js';
 // já travou. Sem teto, uma instância lenta seguraria o webhook indefinidamente.
 const TIMEOUT_MS = 15000;
 
+// Status de cliente_contrato: A ativo, P pré-contrato, N negativado, I inativo
+// (é como o IXC deixa o contrato cancelado), D desistiu. Negativado ainda deve.
+const STATUS_CONTRATO_ENCERRADO = new Set(['I', 'D']);
+
 export class IxcAdaptador extends SgpAdaptador {
 
   #urlValidada = null;
@@ -153,32 +157,31 @@ export class IxcAdaptador extends SgpAdaptador {
 
   // Monta contexto completo a partir do registro de cliente já buscado
   async #buildContexto(c) {
-    const contData = await this.#listar('cliente_contrato', {
-      qtype: 'cliente_contrato.id_cliente',
-      query: c.id,
-      oper: '=',
-      rp: '5',
-    }).catch(() => ({ registros: [] }));
+    const contratos = (await this.#contratosDoCliente(c.id)) || [];
 
     const contratoAtivo =
-      (contData.registros || []).find(ct => ct.status === 'A') ||
-      contData.registros?.[0];
+      contratos.find(ct => ct.status === 'A') ||
+      contratos[0];
 
     // faturas === null significa que a consulta falhou. Não dá para tratar isso
     // como "sem débito": o bot afirmaria que um inadimplente está em dia e ainda
     // ofereceria desbloqueio.
+    //
+    // rp maior que o necessário de propósito: o filtro de contrato encerrado
+    // roda depois, e com 10 as faturas do contrato atual podiam ficar de fora
+    // da página atrás das do cancelado.
     let faturas = null;
     try {
       const fatData = await this.#listar('fn_areceber', {
         qtype: 'fn_areceber.id_cliente',
         query: c.id,
         oper: '=',
-        rp: '10',
+        rp: '50',
         sortname: 'fn_areceber.data_vencimento',
         sortorder: 'asc',
         grid_param: JSON.stringify([{ TB: 'fn_areceber.status', OP: '=', P: 'A' }]),
       });
-      faturas = fatData.registros || [];
+      faturas = await this.#semContratoEncerrado(fatData.registros || []);
     } catch (err) {
       console.error(`[IXC] Falha ao consultar faturas do cliente ${c.id}:`, err.message);
     }
@@ -324,6 +327,53 @@ export class IxcAdaptador extends SgpAdaptador {
   // e o provedor fica sem lembrete nenhum, em silêncio.
 
   #clientesCache = new Map(); // id_cliente -> registro do cliente
+  #contratosCache = new Map(); // id_cliente -> registros de cliente_contrato
+  #avisouSemContrato = false;
+
+  // Falha devolve null (e não entra no cache): sem a lista de contratos, o
+  // filtro abaixo deixa tudo passar em vez de esconder dívida por engano.
+  async #contratosDoCliente(idCliente) {
+    const chave = String(idCliente);
+    if (this.#contratosCache.has(chave)) return this.#contratosCache.get(chave);
+    try {
+      const data = await this.#listar('cliente_contrato', {
+        qtype: 'cliente_contrato.id_cliente', query: chave, oper: '=', rp: '50',
+      });
+      const contratos = data?.registros || [];
+      this.#contratosCache.set(chave, contratos);
+      return contratos;
+    } catch (err) {
+      console.error(`[IXC] Falha ao listar contratos do cliente ${chave}:`, err.message);
+      return null;
+    }
+  }
+
+  // Cancelar um contrato no IXC o deixa Inativo (I) ou Desistiu (D), mas as
+  // faturas abertas dele continuam "A" em fn_areceber. Como toda busca de
+  // fatura era por cliente, quem já teve um contrato cancelado recebia na 2ª
+  // via, no contexto do bot e nos lembretes as faturas do contrato morto
+  // misturadas às do atual — caso real na Mataverde.
+  //
+  // Fatura sem contrato (avulsa) continua aparecendo: não há como saber a que
+  // ela pertence, e esconder dívida é pior do que mostrar uma a mais.
+  async #semContratoEncerrado(faturas) {
+    if (faturas.length && faturas.every(f => !('id_contrato' in f)) && !this.#avisouSemContrato) {
+      this.#avisouSemContrato = true;
+      console.warn('[IXC] fn_areceber veio sem id_contrato — faturas de contrato cancelado não serão filtradas.');
+    }
+
+    const resultado = [];
+    for (const f of faturas) {
+      const idContrato = String(f.id_contrato ?? '');
+      if (!idContrato || idContrato === '0') { resultado.push(f); continue; }
+
+      const contratos = await this.#contratosDoCliente(f.id_cliente);
+      const contrato = contratos?.find(ct => String(ct.id) === idContrato);
+      if (contrato && STATUS_CONTRATO_ENCERRADO.has(contrato.status)) continue;
+      resultado.push(f);
+    }
+    return resultado;
+  }
 
   async #clientePorId(id) {
     const chave = String(id);
@@ -403,7 +453,7 @@ export class IxcAdaptador extends SgpAdaptador {
       page++;
     }
 
-    return this.#titulosParaLembrete(faturas);
+    return this.#titulosParaLembrete(await this.#semContratoEncerrado(faturas));
   }
 
   async buscarTelefonePorDocumento(doc) {
@@ -429,13 +479,13 @@ export class IxcAdaptador extends SgpAdaptador {
       qtype: 'fn_areceber.id_cliente',
       query: cliente.id,
       oper: '=',
-      rp: '10',
+      rp: '50',
       sortname: 'fn_areceber.data_vencimento',
       sortorder: 'asc',
       grid_param: JSON.stringify([{ TB: 'fn_areceber.status', OP: '=', P: 'A' }]),
     }).catch(() => null);
 
-    const fatura = (data?.registros || [])[0];
+    const [fatura] = await this.#semContratoEncerrado(data?.registros || []);
     if (!fatura) return null;
 
     this.#clientesCache.set(String(cliente.id), cliente);
@@ -472,12 +522,12 @@ export class IxcAdaptador extends SgpAdaptador {
           qtype: 'fn_areceber.id_cliente',
           query: toolInput.id_cliente,
           oper: '=',
-          rp: '5',
+          rp: '50',
           sortname: 'fn_areceber.data_vencimento',
           sortorder: 'asc',
           grid_param: JSON.stringify([{ TB: 'fn_areceber.status', OP: '=', P: 'A' }]),
         });
-        const faturas = data.registros || [];
+        const faturas = await this.#semContratoEncerrado(data.registros || []);
         if (!faturas.length) return 'Nenhuma fatura em aberto.';
 
         const f = faturas.sort(
