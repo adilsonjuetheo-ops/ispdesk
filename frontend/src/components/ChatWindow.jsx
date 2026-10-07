@@ -1048,6 +1048,27 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
     });
   };
 
+  // Atendimento assistido por vídeo, enquanto a Calling API da Meta não tem
+  // vídeo (só voz). Abre uma sala do Jitsi para o atendente e deixa o convite
+  // no campo, sem enviar: o atendente revisa e manda pelo envio de sempre.
+  // A sala tem nome aleatório porque quem tiver o link entra.
+  const handleVideo = () => {
+    if (texto.trim() && !confirm('Substituir o que você já escreveu pelo convite da chamada de vídeo?')) return;
+    const sala = `ispdesk-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+    const link = `https://meet.jit.si/${sala}`;
+    // No celular o Jitsi para numa tela pedindo para instalar o app; com
+    // disableDeepLinking a chamada abre direto no navegador.
+    const linkCliente = `${link}#config.disableDeepLinking=true`;
+    window.open(link, '_blank', 'noopener');
+    setTexto(
+      'Vamos fazer uma chamada de vídeo para eu ver o seu equipamento e te orientar. ' +
+      'Toque no link abaixo — abre direto no navegador, não precisa instalar nada:\n\n' +
+      `${linkCliente}\n\n` +
+      'Quando abrir, permita o uso da câmera. Se puder, use a câmera de trás para mostrar o roteador.'
+    );
+    textareaRef.current?.focus();
+  };
+
   // Preenche o campo com uma sugestão da IA. Não envia nada: o atendente lê,
   // edita e decide. Se já houver texto digitado, confirma antes de substituir.
   const handleSugerir = async () => {
@@ -1539,6 +1560,13 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                             <span className="text-xs font-medium hidden sm:inline">
                               {sugerindo ? 'Gerando...' : 'Gerar resposta'}
                             </span>
+                          </button>
+                          <button type="button"
+                            onClick={handleVideo}
+                            disabled={!podeAtuar || gravando}
+                            title="Chamada de vídeo com o cliente"
+                            className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors">
+                            <Video className="w-4 h-4" />
                           </button>
                           <button type="button"
                             onClick={() => fileRef.current?.click()}
