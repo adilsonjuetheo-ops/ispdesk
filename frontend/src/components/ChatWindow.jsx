@@ -1064,7 +1064,8 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
       'Vamos fazer uma chamada de vídeo para eu ver o seu equipamento e te orientar. ' +
       'Toque no link abaixo — abre direto no navegador, não precisa instalar nada:\n\n' +
       `${linkCliente}\n\n` +
-      'Quando abrir, permita o uso da câmera. Se puder, use a câmera de trás para mostrar o roteador.'
+      'Quando abrir, permita o uso da câmera e do microfone — assim a gente se vê e conversa. ' +
+      'Se puder, use a câmera de trás para mostrar o roteador.'
     );
     textareaRef.current?.focus();
   };
