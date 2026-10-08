@@ -10,7 +10,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // desbloqueio, dúvidas comuns) por uma fração do custo do Sonnet. Quando o
 // próprio modelo sinaliza que o caso é incomum (ACTION:ESCALATE), a mesma
 // conversa — já com qualquer tool já executada — continua no Sonnet.
-const MODELO_RAPIDO = 'claude-haiku-4-5-20251001';
+const MODELO_RAPIDO = 'claude-haiku-5-5';
 const MODELO_COMPLETO = 'claude-sonnet-5';
 
 // clienteWhatsapp: número do remetente vindo direto do payload do webhook
@@ -69,10 +69,20 @@ ${textos}
 // daí a rede em chamarModelo e este interruptor.
 let cacheDePromptIndisponivel = false;
 
-function pareceRecusaDeFormato(err) {
-  if (err?.status !== 400) return false;
+// Mesma ideia para o output_config/effort, que entrou com o Haiku 5.5: se a API
+// recusar o campo, o atendimento dos cinco provedores cairia junto. Na primeira
+// recusa o campo some e a chamada é refeita — perde-se o controle de esforço,
+// não o atendimento.
+let efeitoIndisponivel = false;
+
+// Devolve qual campo a API recusou, ou null se o 400 veio de outra coisa (aí o
+// erro sobe, porque desligar recurso por engano esconderia o problema real).
+function campoRecusado(err) {
+  if (err?.status !== 400) return null;
   const texto = String(err?.message || '').toLowerCase();
-  return texto.includes('system') || texto.includes('cache_control');
+  if (texto.includes('output_config') || texto.includes('effort')) return 'efeito';
+  if (texto.includes('system') || texto.includes('cache_control')) return 'cache';
+  return null;
 }
 
 // Dois pontos de corte, cada um pegando um tipo de repetição diferente:
@@ -371,14 +381,19 @@ ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclu
   const chamarModelo = async () => {
     const corpo = () => ({
       model: modelo,
-      max_tokens: 1024,
+      // O raciocínio sai do mesmo teto da resposta. O Haiku 4.5 não raciocinava
+      // e 1024 bastava; o 5.5 raciocina por padrão, e com o teto antigo o
+      // cliente podia receber mensagem cortada no meio. Teto maior não custa
+      // nada por si só — saída é cobrada pelo que o modelo gera, não pelo teto.
+      max_tokens: 2048,
       system: sistemaEmBlocos(parteEstavel, parteConversa, parteAgora),
-      // O Sonnet 5 raciocina por padrão (o 4.6 não), e o raciocínio sai do
-      // mesmo max_tokens da resposta: com 1024 o cliente receberia mensagem
-      // cortada, e o raciocínio ainda é cobrado como saída. Desligado, o
-      // comportamento é o de sempre — só que 33% mais barato por token.
-      // Só vai para o Sonnet: o Haiku não raciocina por padrão e usa outro
-      // formato deste campo.
+      // Haiku 5.5 vem com raciocínio adaptativo em esforço 'medium'. Para
+      // atendimento — consultar fatura, mandar 2ª via, desbloquear — 'low' é o
+      // patamar certo: menos token de raciocínio, resposta mais rápida, e a
+      // conversa não fica melhor por ele pensar mais.
+      ...(modelo === MODELO_RAPIDO && !efeitoIndisponivel && { output_config: { effort: 'low' } }),
+      // Sonnet 5 raciocina por padrão e aqui isso não agrega: sai do mesmo
+      // max_tokens e é cobrado como saída.
       ...(modelo === MODELO_COMPLETO && { thinking: { type: 'disabled' } }),
       ...(tools.length > 0 && { tools }),
       messages: conversaAcumulada,
@@ -388,13 +403,22 @@ ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclu
     try {
       resposta = await anthropic.messages.create(corpo());
     } catch (err) {
-      // Se a API recusar o system em blocos, o atendimento dos quatro
-      // provedores cairia junto. Na primeira recusa desse tipo o cache é
-      // desligado para o processo inteiro e a chamada é refeita com o prompt
-      // numa string só — perde-se a economia, não o atendimento.
-      if (cacheDePromptIndisponivel || !pareceRecusaDeFormato(err)) throw err;
-      cacheDePromptIndisponivel = true;
-      console.warn('[ia] system em blocos recusado pela API; seguindo sem cache de prompt:', err.message);
+      // Campo recusado pela API derruba o atendimento dos cinco provedores de
+      // uma vez. Na primeira recusa o recurso é desligado para o processo
+      // inteiro e a chamada é refeita sem ele — perde-se a economia ou o
+      // controle de esforço, não o atendimento.
+      const campo = campoRecusado(err);
+      if (!campo) throw err;
+      if (campo === 'cache' && cacheDePromptIndisponivel) throw err;
+      if (campo === 'efeito' && efeitoIndisponivel) throw err;
+
+      if (campo === 'cache') {
+        cacheDePromptIndisponivel = true;
+        console.warn('[ia] system em blocos recusado; seguindo sem cache de prompt:', err.message);
+      } else {
+        efeitoIndisponivel = true;
+        console.warn('[ia] output_config recusado; seguindo no esforço padrão:', err.message);
+      }
       resposta = await anthropic.messages.create(corpo());
     }
     registrarUso('atendimento', tenant, modelo, resposta.usage);
