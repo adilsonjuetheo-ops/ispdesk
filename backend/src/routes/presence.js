@@ -17,6 +17,7 @@ router.post('/ping', (req, res) => {
   presenceMap.set(req.user.id, {
     nome: req.user.nome,
     role: req.user.role,
+    fotoVersao: req.user.fotoVersao || null,
     tenantId: req.user.tenantId,
     status,
     lastSeen: Date.now(),
@@ -35,7 +36,7 @@ router.get('/', (req, res) => {
       continue;
     }
     if (data.tenantId !== tenantId) continue;
-    online.push({ id: userId, nome: data.nome, role: data.role, status: data.status || 'disponivel' });
+    online.push({ id: userId, nome: data.nome, role: data.role, status: data.status || 'disponivel', fotoVersao: data.fotoVersao || null });
   }
 
   res.json(online);

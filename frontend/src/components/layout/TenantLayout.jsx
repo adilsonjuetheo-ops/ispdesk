@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 import { usePolling } from '../../hooks/usePolling.js';
@@ -8,8 +8,9 @@ import { usePresencaStatus, STATUS } from '../../hooks/usePresencaStatus.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
   Activity, Clock, UserCheck, Archive, MapPin, Zap, AlertTriangle, Star, X, BookUser,
-  PanelLeftClose, PanelLeftOpen, BellRing, Sun, Moon, FileSignature, TrendingUp } from 'lucide-react';
+  PanelLeftClose, PanelLeftOpen, BellRing, Sun, Moon, FileSignature, TrendingUp, Camera } from 'lucide-react';
 import api from '../../lib/api.js';
+import AvatarAtendente, { reduzirParaAvatar } from '../AvatarAtendente.jsx';
 import UpdateBanner from '../UpdateBanner.jsx';
 import BottomTabBar from '../BottomTabBar.jsx';
 
@@ -38,6 +39,79 @@ function avatarColor(nome) {
   let hash = 0;
   for (const c of nome) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+// A versão da foto sai da lista de presença, que o painel já consulta — assim
+// o avatar próprio não custa requisição nenhuma a mais. Depois de enviar ou
+// remover, o estado local manda até a presença alcançar (até 15s).
+// undefined = nada mexeu aqui; null = o atendente removeu agora.
+function MinhaFoto({ user, online }) {
+  const [versaoLocal, setVersaoLocal] = useState(undefined);
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState('');
+  const fileRef = useRef(null);
+
+  const daPresenca = online.find(u => u.id === user?.id)?.fotoVersao ?? null;
+  const versao = versaoLocal === undefined ? daPresenca : versaoLocal;
+
+  const escolher = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setErro(''); setOcupado(true);
+    try {
+      const fotoUrl = await reduzirParaAvatar(file);
+      const r = await api.put('/auth/me/foto', { fotoUrl });
+      setVersaoLocal(r.data.fotoVersao);
+    } catch (err) {
+      setErro(err.response?.data?.erro || err.message || 'Não foi possível enviar a foto.');
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  const remover = async () => {
+    setErro(''); setOcupado(true);
+    try {
+      await api.delete('/auth/me/foto');
+      setVersaoLocal(null);
+    } catch {
+      setErro('Não foi possível remover a foto.');
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  return (
+    <div className="shrink-0">
+      <div className="relative group">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={ocupado}
+          title={versao ? 'Trocar sua foto' : 'Enviar sua foto'}
+          className="block rounded-full disabled:opacity-50"
+        >
+          <AvatarAtendente id={user?.id} nome={user?.nome} fotoVersao={versao} tamanho={34} cor="#9ca3af" />
+          <span className="absolute inset-0 rounded-full bg-black/45 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <Camera className="w-3.5 h-3.5 text-white" />
+          </span>
+        </button>
+        {versao && !ocupado && (
+          <button
+            type="button"
+            onClick={remover}
+            title="Remover foto"
+            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-gray-700 text-white text-[10px] leading-none opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            ×
+          </button>
+        )}
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" onChange={escolher} className="hidden" />
+      {erro && <p className="text-[10px] text-red-500 mt-1 max-w-[9rem]">{erro}</p>}
+    </div>
+  );
 }
 
 export default function TenantLayout() {
@@ -391,8 +465,13 @@ export default function TenantLayout() {
           )}
           {!colapsado && (
             <div className="px-3 py-2">
-              <p className="text-xs font-medium text-gray-800 dark:text-gray-100 truncate">{user?.nome}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">{user?.role}</p>
+              <div className="flex items-center gap-2 mb-1.5">
+                <MinhaFoto user={user} online={online} />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-800 dark:text-gray-100 truncate">{user?.nome}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate capitalize">{user?.role}</p>
+                </div>
+              </div>
               <div className="flex items-center gap-1.5 mt-1.5">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS[statusPresenca].cor}`} />
                 <select

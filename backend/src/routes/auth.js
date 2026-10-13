@@ -4,7 +4,9 @@ import jwt from 'jsonwebtoken';
 import { db } from '../db/index.js';
 import { superAdmins, tenantUsers, tenants } from '../db/schema.js';
 import { eq, count } from 'drizzle-orm';
-import { autenticar, invalidarSessaoDaRequisicao } from '../middleware/auth.js';
+import { autenticar, invalidarSessaoDaRequisicao, invalidarSessao } from '../middleware/auth.js';
+import crypto from 'crypto';
+import { lerFotoDataUri } from '../services/fotoAtendente.js';
 
 const router = Router();
 
@@ -92,6 +94,37 @@ router.put('/change-password', autenticar, async (req, res) => {
   }
 
   res.json({ mensagem: 'Senha alterada com sucesso' });
+});
+
+// Foto do atendente. Cada um cuida da sua — não passa por admin.
+//
+// O frontend reduz a imagem para 96px antes de mandar, então o que chega aqui
+// são poucos KB. O teto abaixo é rede de segurança contra quem chamar a API
+// direto: data URI grande ficaria no banco e sairia em toda listagem.
+router.put('/me/foto', autenticar, async (req, res) => {
+  if (req.user.role === 'superadmin') {
+    return res.status(400).json({ erro: 'Foto é do atendente do provedor.' });
+  }
+  if (!lerFotoDataUri(req.body?.fotoUrl)) {
+    return res.status(400).json({ erro: 'Envie uma imagem JPEG, PNG ou WEBP de até 80 KB.' });
+  }
+
+  const versao = crypto.randomBytes(6).toString('hex');
+  await db.update(tenantUsers)
+    .set({ fotoUrl: req.body.fotoUrl.trim(), fotoVersao: versao })
+    .where(eq(tenantUsers.id, req.user.id));
+  // A sessão fica 30s em cache e carrega a versão da foto; sem limpar, o
+  // próprio atendente continuaria vendo a antiga por meio minuto.
+  invalidarSessao(req.user.id);
+  res.json({ fotoVersao: versao });
+});
+
+router.delete('/me/foto', autenticar, async (req, res) => {
+  await db.update(tenantUsers)
+    .set({ fotoUrl: null, fotoVersao: null })
+    .where(eq(tenantUsers.id, req.user.id));
+  invalidarSessao(req.user.id);
+  res.json({ ok: true });
 });
 
 // rota de setup — cria primeiro super admin se não existir nenhum

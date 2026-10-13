@@ -4,6 +4,7 @@ import { differenceInMinutes } from 'date-fns';
 import clsx from 'clsx';
 import { Search, Check, User, Menu, MapPin, Phone, PenSquare, Clock } from 'lucide-react';
 import NovaConversaModal from './NovaConversaModal.jsx';
+import AvatarAtendente from './AvatarAtendente.jsx';
 import { STATUS } from '../hooks/usePresencaStatus.js';
 import { useAuth } from '../hooks/useAuth.js';
 
@@ -387,14 +388,14 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
           <div className="flex flex-wrap gap-1.5">
             {online.map(u => (
               <div key={u.id} className="relative group">
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                    u.id === (currentUser?.id || user?.id) ? 'ring-2 ring-offset-1 ring-blue-400' : ''
-                  }`}
-                  style={{ backgroundColor: presenceColor(u.nome) }}
-                >
-                  {u.nome[0].toUpperCase()}
-                </div>
+                <AvatarAtendente
+                  id={u.id}
+                  nome={u.nome}
+                  fotoVersao={u.fotoVersao}
+                  tamanho={28}
+                  cor={presenceColor(u.nome)}
+                  className={u.id === (currentUser?.id || user?.id) ? 'ring-2 ring-offset-1 ring-blue-400' : ''}
+                />
                 <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
                   (STATUS[u.status] || STATUS.disponivel).cor
                 }`} />

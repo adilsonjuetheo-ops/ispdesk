@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 
 import authRouter from './routes/auth.js';
+import fotosRouter from './routes/fotos.js';
 import tenantsRouter from './routes/tenants.js';
 import agentsRouter from './routes/agents.js';
 import filiaisRouter from './routes/filiais.js';
@@ -72,6 +73,7 @@ app.use('/api/auth', criarRateLimit({
   prefixo: 'auth',
   mensagem: 'Muitas tentativas de autenticação. Aguarde antes de tentar novamente.',
 }), authRouter);
+app.use('/api/fotos', fotosRouter);
 app.use('/api/tenants/:tenantId/agents', agentsRouter);
 app.use('/api/tenants/:tenantId/filiais', filiaisRouter);
 app.use('/api/tenants/:tenantId/atalhos', atalhoRouter);

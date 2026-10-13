@@ -107,6 +107,8 @@ export async function autenticar(req, res, next) {
       email: tenantUsers.email,
       nome: tenantUsers.nome,
       role: tenantUsers.role,
+      // Só a versão, nunca a foto: isto viaja em toda requisição autenticada.
+      fotoVersao: tenantUsers.fotoVersao,
       ativo: tenantUsers.ativo,
       tenantAtivo: tenants.ativo,
       plano: tenants.plano,

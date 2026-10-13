@@ -110,6 +110,15 @@ export const tenantUsers = pgTable('tenant_users', {
   senhaHash: text('senha_hash').notNull(),
   role:      text('role').default('agente'),
   ativo:     boolean('ativo').default(true),
+  // Foto do atendente, guardada como data URI igual ao logo do provedor — o
+  // projeto não tem storage de arquivo e não vale criar um para um avatar.
+  // O frontend reduz para 96px antes de enviar, então são poucos KB.
+  //
+  // fotoVersao existe para o cache do navegador: a foto é servida por uma rota
+  // própria (e não no corpo da presença, consultada a cada 15s), com cache
+  // longo. Trocar a foto muda a versão e só então o navegador busca de novo.
+  fotoUrl:    text('foto_url'),
+  fotoVersao: text('foto_versao'),
   criadoEm:  timestamp('criado_em').defaultNow(),
 });
 
