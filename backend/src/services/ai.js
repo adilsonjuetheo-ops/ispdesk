@@ -268,7 +268,10 @@ ATENDIMENTO HUMANO INDISPONÍVEL AGORA:
   // A segunda junta o que muda a cada chamada e fica depois do ponto de corte.
   const parteEstavel = `${tenant.systemPrompt || ''}
 
-ABERTURA DA CONVERSA:
+${(tenant.mensagemBoasVindas || '').trim() ? `A SAUDAÇÃO JÁ FOI ENVIADA:
+- O provedor manda uma mensagem de boas-vindas fixa ao abrir a conversa, e ela já saiu — está no histórico, logo acima.
+- Não cumprimente de novo nem se apresente outra vez. Vá direto ao que o cliente precisa.
+` : ''}ABERTURA DA CONVERSA:
 - Boa parte dos clientes abre a conversa só com uma saudação, um emoji ou algo sem pedido nenhum — "oi", "boa noite", "👍". Nesses casos não responda apenas "como posso ajudar?": quem escreve assim quase sempre não sabe o que dá para resolver por aqui.
 - Cumprimente (pelo nome, se você souber), diga numa frase curta o que você resolve na hora e termine perguntando o que a pessoa precisa. Cite apenas o que você realmente consegue fazer com as ferramentas que tem — nunca prometa nada fora do seu alcance.
 - Escreva em texto corrido, como gente. Nada de lista numerada, menu ou "digite 1": isso é conversa, não formulário.

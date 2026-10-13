@@ -1426,6 +1426,43 @@ export default function Settings() {
               placeholder="Você é o assistente virtual do provedor de internet [nome]. Sua função é ajudar os clientes com dúvidas sobre..." />
           </section>
 
+          {/* saudação de boas-vindas */}
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-700 mb-1">Saudação de boas-vindas</h2>
+            <p className="text-xs text-gray-500 mb-3">
+              Enviada exatamente como escrita, antes da primeira resposta do assistente. Deixe em
+              branco para não enviar nenhuma.
+            </p>
+            <textarea rows={8} value={tenant.mensagemBoasVindas || ''}
+              onChange={e => set('mensagemBoasVindas', e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder={'Olá! 👋 Seja bem-vindo!\n\nSou o assistente da equipe e estou aqui para ajudar.'} />
+
+            <p className="text-xs font-medium text-gray-600 mt-4 mb-1.5">Quando enviar</p>
+            <div className="space-y-1.5">
+              {[
+                { valor: 'primeiro_contato', titulo: 'Só no primeiro contato', ajuda: 'Uma vez por cliente. Quem já conversou antes não recebe de novo.' },
+                { valor: 'sempre', titulo: 'A cada conversa nova', ajuda: 'Toda vez que uma conversa é aberta, inclusive com cliente antigo.' },
+              ].map(op => (
+                <button key={op.valor} type="button"
+                  onClick={() => set('boasVindasQuando', op.valor)}
+                  className={`w-full text-left border rounded-lg px-3 py-2 transition-colors ${
+                    (tenant.boasVindasQuando || 'primeiro_contato') === op.valor
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                  <p className="text-sm text-gray-800">{op.titulo}</p>
+                  <p className="text-xs text-gray-500">{op.ajuda}</p>
+                </button>
+              ))}
+            </div>
+
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
+              Cada saudação é uma mensagem de WhatsApp a mais. A Meta dá 1.000 mensagens de serviço
+              grátis por mês para cada número; acima disso, cerca de R$ 0,04 cada.
+            </p>
+          </section>
+
           {/* comportamento do atendimento */}
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">

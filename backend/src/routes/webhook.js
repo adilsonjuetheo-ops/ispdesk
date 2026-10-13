@@ -500,6 +500,7 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
     ))
     .limit(1);
 
+  let conversaRecemCriada = false;
   if (!conversa) {
     [conversa] = await db.insert(conversas).values({
       tenantId: tenant.id,
@@ -508,6 +509,7 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
       filialId: filialEntrada?.id || null,
       numeroRecebidoId: wConfig.whatsappNumberId || null,
     }).returning();
+    conversaRecemCriada = true;
   }
 
   const conteudoCliente = isAudio ? `[Áudio] ${texto}` : texto;
@@ -615,6 +617,35 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
     await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: msgBloqueio });
     try { await enviarMensagem(wConfig, remetente, msgBloqueio); } catch {}
     return;
+  }
+
+  // Saudação do provedor, antes de qualquer resposta do bot.
+  //
+  // Vai palavra por palavra, sem passar pelo modelo: é texto de marca, e o
+  // provedor espera exatamente o que escreveu. Fica depois das checagens de
+  // suspensão e de limite de propósito — abrir com "seja bem-vindo" e emendar
+  // "assistente indisponível" seria pior do que não cumprimentar.
+  //
+  // Cada envio é uma mensagem de WhatsApp a mais, cobrada depois da franquia
+  // mensal. Daí a opção entre mandar em toda conversa nova ou só no primeiro
+  // contato daquele cliente.
+  const saudacao = (tenant.mensagemBoasVindas || '').trim();
+  if (saudacao && conversaRecemCriada) {
+    const soNoPrimeiroContato = (tenant.boasVindasQuando || 'primeiro_contato') !== 'sempre';
+    // Conta as conversas do cliente: a recém-criada já está no banco, então
+    // primeiro contato é exatamente uma.
+    const [{ total } = { total: 0 }] = soNoPrimeiroContato
+      ? await db.select({ total: sqlRaw`count(*)::int` }).from(conversas)
+          .where(and(eq(conversas.tenantId, tenant.id), eq(conversas.clienteId, cliente.id)))
+      : [{ total: 1 }];
+
+    if (total <= 1) {
+      await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: saudacao });
+      await atualizarUltMsg(conversa.id, saudacao, 'bot');
+      try { await enviarMensagem(wConfig, remetente, saudacao); } catch (err) {
+        console.error('[boas-vindas] Falha ao enviar saudação:', err.message);
+      }
+    }
   }
 
   // Chama IA

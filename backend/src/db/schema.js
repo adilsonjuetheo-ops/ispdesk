@@ -20,6 +20,15 @@ export const tenants = pgTable('tenants', {
   whatsappToken:      text('whatsapp_token'),
   whatsappTokenExpiraEm: timestamp('whatsapp_token_expira_em'),
   webhookVerifyToken: text('webhook_verify_token').notNull(),
+  // Saudação fixa que abre a conversa, antes do bot responder. Texto do
+  // provedor, enviado palavra por palavra — é marca, não resposta, então não
+  // passa pelo modelo. Nulo ou vazio desliga.
+  //
+  // boasVindasQuando: 'primeiro_contato' manda só na primeira conversa daquele
+  // cliente; 'sempre' manda a cada conversa nova. A diferença é dinheiro: cada
+  // envio é uma mensagem de WhatsApp a mais, cobrada depois da franquia.
+  mensagemBoasVindas: text('mensagem_boas_vindas'),
+  boasVindasQuando:   text('boas_vindas_quando').default('primeiro_contato'),
   systemPrompt:       text('system_prompt').notNull(),
   nomeAssistente:     text('nome_assistente').default('Assistente'),
   sgpTipo:            text('sgp_tipo'),   // 'atlaz' | 'ixc' | 'mkauth' | 'generico'
