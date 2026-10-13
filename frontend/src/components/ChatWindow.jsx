@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import api from '../lib/api.js';
 import { useMidiaBlob } from '../hooks/useMidiaBlob.js';
+import { useEquipe, indexarPorNome } from '../hooks/useEquipe.js';
+import AvatarAtendente from './AvatarAtendente.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 import { usePolling } from '../hooks/usePolling.js';
 import { useNotificationSound } from '../hooks/useNotificationSound.js';
@@ -567,7 +569,7 @@ function StatusIcon({ status }) {
   return <Check className="w-3.5 h-3.5 text-gray-400 shrink-0" />;
 }
 
-function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
+function BolaoMsg({ msg, agenteNome, nomeAssistente, equipePorNome }) {
   const isCliente = msg.origem === 'cliente';
   const isBot = msg.origem === 'bot';
   const isNota = msg.origem === 'nota';
@@ -605,10 +607,19 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente }) {
     <div className={clsx('flex mb-3', isCliente ? 'justify-start' : 'justify-end')}>
       <div className="max-w-[85%] md:max-w-balao">
         {!isCliente && (
-          <p className="text-xs mb-1 text-right">
+          <p className="text-xs mb-1 flex items-center justify-end gap-1.5">
             {isBot
               ? <span className="text-gray-500 dark:text-gray-400">{nomeAssistente || 'Bot'}</span>
-              : <span className="font-bold text-gray-700 dark:text-gray-300">{agenteNome || 'Agente'}</span>
+              : <>
+                  <span className="font-bold text-gray-700 dark:text-gray-300">{agenteNome || 'Agente'}</span>
+                  <AvatarAtendente
+                    id={equipePorNome?.get(agenteNome)?.id}
+                    nome={agenteNome || 'Agente'}
+                    fotoVersao={equipePorNome?.get(agenteNome)?.fotoVersao}
+                    tamanho={18}
+                    cor="#9ca3af"
+                  />
+                </>
             }
           </p>
         )}
@@ -777,6 +788,10 @@ function TransferModal({ conversa, onClose, onTransferred }) {
 }
 
 export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAberto, onTogglePainel }) {
+  // Diretório da equipe, cacheado para a aba — é daqui que sai a foto ao lado
+  // do nome de quem respondeu, já que a mensagem guarda só o nome.
+  const equipe = useEquipe();
+  const equipePorNome = useMemo(() => indexarPorNome(equipe), [equipe]);
   const { user } = useAuth();
   const [msgs, setMsgs] = useState([]);
   const [texto, setTexto] = useState('');
@@ -1355,7 +1370,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
             {groupMsgsByDate(pendentes.length ? [...msgs, ...pendentes] : msgs).map(item =>
               item.type === 'separator'
                 ? <DateSeparator key={item.key} date={item.date} />
-                : <BolaoMsg key={item.key} msg={item.msg} agenteNome={item.msg.agenteNome || user?.nome} nomeAssistente={user?.nomeAssistente} />
+                : <BolaoMsg key={item.key} msg={item.msg} agenteNome={item.msg.agenteNome || user?.nome} nomeAssistente={user?.nomeAssistente} equipePorNome={equipePorNome} />
             )}
             {(() => {
               const ultima = msgs[msgs.length - 1];

@@ -11,6 +11,7 @@ import {
   PanelLeftClose, PanelLeftOpen, BellRing, Sun, Moon, FileSignature, TrendingUp, Camera } from 'lucide-react';
 import api from '../../lib/api.js';
 import AvatarAtendente, { reduzirParaAvatar } from '../AvatarAtendente.jsx';
+import { recarregarEquipe } from '../../hooks/useEquipe.js';
 import UpdateBanner from '../UpdateBanner.jsx';
 import BottomTabBar from '../BottomTabBar.jsx';
 
@@ -63,6 +64,7 @@ function MinhaFoto({ user, online }) {
       const fotoUrl = await reduzirParaAvatar(file);
       const r = await api.put('/auth/me/foto', { fotoUrl });
       setVersaoLocal(r.data.fotoVersao);
+      recarregarEquipe();
     } catch (err) {
       setErro(err.response?.data?.erro || err.message || 'Não foi possível enviar a foto.');
     } finally {
@@ -75,6 +77,7 @@ function MinhaFoto({ user, online }) {
     try {
       await api.delete('/auth/me/foto');
       setVersaoLocal(null);
+      recarregarEquipe();
     } catch {
       setErro('Não foi possível remover a foto.');
     } finally {

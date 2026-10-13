@@ -436,6 +436,7 @@ router.get('/agentes', async (req, res) => {
     nome: tenantUsers.nome,
     role: tenantUsers.role,
     filialNome: filiais.nome,
+    fotoVersao: tenantUsers.fotoVersao,
   })
     .from(tenantUsers)
     .leftJoin(filiais, eq(tenantUsers.filialId, filiais.id))

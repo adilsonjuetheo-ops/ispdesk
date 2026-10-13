@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { differenceInMinutes } from 'date-fns';
 import clsx from 'clsx';
 import { Search, Check, User, Menu, MapPin, Phone, PenSquare, Clock } from 'lucide-react';
 import NovaConversaModal from './NovaConversaModal.jsx';
 import AvatarAtendente from './AvatarAtendente.jsx';
+import { useEquipe, indexarPorId } from '../hooks/useEquipe.js';
 import { STATUS } from '../hooks/usePresencaStatus.js';
 import { useAuth } from '../hooks/useAuth.js';
 
@@ -168,6 +169,9 @@ const SUB_TABS = [
 ];
 
 export default function ConversationList({ conversas, selecionada, onSelecionar, onConversaCriada, view = 'todos', filialId, online = [], currentUser, slaMinutos = 0, onOpenSidebar }) {
+  // Foto do responsável na linha da conversa. Vem por id, que a lista já traz.
+  const equipe = useEquipe();
+  const equipePorId = useMemo(() => indexarPorId(equipe), [equipe]);
   const { user } = useAuth();
   const navigate = useNavigate();
   const [busca, setBusca] = useState('');
@@ -328,8 +332,17 @@ export default function ConversationList({ conversas, selecionada, onSelecionar,
                   <WaitTime iniciadaEm={c.iniciadaEm} status={c.status} />
 
                   {(c.agenteNome || c.filialNome) && (
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                      {[c.agenteNome, c.filialNome].filter(Boolean).join(' › ')}
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 truncate flex items-center gap-1">
+                      {c.agenteId && equipePorId.get(c.agenteId) && (
+                        <AvatarAtendente
+                          id={c.agenteId}
+                          nome={c.agenteNome}
+                          fotoVersao={equipePorId.get(c.agenteId)?.fotoVersao}
+                          tamanho={14}
+                          cor={presenceColor(c.agenteNome)}
+                        />
+                      )}
+                      <span className="truncate">{[c.agenteNome, c.filialNome].filter(Boolean).join(' › ')}</span>
                     </p>
                   )}
                 </div>
