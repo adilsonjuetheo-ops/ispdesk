@@ -24,7 +24,7 @@ import clsx from 'clsx';
 function mesmasMsgs(a, b) {
   if (a === b) return true;
   if (a.length !== b.length) return false;
-  return a.every((m, i) => m.id === b[i].id && m.status === b[i].status);
+  return a.every((m, i) => m.id === b[i].id && m.status === b[i].status && m.erro === b[i].erro);
 }
 
 // Mensagem enviada que ainda pode ganhar tique de entregue ou lida.
@@ -47,8 +47,10 @@ function mesclarMsgs(atuais, { novas = [], status = [] }) {
   }
   for (const s of status) {
     const antes = porId.get(s.id);
-    if (antes && antes.status !== s.status) {
-      porId.set(s.id, { ...antes, status: s.status });
+    // O motivo precisa entrar junto: comparar só o status fazia a falha chegar
+    // à tela sem a explicação, e aí "não entregue" não dizia por quê.
+    if (antes && (antes.status !== s.status || (s.erro ?? null) !== (antes.erro ?? null))) {
+      porId.set(s.id, { ...antes, status: s.status, erro: s.erro ?? null });
       mudou = true;
     }
   }
@@ -643,9 +645,20 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente, equipePorNome }) {
           </span>
           {!isCliente && !isNota && !isSistema && <StatusIcon status={msg.status} />}
           {msg.status === 'falhou' && (
-            <span className="text-[10px] text-red-500" title={msg.erro || ''}>não entregue</span>
+            <span className="text-[10px] text-red-500">não entregue</span>
           )}
         </div>
+        {/* O motivo vai na tela, não num title: quem precisa dele está
+            investigando por que o cliente ficou sem resposta, e passar o mouse
+            em cada balão para descobrir é o oposto de ajudar. */}
+        {msg.status === 'falhou' && msg.erro && (
+          <p className={clsx(
+            'text-[10px] text-red-500 mt-0.5 break-words',
+            isCliente ? 'text-left' : 'text-right',
+          )}>
+            {msg.erro}
+          </p>
+        )}
       </div>
     </div>
   );
