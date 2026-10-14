@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { tenants, tenantUsers, conversas, usoTokensIa } from '../db/schema.js';
+import { tenants, tenantUsers, conversas, usoTokensIa, mensagens } from '../db/schema.js';
 import { eq, count, and, gte } from 'drizzle-orm';
 import { autenticar, apenasSuper, invalidarSessoesDoTenant } from '../middleware/auth.js';
 import { proximoVencimento } from '../services/vencimento.js';
@@ -224,6 +224,41 @@ router.use(autenticar, apenasSuper);
 router.get('/', async (req, res) => {
   const rows = await db.select(CAMPOS_TENANT_SEGUROS).from(tenants).orderBy(tenants.criadoEm);
   res.json(rows);
+});
+
+// Falhas de entrega por provedor, das últimas 24h. Precisa vir antes de '/:id'.
+//
+// Existe porque os três incidentes de outubro — limite de IA estourado, boleto
+// sem código e pagamento bloqueado — tinham sinal claro no servidor e nenhum
+// chegou a ninguém: foram descobertos por reclamação de cliente.
+router.get('/falhas-envio', async (req, res) => {
+  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const linhas = await db
+    .select({
+      tenantId: conversas.tenantId,
+      nome: tenants.nome,
+      erro: mensagens.erro,
+      enviadaEm: mensagens.enviadaEm,
+    })
+    .from(mensagens)
+    .innerJoin(conversas, eq(conversas.id, mensagens.conversaId))
+    .leftJoin(tenants, eq(tenants.id, conversas.tenantId))
+    .where(and(eq(mensagens.status, 'falhou'), gte(mensagens.enviadaEm, desde)));
+
+  const porProvedor = new Map();
+  for (const l of linhas) {
+    const atual = porProvedor.get(l.tenantId)
+      || { tenantId: l.tenantId, nome: l.nome || '(removido)', total: 0, ultima: null, motivo: null };
+    atual.total += 1;
+    if (!atual.ultima || l.enviadaEm > atual.ultima) {
+      atual.ultima = l.enviadaEm;
+      atual.motivo = l.erro;
+    }
+    porProvedor.set(l.tenantId, atual);
+  }
+
+  res.json([...porProvedor.values()].sort((a, b) => b.total - a.total));
 });
 
 // Consumo da API de IA por provedor. Precisa vir antes de '/:id', senão o

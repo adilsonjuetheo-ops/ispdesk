@@ -13,6 +13,55 @@ const usd = v => `US$ ${v.toFixed(2)}`;
 const brl = v => `R$ ${v.toFixed(2).replace('.', ',')}`;
 const milhares = n => n.toLocaleString('pt-BR');
 
+// Fica acima do consumo de IA de propósito: provedor que não entrega mensagem
+// está com o atendimento parado, e isso tem que ser a primeira coisa na tela.
+// Some quando não há nada — alerta que aparece sempre vira paisagem.
+function FalhasEnvio() {
+  const [linhas, setLinhas] = useState([]);
+
+  useEffect(() => {
+    const buscar = () => api.get('/tenants/falhas-envio')
+      .then(r => setLinhas(r.data || []))
+      .catch(() => {});
+    buscar();
+    const id = setInterval(buscar, 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (!linhas.length) return null;
+
+  return (
+    <div className="bg-red-500/10 border border-red-500/40 rounded-xl mb-8">
+      <div className="p-5 border-b border-red-500/30">
+        <h2 className="font-semibold text-red-200 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" /> Mensagens não entregues nas últimas 24h
+        </h2>
+        <p className="text-red-300/70 text-xs mt-0.5">
+          O WhatsApp recusou esses envios. Enquanto durar, o cliente escreve e não recebe resposta.
+        </p>
+      </div>
+      <table className="w-full">
+        <tbody>
+          {linhas.map(l => (
+            <tr key={l.tenantId} className="border-b border-red-500/20 last:border-0">
+              <td className="px-5 py-3">
+                <p className="text-white font-medium">{l.nome}</p>
+                <p className="text-red-300/80 text-xs">{l.motivo || 'sem motivo informado'}</p>
+              </td>
+              <td className="px-5 py-3 text-right whitespace-nowrap">
+                <p className="text-white font-bold tabular-nums">{l.total}</p>
+                <p className="text-red-300/70 text-xs">
+                  última {new Date(l.ultima).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                </p>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ConsumoIa() {
   const [dados, setDados] = useState(null);
   const [dias, setDias] = useState(30);
@@ -239,6 +288,8 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      <FalhasEnvio />
 
       <ConsumoIa />
 

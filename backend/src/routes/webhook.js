@@ -8,6 +8,7 @@ import { dividirEmBlocos } from '../services/blocosResposta.js';
 import { enviarMensagem, enviarBotoes, transcreverAudioMeta, downloadMidiaBase64, baixarArquivoUrl, uploadMidia, enviarMidia } from '../services/whatsapp.js';
 import { realizarHandoff } from '../services/handoff.js';
 import { enviarPushParaTenant } from '../services/pushNotification.js';
+import { registrarFalhaEnvio, registrarEntrega } from '../services/alertaEnvio.js';
 import { dentroDoHorario, proximoAtendimento } from '../services/horarios.js';
 import { getLimite, getUso, incrementarUso } from '../services/limites.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
@@ -179,6 +180,7 @@ router.post('/', async (req, res) => {
         for (const s of value.statuses || []) {
           if (s.status === 'delivered') {
             await db.update(mensagens).set({ status: 'entregue', erro: null }).where(eq(mensagens.wamid, s.id)).catch(() => {});
+            registrarEntrega(phoneNumberId).catch(() => {});
           } else if (s.status === 'read') {
             await db.update(mensagens).set({ status: 'lida', erro: null }).where(eq(mensagens.wamid, s.id)).catch(() => {});
           } else if (s.status === 'failed') {
@@ -192,6 +194,7 @@ router.post('/', async (req, res) => {
               : 'a Meta não conseguiu entregar';
             await db.update(mensagens).set({ status: 'falhou', erro: motivo })
               .where(eq(mensagens.wamid, s.id)).catch(() => {});
+            registrarFalhaEnvio(phoneNumberId, motivo).catch(() => {});
           }
 
           // A fatura do ISPDesk sai pelo WhatsApp do próprio provedor, e a Meta
@@ -661,6 +664,9 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
       } catch (err) {
         erroSaudacao = err.message;
         console.error('[boas-vindas] Falha ao enviar saudação:', err.message);
+        // Recusa na hora (token inválido, conta suspensa) também conta para o
+        // alerta: nem toda falha espera o webhook de status.
+        registrarFalhaEnvio(wConfig.whatsappNumberId, err.message).catch(() => {});
       }
       await db.insert(mensagens).values({
         conversaId: conversa.id,
@@ -760,6 +766,7 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
       } catch (err) {
         erroEnvio = err.message;
         console.error('Erro ao enviar resposta IA:', err.message);
+        registrarFalhaEnvio(wConfig.whatsappNumberId, err.message).catch(() => {});
         // Botão é enfeite; a pergunta não pode se perder junto com ele.
         if (comBotoes) {
           try {
