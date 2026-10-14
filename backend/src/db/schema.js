@@ -189,7 +189,11 @@ export const mensagens = pgTable('mensagens', {
   conteudo:   text('conteudo').notNull(),
   wamid:      text('wamid').unique(),
   midiaUrl:   text('midia_url'),
-  status:     text('status').default('enviada'), // 'enviada' | 'entregue' | 'lida'
+  // 'falhou' entra quando o envio para a Meta estourou. Sem esse estado o
+  // painel mostrava o balão como enviado e o cliente nunca recebia nada — a
+  // tela afirmava o que não tinha acontecido.
+  status:     text('status').default('enviada'), // 'enviada' | 'entregue' | 'lida' | 'falhou'
+  erro:       text('erro'),
   agenteNome: text('agente_nome'),
   enviadaEm:  timestamp('enviada_em').defaultNow(),
 });

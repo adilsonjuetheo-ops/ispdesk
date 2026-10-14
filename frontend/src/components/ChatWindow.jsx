@@ -11,7 +11,7 @@ import {
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
   List, ListOrdered, Plus, ArrowLeft, Video, Sparkles, Maximize2, Clock,
-  MoreHorizontal, PanelRight, Play, Pause, BellRing, ChevronDown, Download,
+  MoreHorizontal, PanelRight, Play, Pause, BellRing, ChevronDown, Download, AlertTriangle,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -564,6 +564,9 @@ function StatusIcon({ status }) {
   // "enviando" é estado só da tela: o balão aparece antes de a API do WhatsApp
   // confirmar, para o atendente não ficar olhando o campo parado.
   if (status === 'enviando')  return <Clock className="w-3.5 h-3.5 text-gray-300 shrink-0" />;
+  // Visto cinza num balão que nunca saiu é pior do que não ter visto nenhum:
+  // o atendente conclui que o cliente leu e não respondeu.
+  if (status === 'falhou')   return <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />;
   if (status === 'lida')     return <CheckCheck className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
   if (status === 'entregue') return <CheckCheck className="w-3.5 h-3.5 text-gray-400 shrink-0" />;
   return <Check className="w-3.5 h-3.5 text-gray-400 shrink-0" />;
@@ -639,6 +642,9 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente, equipePorNome }) {
             {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
           </span>
           {!isCliente && !isNota && !isSistema && <StatusIcon status={msg.status} />}
+          {msg.status === 'falhou' && (
+            <span className="text-[10px] text-red-500" title={msg.erro || ''}>não entregue</span>
+          )}
         </div>
       </div>
     </div>

@@ -136,6 +136,7 @@ export async function runMigrations() {
       )
     `;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_lembrete_enviado_unico ON lembrete_fatura_enviados(tenant_id, titulo_id, tipo)`;
+    await sql`ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS erro text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS mensagem_boas_vindas text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS boas_vindas_quando text DEFAULT 'primeiro_contato'`;
     await sql`ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS foto_url text`;

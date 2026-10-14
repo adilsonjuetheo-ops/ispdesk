@@ -178,9 +178,20 @@ router.post('/', async (req, res) => {
         // Processa atualizações de status (entregue / lida / falhou)
         for (const s of value.statuses || []) {
           if (s.status === 'delivered') {
-            await db.update(mensagens).set({ status: 'entregue' }).where(eq(mensagens.wamid, s.id)).catch(() => {});
+            await db.update(mensagens).set({ status: 'entregue', erro: null }).where(eq(mensagens.wamid, s.id)).catch(() => {});
           } else if (s.status === 'read') {
-            await db.update(mensagens).set({ status: 'lida' }).where(eq(mensagens.wamid, s.id)).catch(() => {});
+            await db.update(mensagens).set({ status: 'lida', erro: null }).where(eq(mensagens.wamid, s.id)).catch(() => {});
+          } else if (s.status === 'failed') {
+            // O caso que mais engana: a Meta responde 200 no envio e só depois
+            // avisa aqui que não entregou. Sem isto o balão ficava com o visto
+            // de enviado para sempre, e ninguém descobria que o cliente não
+            // recebeu — foi o que aconteceu com a saudação do Mataverde.
+            const falha = (s.errors || [])[0];
+            const motivo = falha
+              ? `a Meta não entregou (${falha.code}): ${falha.title || falha.message || ''}`.trim()
+              : 'a Meta não conseguiu entregar';
+            await db.update(mensagens).set({ status: 'falhou', erro: motivo })
+              .where(eq(mensagens.wamid, s.id)).catch(() => {});
           }
 
           // A fatura do ISPDesk sai pelo WhatsApp do próprio provedor, e a Meta
@@ -640,11 +651,26 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
       : [{ total: 1 }];
 
     if (total <= 1) {
-      await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'bot', conteudo: saudacao });
-      await atualizarUltMsg(conversa.id, saudacao, 'bot');
-      try { await enviarMensagem(wConfig, remetente, saudacao); } catch (err) {
+      // Envia primeiro, grava depois com o resultado real. Ao contrário, o
+      // painel mostrava a saudação como entregue mesmo quando ela nunca saiu.
+      let wamidSaudacao = null;
+      let erroSaudacao = null;
+      try {
+        const apiRes = await enviarMensagem(wConfig, remetente, saudacao);
+        wamidSaudacao = apiRes?.messages?.[0]?.id || null;
+      } catch (err) {
+        erroSaudacao = err.message;
         console.error('[boas-vindas] Falha ao enviar saudação:', err.message);
       }
+      await db.insert(mensagens).values({
+        conversaId: conversa.id,
+        origem: 'bot',
+        conteudo: saudacao,
+        wamid: wamidSaudacao,
+        status: erroSaudacao ? 'falhou' : 'enviada',
+        erro: erroSaudacao,
+      });
+      await atualizarUltMsg(conversa.id, saudacao, 'bot');
     }
   }
 
@@ -723,6 +749,7 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
       // Os botões acompanham o último balão, que é onde está a pergunta.
       const comBotoes = resultado.botoes?.length && i === blocos.length - 1;
       let botWamid = null;
+      let erroEnvio = null;
       try {
         // Um de cada vez, esperando o anterior: dois envios em paralelo podem
         // chegar fora de ordem no WhatsApp, e aí o código cai antes do label.
@@ -731,13 +758,16 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
           : await enviarMensagem(wConfig, remetente, bloco);
         botWamid = apiRes?.messages?.[0]?.id || null;
       } catch (err) {
+        erroEnvio = err.message;
         console.error('Erro ao enviar resposta IA:', err.message);
         // Botão é enfeite; a pergunta não pode se perder junto com ele.
         if (comBotoes) {
           try {
             const apiRes = await enviarMensagem(wConfig, remetente, bloco);
             botWamid = apiRes?.messages?.[0]?.id || null;
+            erroEnvio = null;
           } catch (err2) {
+            erroEnvio = err2.message;
             console.error('Erro ao reenviar sem botões:', err2.message);
           }
         }
@@ -747,7 +777,10 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
         origem: 'bot',
         conteudo: bloco,
         wamid: botWamid,
-        status: 'enviada',
+        // Sem wamid a Meta não aceitou nada: o balão não pode se passar por
+        // enviado, senão ninguém descobre que o cliente ficou sem resposta.
+        status: erroEnvio ? 'falhou' : 'enviada',
+        erro: erroEnvio,
       });
     }
     // A prévia da lista leva a resposta inteira, não o último balão: dividida, a

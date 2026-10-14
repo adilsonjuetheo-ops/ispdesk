@@ -583,7 +583,7 @@ router.get('/:id/messages', async (req, res) => {
       .filter(x => /^[0-9a-f-]{36}$/i.test(x))
       .slice(0, 100);
     const status = acompanhar.length
-      ? await db.select({ id: mensagens.id, status: mensagens.status })
+      ? await db.select({ id: mensagens.id, status: mensagens.status, erro: mensagens.erro })
         .from(mensagens)
         .where(and(eq(mensagens.conversaId, id), inArray(mensagens.id, acompanhar)))
       : [];
