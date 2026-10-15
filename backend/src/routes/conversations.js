@@ -672,6 +672,18 @@ router.post('/:id/send', async (req, res) => {
   if (!podeAcessarConversa(req, conversa)) {
     return res.status(403).json({ erro: 'Acesso negado' });
   }
+
+  // A rota de iniciar conversa já checava a janela de 24h; esta, de responder,
+  // não checava — e era a mais usada. O atendente digitava, a Meta aceitava com
+  // 200 e só depois recusava por webhook. Na UaiFibra a atendente mandou "Boa
+  // tarde!" duas vezes sem ninguém receber, porque nada a avisou na primeira.
+  if (!await janelaAberta(conversa.id)) {
+    return res.status(409).json({
+      erro: 'Faz mais de 24h que o cliente não escreve. Para falar com ele agora, use um modelo aprovado.',
+      janelaFechada: true,
+    });
+  }
+
   // Responder já é assumir: o atendente não precisa clicar em Assumir antes —
   // vale também pra conversa encerrada, que reabre ao ser respondida.
   if (conversa.status !== 'humano') {
@@ -727,6 +739,16 @@ router.post('/:id/send-media', limitarUpload, upload.single('arquivo'), async (r
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
   if (!podeAcessarConversa(req, conversa))
     return res.status(403).json({ erro: 'Acesso negado' });
+
+  // Mesma regra do texto: fora da janela a Meta recusa, e um PDF de boleto que
+  // não chega é pior do que um "boa tarde" que não chega.
+  if (!await janelaAberta(conversa.id)) {
+    return res.status(409).json({
+      erro: 'Faz mais de 24h que o cliente não escreve. Para enviar arquivo agora, ele precisa escrever primeiro.',
+      janelaFechada: true,
+    });
+  }
+
   // Enviar arquivo também assume a conversa — vale também pra encerrada, que reabre.
   if (conversa.status !== 'humano') {
     await assumirConversa(req, conversa);

@@ -813,6 +813,25 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const equipePorNome = useMemo(() => indexarPorNome(equipe), [equipe]);
   const { user } = useAuth();
   const [msgs, setMsgs] = useState([]);
+
+  // A Meta conta a janela de 24h a partir da última mensagem DO CLIENTE, não da
+  // última atividade da conversa. Calculado aqui com o que a tela já tem, sem
+  // chamada nova — o backend valida de novo no envio; isto serve para avisar
+  // antes de a pessoa digitar.
+  //
+  // O relógio de minuto em minuto existe porque a janela fecha pela passagem do
+  // tempo, não por mensagem nova: sem ele, uma conversa aberta desde cedo
+  // continuaria dizendo que dá para responder depois que já não dá.
+  const [agoraMin, setAgoraMin] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setAgoraMin(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const janelaAberta = useMemo(() => {
+    const ultimaDoCliente = [...msgs].reverse().find(m => m.origem === 'cliente');
+    if (!ultimaDoCliente?.enviadaEm) return false;
+    return agoraMin - new Date(ultimaDoCliente.enviadaEm).getTime() < 24 * 60 * 60 * 1000;
+  }, [msgs, agoraMin]);
   const [texto, setTexto] = useState('');
   const [pendentes, setPendentes] = useState([]);
   const [temNovas, setTemNovas] = useState(false);
@@ -1484,6 +1503,22 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
           />
         )}
 
+        {/* Fora da janela de 24h a Meta recusa texto livre. O aviso vem antes
+            de digitar: na UaiFibra a atendente mandou "Boa tarde!" duas vezes
+            sem ninguém receber, porque nada avisou na primeira. Nota interna
+            não sai para o WhatsApp, então segue liberada. */}
+        {aba === 'resposta' && !janelaAberta && (
+          <div className="mx-3 mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950">
+            <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+              Faz mais de 24h que {conversa.clienteNome || 'o cliente'} não escreve
+            </p>
+            <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5">
+              O WhatsApp não entrega mensagem escrita agora. Para falar com ele, use um modelo
+              aprovado — ou espere ele responder.
+            </p>
+          </div>
+        )}
+
         {(aba === 'resposta' || aba === 'nota') && (
           <form onSubmit={handleEnviar}>
             <input ref={fileRef} type="file" className="hidden"
@@ -1536,10 +1571,12 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEnviar(e); }
                     }}
-                    disabled={!podeAtuar && !isNota}
+                    disabled={(!podeAtuar && !isNota) || (!isNota && !janelaAberta)}
                     placeholder={
                       isNota
                         ? 'Lembrete interno (só a equipe vê)...'
+                        : !janelaAberta
+                          ? 'Fora da janela de 24h — use um modelo aprovado'
                         : eHumano
                           ? 'Digite uma mensagem e pressione enter para enviar...'
                           : conversa.status === 'encerrada'

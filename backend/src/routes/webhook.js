@@ -9,6 +9,7 @@ import { enviarMensagem, enviarBotoes, transcreverAudioMeta, downloadMidiaBase64
 import { realizarHandoff } from '../services/handoff.js';
 import { enviarPushParaTenant } from '../services/pushNotification.js';
 import { registrarFalhaEnvio, registrarEntrega } from '../services/alertaEnvio.js';
+import { motivoLegivel } from '../services/errosWhatsapp.js';
 import { dentroDoHorario, proximoAtendimento } from '../services/horarios.js';
 import { getLimite, getUso, incrementarUso } from '../services/limites.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
@@ -189,9 +190,7 @@ router.post('/', async (req, res) => {
             // de enviado para sempre, e ninguém descobria que o cliente não
             // recebeu — foi o que aconteceu com a saudação do Mataverde.
             const falha = (s.errors || [])[0];
-            const motivo = falha
-              ? `a Meta não entregou (${falha.code}): ${falha.title || falha.message || ''}`.trim()
-              : 'a Meta não conseguiu entregar';
+            const motivo = motivoLegivel(falha?.code, falha?.title || falha?.message);
             await db.update(mensagens).set({ status: 'falhou', erro: motivo })
               .where(eq(mensagens.wamid, s.id)).catch(() => {});
             registrarFalhaEnvio(phoneNumberId, motivo).catch(() => {});
