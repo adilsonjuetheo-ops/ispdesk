@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import api from '../lib/api.js';
 import { useMidiaBlob } from '../hooks/useMidiaBlob.js';
 import { useEquipe, indexarPorNome } from '../hooks/useEquipe.js';
+import NovaConversaModal from './NovaConversaModal.jsx';
 import AvatarAtendente from './AvatarAtendente.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 import { usePolling } from '../hooks/usePolling.js';
@@ -813,6 +814,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const equipePorNome = useMemo(() => indexarPorNome(equipe), [equipe]);
   const { user } = useAuth();
   const [msgs, setMsgs] = useState([]);
+  const [modeloAberto, setModeloAberto] = useState(false);
 
   // A Meta conta a janela de 24h a partir da última mensagem DO CLIENTE, não da
   // última atividade da conversa. Calculado aqui com o que a tela já tem, sem
@@ -1516,6 +1518,16 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
               O WhatsApp não entrega mensagem escrita agora. Para falar com ele, use um modelo
               aprovado — ou espere ele responder.
             </p>
+            {/* O botão fica aqui, e não escondido noutro menu: quem lê o aviso
+                é quem precisa da saída, e no mesmo segundo. */}
+            <button
+              type="button"
+              onClick={() => setModeloAberto(true)}
+              disabled={!podeAtuar}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+            >
+              <Send className="w-3 h-3" /> Enviar modelo aprovado
+            </button>
           </div>
         )}
 
@@ -1684,6 +1696,18 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
           conversa={conversa}
           onClose={() => setShowTransfer(false)}
           onTransferred={() => { onAtualizar(); carregarMsgs(); }}
+        />
+      )}
+
+      {/* Reusa o fluxo de nova conversa com o número já preenchido: ele detecta
+          a janela fechada sozinho e mostra os modelos aprovados, com os campos
+          de variável. A rota reaproveita a conversa que já existe em vez de
+          abrir outra, então o modelo entra nesta mesma thread. */}
+      {modeloAberto && (
+        <NovaConversaModal
+          telefoneInicial={conversa.clienteWhatsapp || ''}
+          onClose={() => setModeloAberto(false)}
+          onCriada={() => { setModeloAberto(false); onAtualizar(); carregarMsgs(); }}
         />
       )}
     </div>
