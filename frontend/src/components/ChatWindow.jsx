@@ -846,6 +846,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const [gravando, setGravando] = useState(false);
   const [tempoGravacao, setTempoGravacao] = useState(0);
   const [audioPreview, setAudioPreview] = useState(null);
+  const [imagemColada, setImagemColada] = useState(null); // { arquivo, url }
   const [acao, setAcao] = useState(false);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -944,6 +945,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
     // Balão otimista é da conversa em que foi digitado. Sem limpar, ele
     // aparecia na conversa seguinte como se fosse dela.
     setPendentes([]);
+    setImagemColada(atual => { if (atual) URL.revokeObjectURL(atual.url); return null; });
     setTemNovas(false);
     setCarregando(true);
     setFalhou(false);
@@ -1142,9 +1144,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
     }
   };
 
-  const handleEnviarArquivo = async e => {
-    const arquivo = e.target.files?.[0];
-    if (!arquivo) return;
+  const enviarArquivo = async arquivo => {
     setEnviandoArquivo(true);
     try {
       const form = new FormData();
@@ -1154,12 +1154,50 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
       });
       carregarMsgs();
       if (!eHumano) onAtualizar();
+      return true;
     } catch (err) {
       alert(err.response?.data?.erro || 'Erro ao enviar arquivo');
+      return false;
     } finally {
       setEnviandoArquivo(false);
-      e.target.value = '';
     }
+  };
+
+  const handleEnviarArquivo = async e => {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    await enviarArquivo(arquivo);
+    e.target.value = '';
+  };
+
+  // Print colado com Ctrl+V vira anexo, como no WhatsApp Web. Passa por uma
+  // prévia em vez de sair direto: print de tela pega com facilidade coisa que
+  // não era para o cliente ver, e o colar é rápido demais para perceber.
+  const handleColar = e => {
+    if (isNota || !janelaAberta || !podeAtuar) return;
+    const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+    const imagem = item?.getAsFile();
+    if (!imagem) return; // texto colado segue o caminho normal
+    e.preventDefault();
+    const ext = imagem.type.split('/')[1] || 'png';
+    const arquivo = new File([imagem], `print-${Date.now()}.${ext}`, { type: imagem.type });
+    setImagemColada(atual => {
+      if (atual) URL.revokeObjectURL(atual.url);
+      return { arquivo, url: URL.createObjectURL(arquivo) };
+    });
+  };
+
+  const descartarImagemColada = () => {
+    setImagemColada(atual => {
+      if (atual) URL.revokeObjectURL(atual.url);
+      return null;
+    });
+    textareaRef.current?.focus();
+  };
+
+  const confirmarImagemColada = async () => {
+    if (!imagemColada || enviandoArquivo) return;
+    if (await enviarArquivo(imagemColada.arquivo)) descartarImagemColada();
   };
 
   const iniciarGravacao = async () => {
@@ -1555,6 +1593,22 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                   {enviandoArquivo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </div>
+            ) : !isNota && imagemColada ? (
+              <div className="flex items-center gap-3 px-3 py-2">
+                <div className="flex-1 flex items-center gap-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-900 rounded-xl p-2 min-w-0">
+                  <img src={imagemColada.url} alt="Imagem colada"
+                    className="h-20 max-w-[160px] object-contain rounded-lg border border-blue-100 dark:border-blue-900 bg-white" />
+                  <span className="text-sm text-blue-700 dark:text-blue-300">Enviar esta imagem para o cliente?</span>
+                </div>
+                <button type="button" onClick={descartarImagemColada} title="Descartar"
+                  className="text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 p-1.5 transition-colors shrink-0">
+                  <X className="w-5 h-5" />
+                </button>
+                <button type="button" onClick={confirmarImagemColada} disabled={enviandoArquivo} title="Enviar imagem"
+                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl px-4 py-2 transition-colors shrink-0">
+                  {enviandoArquivo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </div>
             ) : !isNota && gravando ? (
               <div className="flex items-center gap-2 px-3 py-2">
                 <div className="flex-1 flex items-center gap-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-2">
@@ -1580,6 +1634,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                     rows={3}
                     value={texto}
                     onChange={e => setTexto(e.target.value)}
+                    onPaste={handleColar}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEnviar(e); }
                     }}
