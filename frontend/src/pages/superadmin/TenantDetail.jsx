@@ -376,6 +376,24 @@ export default function TenantDetail() {
           )}
         </div>
 
+        {/* Setor dos chamados — fica junto do SGP porque é configuração do
+            ERP, não do assistente. O IXC não expõe a tabela de setores por
+            API, então o número precisa ser informado à mão uma vez. */}
+        {tenant.sgpTipo === 'ixc' && (
+          <div className="mb-4">
+            <Field dark
+              label="Setor dos chamados técnicos (IXC)"
+              value={tenant.chamadoSetorPadrao || ''}
+              onChange={v => setTenant(t => ({ ...t, chamadoSetorPadrao: v.replace(/\D/g, '') }))}
+              placeholder="ex: 4"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              No IXC: Suporte → Setores, coluna "ID setor". Sem isso o chamado cai num setor que a
+              equipe não enxerga — o usuário da API filtra por setor.
+            </p>
+          </div>
+        )}
+
         <div className="mb-4">
           <label className="block text-xs text-gray-400 mb-1">System Prompt</label>
           <textarea rows={6} value={tenant.systemPrompt}

@@ -379,6 +379,10 @@ router.put('/:id', async (req, res) => {
     endereco, cidade, uf, cep,
     whatsappNumberId, whatsappToken,
     systemPrompt, nomeAssistente, sgpTipo, sgpApiUrl, sgpApiKey, plano, ativo,
+    // Faltavam aqui: o super admin editava o provedor e esses campos voltavam
+    // em branco, porque só a rota do próprio provedor os aceitava. Quem
+    // configura pelo super admin não tinha como preencher nem percebia.
+    chamadoSetorPadrao, mensagemBoasVindas, boasVindasQuando,
   } = req.body;
 
   try {
@@ -390,6 +394,7 @@ router.put('/:id', async (req, res) => {
         whatsappNumberId: whatsappNumberId || null,
         whatsappToken: whatsappToken || null,
         systemPrompt, nomeAssistente, sgpTipo, sgpApiUrl, sgpApiKey, plano, ativo,
+        chamadoSetorPadrao, mensagemBoasVindas, boasVindasQuando,
         atualizadoEm: new Date(),
       })
       .where(eq(tenants.id, req.params.id))
