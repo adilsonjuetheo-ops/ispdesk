@@ -27,6 +27,10 @@ export const tenants = pgTable('tenants', {
   // boasVindasQuando: 'primeiro_contato' manda só na primeira conversa daquele
   // cliente; 'sempre' manda a cada conversa nova. A diferença é dinheiro: cada
   // envio é uma mensagem de WhatsApp a mais, cobrada depois da franquia.
+  // Id do setor que recebe os chamados abertos pelo painel. Precisa ser
+  // configurado porque o IXC não expõe a tabela de setores por API — e os ids
+  // variam por provedor: no Mataverde é 1, na Microdata são 2 e 4.
+  chamadoSetorPadrao: text('chamado_setor_padrao'),
   mensagemBoasVindas: text('mensagem_boas_vindas'),
   boasVindasQuando:   text('boas_vindas_quando').default('primeiro_contato'),
   systemPrompt:       text('system_prompt').notNull(),

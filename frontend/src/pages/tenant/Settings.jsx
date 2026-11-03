@@ -1426,6 +1426,28 @@ export default function Settings() {
               placeholder="Você é o assistente virtual do provedor de internet [nome]. Sua função é ajudar os clientes com dúvidas sobre..." />
           </section>
 
+          {/* chamado técnico */}
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-700 mb-1">Chamado técnico</h2>
+            <p className="text-xs text-gray-500 mb-3">
+              Setor que recebe os chamados abertos pelo painel. O IXC não entrega essa lista por
+              API, então o número precisa ser informado aqui uma vez.
+            </p>
+            <input
+              value={tenant.chamadoSetorPadrao || ''}
+              onChange={e => set('chamadoSetorPadrao', e.target.value.replace(/\D/g, ''))}
+              placeholder="ex: 4"
+              className="w-32 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <p className="text-xs text-gray-500 mt-2">
+              No IXC: <span className="font-medium">Suporte → Setores</span>. Use o número da coluna
+              <span className="font-medium"> ID setor</span> do setor de suporte técnico.
+            </p>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
+              Sem isso, o chamado abre com o setor que o assunto tiver cadastrado — e se o assunto
+              não tiver nenhum, o IXC recusa pedindo para preencher o setor.
+            </p>
+          </section>
+
           {/* saudação de boas-vindas */}
           <section className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-700 mb-1">Saudação de boas-vindas</h2>

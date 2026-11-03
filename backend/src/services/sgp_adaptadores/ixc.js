@@ -395,7 +395,7 @@ export class IxcAdaptador extends SgpAdaptador {
   // O IXC guarda o assunto em id_assunto (numérico). Mandar o texto num campo
   // "assunto", como o código fazia antes, não grava nada: o chamado cai no
   // padrão e um pedido de troca de roteador vira "Sem Internet".
-  async abrirChamado({ whatsapp, documento, idAssunto, idFilial, idTecnico, mensagem, prioridade = 'N' }) {
+  async abrirChamado({ whatsapp, documento, idAssunto, idFilial, idTecnico, setorPadrao, mensagem, prioridade = 'N' }) {
     const cliente = documento
       ? await this.#buscarClientePorDocumento(documento)
       : await this.#buscarClientePorTelefone(whatsapp);
@@ -407,13 +407,22 @@ export class IxcAdaptador extends SgpAdaptador {
     const assunto = (await this.listarAssuntosChamado().catch(() => []))
       .find(a => a.id === String(idAssunto));
 
+    // Precedência: o setor do assunto, depois o configurado no provedor.
+    // Nenhum dos dois? Não manda nada. Chutar um id — era '1' aqui — e esse id
+    // não existir faz o IXC recusar o técnico dizendo que ele "não está
+    // vinculado ao setor", quando o problema é o setor inexistente. Na
+    // Microdata os setores são 2 e 4; o 1 que eu mandava não existe.
+    const setorEscolhido = (assunto?.setorPadrao && assunto.setorPadrao !== '0')
+      ? assunto.setorPadrao
+      : (setorPadrao ? String(setorPadrao) : null);
+
     const data = await this.#inserir('su_oss_chamado', {
       id_cliente: String(cliente.id),
       id_assunto: String(idAssunto),
       mensagem,
       prioridade: prioridade || assunto?.prioridadePadrao || 'N',
       status: 'A',
-      setor: assunto?.setorPadrao && assunto.setorPadrao !== '0' ? assunto.setorPadrao : '1',
+      ...(setorEscolhido ? { setor: setorEscolhido } : {}),
       origem_endereco: assunto?.enderecoPadrao || 'C',
       // Só vai quando a tela mandou: sem filial escolhida, deixa o IXC aplicar
       // o padrão dele em vez de a gente chutar a primeira.
@@ -440,7 +449,7 @@ export class IxcAdaptador extends SgpAdaptador {
     const eRecusaDeTecnico = idTecnico && /colaborador|setor dessa|vinculado/i.test(limpo);
     if (eRecusaDeTecnico) {
       const semTecnico = await this.abrirChamado({
-        whatsapp, documento, idAssunto, idFilial, mensagem, prioridade,
+        whatsapp, documento, idAssunto, idFilial, setorPadrao, mensagem, prioridade,
       });
       if (semTecnico?.protocolo) {
         return {

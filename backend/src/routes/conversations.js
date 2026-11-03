@@ -1036,6 +1036,7 @@ router.post('/:id/chamado', async (req, res) => {
       idAssunto,
       idFilial: idFilial || null,
       idTecnico: idTecnico || null,
+      setorPadrao: tenant?.chamadoSetorPadrao || null,
       mensagem: mensagem.trim(),
       prioridade: prioridade || 'N',
     });
