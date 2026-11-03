@@ -963,7 +963,20 @@ router.get('/:id/chamado/assuntos', async (req, res) => {
   }
 
   try {
-    res.json({ suportado: true, assuntos: await sgp.listarAssuntosChamado() });
+    // As filiais são opcionais: provedor que não expõe a tabela, ou que tem uma
+    // só, simplesmente não ganha o campo na tela. Por isso a falha aqui não
+    // derruba o formulário inteiro — sem assunto não dá para abrir chamado,
+    // sem filial dá.
+    const [assuntos, filiais] = await Promise.all([
+      sgp.listarAssuntosChamado(),
+      typeof sgp.listarFiliaisChamado === 'function'
+        ? sgp.listarFiliaisChamado().catch(err => {
+            console.error('[chamado] Falha ao listar filiais:', err.message);
+            return [];
+          })
+        : [],
+    ]);
+    res.json({ suportado: true, assuntos, filiais });
   } catch (err) {
     console.error('[chamado] Falha ao listar assuntos:', err.message);
     res.status(502).json({ erro: 'Não foi possível carregar os assuntos no sistema do provedor.' });
@@ -971,7 +984,7 @@ router.get('/:id/chamado/assuntos', async (req, res) => {
 });
 
 router.post('/:id/chamado', async (req, res) => {
-  const { idAssunto, mensagem, prioridade } = req.body;
+  const { idAssunto, idFilial, mensagem, prioridade } = req.body;
   if (!idAssunto) return res.status(400).json({ erro: 'Escolha o assunto do chamado' });
   if (!mensagem?.trim()) return res.status(400).json({ erro: 'Descreva o problema' });
 
@@ -993,6 +1006,7 @@ router.post('/:id/chamado', async (req, res) => {
       whatsapp: cliente?.whatsapp,
       documento: conversa.documentoValidado || null,
       idAssunto,
+      idFilial: idFilial || null,
       mensagem: mensagem.trim(),
       prioridade: prioridade || 'N',
     });

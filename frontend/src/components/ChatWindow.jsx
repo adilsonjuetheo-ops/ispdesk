@@ -746,8 +746,10 @@ function TagsBar({ conversa, onUpdate, catalog = [], podeEditar = false }) {
 // seus, e opção que não existe lá abriria chamado no lugar errado.
 function ChamadoModal({ conversa, onClose, onAberto }) {
   const [assuntos, setAssuntos] = useState([]);
+  const [filiais, setFiliais] = useState([]);
   const [suportado, setSuportado] = useState(null);
   const [idAssunto, setIdAssunto] = useState('');
+  const [idFilial, setIdFilial] = useState('');
   const [mensagem, setMensagem] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
@@ -757,7 +759,10 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
       .then(r => {
         setSuportado(r.data.suportado);
         setAssuntos(r.data.assuntos || []);
+        setFiliais(r.data.filiais || []);
         if (r.data.assuntos?.length === 1) setIdAssunto(r.data.assuntos[0].id);
+        // Uma filial só não é escolha: já vai preenchida e o campo nem aparece.
+        if (r.data.filiais?.length === 1) setIdFilial(r.data.filiais[0].id);
       })
       .catch(err => {
         setSuportado(false);
@@ -769,7 +774,7 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
     e.preventDefault();
     setErro(''); setEnviando(true);
     try {
-      const r = await api.post(`/conversations/${conversa.id}/chamado`, { idAssunto, mensagem });
+      const r = await api.post(`/conversations/${conversa.id}/chamado`, { idAssunto, idFilial, mensagem });
       alert(`Chamado aberto. Protocolo ${r.data.protocolo}.`);
       onAberto();
     } catch (err) {
@@ -810,6 +815,24 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
               <option value="">Escolha...</option>
               {assuntos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
             </select>
+
+            {/* Só aparece quando há de fato o que escolher. Provedor de uma
+                filial não precisa decidir nada, e campo com opção única é
+                degrau sem motivo. */}
+            {filiais.length > 1 && (
+              <>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Filial</label>
+                <select value={idFilial} onChange={e => setIdFilial(e.target.value)}
+                  className="w-full mb-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+                  <option value="">Padrão do sistema</option>
+                  {filiais.map(f => (
+                    <option key={f.id} value={f.id}>
+                      {f.nome}{f.cidade ? ` · ${f.cidade}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
 
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">O que está acontecendo</label>
             <textarea rows={4} value={mensagem} onChange={e => setMensagem(e.target.value)}

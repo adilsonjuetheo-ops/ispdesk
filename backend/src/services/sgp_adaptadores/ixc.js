@@ -287,10 +287,25 @@ export class IxcAdaptador extends SgpAdaptador {
     return (parcial || lista[0]).id;
   }
 
+  // Filiais ativas, com a cidade ao lado — "MICRODATA ITINGA · Itinga" diz mais
+  // do que o nome sozinho quando o provedor tem quatro delas em cidades
+  // diferentes. Provedor de uma filial só não precisa escolher nada, e a tela
+  // esconde o campo nesse caso.
+  async listarFiliaisChamado() {
+    const data = await this.#listar('filial', { rp: '50' });
+    const ativas = (data?.registros || []).filter(f => f.ativo !== 'N');
+
+    return Promise.all(ativas.map(async f => ({
+      id: String(f.id),
+      nome: f.fantasia || f.razao || `Filial ${f.id}`,
+      cidade: await this.#nomeCidade(f.cidade).catch(() => null),
+    })));
+  }
+
   // O IXC guarda o assunto em id_assunto (numérico). Mandar o texto num campo
   // "assunto", como o código fazia antes, não grava nada: o chamado cai no
   // padrão e um pedido de troca de roteador vira "Sem Internet".
-  async abrirChamado({ whatsapp, documento, idAssunto, mensagem, prioridade = 'N' }) {
+  async abrirChamado({ whatsapp, documento, idAssunto, idFilial, mensagem, prioridade = 'N' }) {
     const cliente = documento
       ? await this.#buscarClientePorDocumento(documento)
       : await this.#buscarClientePorTelefone(whatsapp);
@@ -302,6 +317,9 @@ export class IxcAdaptador extends SgpAdaptador {
       mensagem,
       prioridade,
       status: 'A',
+      // Só vai quando a tela mandou: sem filial escolhida, deixa o IXC aplicar
+      // o padrão dele em vez de a gente chutar a primeira.
+      ...(idFilial ? { id_filial: String(idFilial) } : {}),
     });
     if (data?.type === 'success') return { protocolo: String(data.id) };
     return { erro: data?.message || 'O IXC recusou a abertura do chamado.' };
