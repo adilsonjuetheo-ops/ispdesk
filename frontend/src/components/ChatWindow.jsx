@@ -787,7 +787,10 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
     setErro(''); setEnviando(true);
     try {
       const r = await api.post(`/conversations/${conversa.id}/chamado`, { idAssunto, idFilial, idTecnico, mensagem });
-      alert(`Chamado aberto. Protocolo ${r.data.protocolo}.`);
+      alert(`Chamado aberto. Protocolo ${r.data.protocolo}.`
+        + (r.data.aviso ? `
+
+${r.data.aviso}` : ''));
       onAberto();
     } catch (err) {
       setErro(err.response?.data?.erro || 'Não foi possível abrir o chamado.');
@@ -851,6 +854,13 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
                 <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                   Técnico <span className="text-gray-400">(opcional)</span>
                 </label>
+                {/* O IXC só aceita quem está vinculado ao setor da O.S., e essa
+                    relação não vem pela API — não dá para filtrar o seletor. O
+                    aviso evita a surpresa; se recusar, o chamado abre sem
+                    técnico em vez de não abrir. */}
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-1">
+                    Precisa estar vinculado ao setor no IXC. Se não estiver, o chamado abre sem técnico.
+                </p>
                 <select value={idTecnico} onChange={e => setIdTecnico(e.target.value)}
                   className="w-full mb-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
                   <option value="">Deixar sem técnico definido</option>

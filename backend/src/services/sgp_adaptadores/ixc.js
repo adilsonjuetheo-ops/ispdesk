@@ -429,7 +429,27 @@ export class IxcAdaptador extends SgpAdaptador {
     const limpo = String(data?.message || '')
       .replace(/<br\s*\/?>/gi, ' · ')
       .replace(/<[^>]+>/g, '')
+      .replace(/clique para saber mais!?/gi, '')   // link que não existe aqui
       .trim();
+
+    // O IXC só aceita como técnico quem está vinculado ao setor daquela O.S., e
+    // essa relação não é exposta pela API — não dá para filtrar o seletor antes.
+    // Derrubar o chamado inteiro por causa de um campo opcional é o pior
+    // desfecho: o atendente queria abrir o chamado, não escolher o técnico.
+    // Então abre sem técnico e avisa, para alguém atribuir no IXC.
+    const eRecusaDeTecnico = idTecnico && /colaborador|setor dessa|vinculado/i.test(limpo);
+    if (eRecusaDeTecnico) {
+      const semTecnico = await this.abrirChamado({
+        whatsapp, documento, idAssunto, idFilial, mensagem, prioridade,
+      });
+      if (semTecnico?.protocolo) {
+        return {
+          ...semTecnico,
+          aviso: 'Aberto sem técnico: o colaborador escolhido não está vinculado ao setor desta O.S. no IXC. Atribua por lá.',
+        };
+      }
+    }
+
     return { erro: limpo || 'O IXC recusou a abertura do chamado.' };
   }
 

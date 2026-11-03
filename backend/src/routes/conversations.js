@@ -1047,10 +1047,11 @@ router.post('/:id/chamado', async (req, res) => {
 
   // Fica na conversa como mensagem de sistema: assim o protocolo e quem abriu
   // ficam registrados onde a próxima pessoa vai procurar, sem ninguém anotar.
-  const registro = `[Sistema] Chamado técnico aberto por ${req.user.nome} — protocolo ${r.protocolo}.`;
+  const registro = `[Sistema] Chamado técnico aberto por ${req.user.nome} — protocolo ${r.protocolo}.`
+    + (r.aviso ? ` ${r.aviso}` : '');
   await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'nota', conteudo: registro });
 
-  res.json({ protocolo: r.protocolo });
+  res.json({ protocolo: r.protocolo, aviso: r.aviso || null });
 });
 
 router.post('/:id/transfer', async (req, res) => {
