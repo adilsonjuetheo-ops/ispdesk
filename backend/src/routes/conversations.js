@@ -543,8 +543,7 @@ router.get('/chamados', async (req, res) => {
   }
 
   try {
-    const status = req.query.status === 'F' ? 'F' : 'A';
-    res.json({ suportado: true, chamados: await sgp.listarChamados({ status }) });
+    res.json({ suportado: true, chamados: await sgp.listarChamados() });
   } catch (err) {
     console.error('[chamados] Falha ao listar:', err.message);
     res.status(502).json({ erro: 'Não foi possível consultar os chamados no sistema do provedor.' });

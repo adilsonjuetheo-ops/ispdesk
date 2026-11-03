@@ -2,9 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../../lib/api.js';
 import { Wrench, RefreshCw, MapPin, User } from 'lucide-react';
 
-const STATUS = [
-  { valor: 'A', rotulo: 'Em aberto' },
-  { valor: 'F', rotulo: 'Finalizados' },
+// O IXC tem quase dez status. Em vez de reproduzir todos como abas, a tela
+// separa pelo que o atendente precisa decidir — o que ainda demanda alguém —
+// e mostra o status exato em cada linha.
+const VISOES = [
+  { valor: 'andamento', rotulo: 'Em andamento' },
+  { valor: 'finalizados', rotulo: 'Finalizados' },
+  { valor: 'todos', rotulo: 'Todos' },
 ];
 
 // "2026-10-14 18:05:11" vem do IXC sem fuso. Tratar como horário local é o
@@ -22,14 +26,14 @@ export default function Chamados() {
   const [suportado, setSuportado] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
-  const [status, setStatus] = useState('A');
+  const [visao, setVisao] = useState('andamento');
   const [cidade, setCidade] = useState('');
   const [tecnico, setTecnico] = useState('');
 
   const carregar = () => {
     setCarregando(true);
     setErro('');
-    api.get(`/conversations/chamados?status=${status}`)
+    api.get('/conversations/chamados')
       .then(r => {
         setSuportado(r.data.suportado);
         setChamados(r.data.chamados || []);
@@ -38,7 +42,7 @@ export default function Chamados() {
       .finally(() => setCarregando(false));
   };
 
-  useEffect(carregar, [status]);
+  useEffect(carregar, []);
 
   // As opções saem do que veio, não de uma lista fixa: filtro que oferece
   // cidade sem chamado nenhum só gera tela vazia.
@@ -49,7 +53,10 @@ export default function Chamados() {
     () => [...new Set(chamados.map(c => c.tecnico).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')),
     [chamados]);
 
-  const visiveis = chamados.filter(c =>
+  const doStatus = chamados.filter(c =>
+    visao === 'todos' ? true : visao === 'finalizados' ? c.finalizado : !c.finalizado);
+
+  const visiveis = doStatus.filter(c =>
     (!cidade || c.cidade === cidade) &&
     (!tecnico || (tecnico === '__sem__' ? !c.tecnico : c.tecnico === tecnico)));
 
@@ -88,10 +95,10 @@ export default function Chamados() {
         {suportado && (
           <>
             <div className="flex flex-wrap gap-2 mb-4">
-              {STATUS.map(s => (
-                <button key={s.valor} onClick={() => setStatus(s.valor)}
+              {VISOES.map(s => (
+                <button key={s.valor} onClick={() => setVisao(s.valor)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    status === s.valor
+                    visao === s.valor
                       ? 'bg-blue-600 text-white'
                       : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}>
@@ -121,7 +128,7 @@ export default function Chamados() {
               <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-10 text-center">
                 <Wrench className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
                 <p className="text-gray-500 dark:text-gray-400 text-sm">
-                  {chamados.length === 0 ? 'Nenhum chamado neste status.' : 'Nenhum chamado com esses filtros.'}
+                  {chamados.length === 0 ? 'Nenhum chamado no sistema do provedor.' : 'Nenhum chamado com esses filtros.'}
                 </p>
               </div>
             )}
@@ -152,6 +159,13 @@ export default function Chamados() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-[11px] text-gray-400 dark:text-gray-500">#{c.id}</p>
+                        <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full mt-0.5 ${
+                          c.finalizado
+                            ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                        }`}>
+                          {c.statusRotulo}
+                        </span>
                         {dataBr(c.abertoEm) && (
                           <p className="text-[11px] text-gray-500 dark:text-gray-400">{dataBr(c.abertoEm)}</p>
                         )}

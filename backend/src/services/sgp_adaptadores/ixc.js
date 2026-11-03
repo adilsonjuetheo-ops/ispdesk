@@ -8,6 +8,23 @@ const TIMEOUT_MS = 15000;
 // (é como o IXC deixa o contrato cancelado), D desistiu. Negativado ainda deve.
 const STATUS_CONTRATO_ENCERRADO = new Set(['I', 'D']);
 
+// Status de chamado no IXC. O código cru não diz nada para quem atende, e a
+// lista é maior do que "aberto ou fechado" — era por isso que o chamado novo
+// sumia de uma tela que só mostrava 'A'.
+const STATUS_CHAMADO = {
+  A: 'Aberto',
+  N: 'Novo',
+  AN: 'Em análise',
+  EN: 'Encaminhado',
+  AS: 'Assumido',
+  DS: 'Em deslocamento',
+  EX: 'Em execução',
+  AG: 'Agendado',
+  RAG: 'Reagendar',
+  F: 'Finalizado',
+  C: 'Cancelado',
+};
+
 export class IxcAdaptador extends SgpAdaptador {
 
   #urlValidada = null;
@@ -355,11 +372,16 @@ export class IxcAdaptador extends SgpAdaptador {
   // aqui porque uma tela com "id_assunto: 2" não serve a ninguém. O cliente sai
   // um por um, mas passa pelo cache da instância e o teto de 80 mantém isso em
   // alguns segundos; é tela que se abre, não que fica em polling.
-  async listarChamados({ status = 'A', limite = 80 } = {}) {
+  async listarChamados({ limite = 80 } = {}) {
+    // Sem filtro de status na consulta: o IXC usa vários — aberto, análise,
+    // encaminhado, assumido, deslocamento, execução, agendado, finalizado — e
+    // filtrar por 'A' escondia chamado recém-criado que nasceu noutro estado.
+    // Foi o que aconteceu com o 6325. Traz os mais recentes e quem separa é a
+    // tela, que mostra o status de cada um.
     const data = await this.#listar('su_oss_chamado', {
-      qtype: 'su_oss_chamado.status',
-      query: status,
-      oper: '=',
+      qtype: 'su_oss_chamado.id',
+      query: '0',
+      oper: '>',
       rp: String(limite),
       sortname: 'su_oss_chamado.id',
       sortorder: 'desc',
@@ -376,6 +398,9 @@ export class IxcAdaptador extends SgpAdaptador {
       const cliente = await this.#clientePorId(c.id_cliente).catch(() => null);
       return {
         id: String(c.id),
+        status: String(c.status || ''),
+        statusRotulo: STATUS_CHAMADO[String(c.status || '')] || String(c.status || '—'),
+        finalizado: String(c.status || '') === 'F',
         clienteNome: cliente?.razao || `Cliente ${c.id_cliente}`,
         clienteWhatsapp: this.#formatarTelefoneWhatsapp(cliente?.telefone_celular || cliente?.fone),
         cidade: cliente ? await this.#nomeCidade(cliente.cidade).catch(() => null) : null,
