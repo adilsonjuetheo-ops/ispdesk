@@ -452,8 +452,10 @@ export class IxcAdaptador extends SgpAdaptador {
     if (!setorEscolhido) {
       return {
         erro: 'Falta configurar o setor dos chamados deste provedor. '
-          + 'Em Configurações → Chamado técnico, informe o ID do setor '
-          + '(no IXC: Suporte → Setores). Sem isso o chamado some num setor que a equipe não enxerga.',
+          + 'Informe o ID do setor em Configurações → Chamado técnico, ou no super admin, '
+          + 'na ficha do provedor abaixo da credencial do SGP. '
+          + 'O número está no IXC em Suporte → Setores, coluna "ID setor". '
+          + 'Sem ele o chamado cai num setor que a equipe não enxerga.',
       };
     }
 
