@@ -16,6 +16,7 @@ import Contatos from './pages/tenant/Contatos.jsx';
 import Nps from './pages/tenant/Nps.jsx';
 import Incidentes from './pages/tenant/Incidentes.jsx';
 import Contratos from './pages/tenant/Contratos.jsx';
+import Chamados from './pages/tenant/Chamados.jsx';
 import Resultados from './pages/tenant/Resultados.jsx';
 import SuperAdminLayout from './components/layout/SuperAdminLayout.jsx';
 import TenantLayout from './components/layout/TenantLayout.jsx';
@@ -61,6 +62,10 @@ export default function App() {
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/contatos" element={<Contatos />} />
           <Route path="/lembretes" element={<Lembretes />} />
+          {/* Sem restrição de admin: quem abre e acompanha chamado é quem
+              atende, e era justamente para não depender de admin que essa
+              tela existe. */}
+          <Route path="/chamados" element={<Chamados />} />
           <Route path="/agents" element={
             <ProtectedRoute roles={['admin']}>
               <Agents />

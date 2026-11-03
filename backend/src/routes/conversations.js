@@ -533,6 +533,24 @@ router.get('/', async (req, res) => {
 // Conversa única — usado por deep links de outras telas (Lembretes, Contratos)
 // que abrem uma conversa específica que pode nem estar na lista principal
 // (ex.: encerrada há mais tempo que o limite trazido por GET /).
+// Chamados abertos no sistema do provedor, para acompanhar sem entrar no IXC.
+// Precisa vir antes de '/:id' — nada aqui é id de conversa.
+router.get('/chamados', async (req, res) => {
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, req.user.tenantId)).limit(1);
+  const sgp = criarSgp(tenant);
+  if (!sgp || typeof sgp.listarChamados !== 'function') {
+    return res.json({ suportado: false, chamados: [] });
+  }
+
+  try {
+    const status = req.query.status === 'F' ? 'F' : 'A';
+    res.json({ suportado: true, chamados: await sgp.listarChamados({ status }) });
+  } catch (err) {
+    console.error('[chamados] Falha ao listar:', err.message);
+    res.status(502).json({ erro: 'Não foi possível consultar os chamados no sistema do provedor.' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   const rows = await db.select(CAMPOS_LISTA)

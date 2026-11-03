@@ -349,6 +349,49 @@ export class IxcAdaptador extends SgpAdaptador {
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }
 
+  // Chamados do provedor, para a tela de acompanhamento.
+  //
+  // O IXC devolve só ids — cliente, assunto, técnico. Os nomes são resolvidos
+  // aqui porque uma tela com "id_assunto: 2" não serve a ninguém. O cliente sai
+  // um por um, mas passa pelo cache da instância e o teto de 80 mantém isso em
+  // alguns segundos; é tela que se abre, não que fica em polling.
+  async listarChamados({ status = 'A', limite = 80 } = {}) {
+    const data = await this.#listar('su_oss_chamado', {
+      qtype: 'su_oss_chamado.status',
+      query: status,
+      oper: '=',
+      rp: String(limite),
+      sortname: 'su_oss_chamado.id',
+      sortorder: 'desc',
+    });
+
+    const [assuntos, tecnicos] = await Promise.all([
+      this.listarAssuntosChamado().catch(() => []),
+      this.listarTecnicos().catch(() => []),
+    ]);
+    const nomeAssunto = new Map(assuntos.map(a => [a.id, a.nome]));
+    const nomeTecnico = new Map(tecnicos.map(t => [t.id, t.nome]));
+
+    return Promise.all((data?.registros || []).map(async c => {
+      const cliente = await this.#clientePorId(c.id_cliente).catch(() => null);
+      return {
+        id: String(c.id),
+        clienteNome: cliente?.razao || `Cliente ${c.id_cliente}`,
+        clienteWhatsapp: this.#formatarTelefoneWhatsapp(cliente?.telefone_celular || cliente?.fone),
+        cidade: cliente ? await this.#nomeCidade(cliente.cidade).catch(() => null) : null,
+        assunto: nomeAssunto.get(String(c.id_assunto)) || null,
+        // id_tecnico 0 é o estado normal de chamado ainda não distribuído.
+        tecnico: c.id_tecnico && c.id_tecnico !== '0'
+          ? (nomeTecnico.get(String(c.id_tecnico)) || `Colaborador ${c.id_tecnico}`)
+          : null,
+        prioridade: c.prioridade || null,
+        abertoEm: c.data_abertura && !c.data_abertura.startsWith('0000') ? c.data_abertura : null,
+        agendadoPara: c.data_agenda && !c.data_agenda.startsWith('0000') ? c.data_agenda : null,
+        mensagem: c.mensagem || '',
+      };
+    }));
+  }
+
   // O IXC guarda o assunto em id_assunto (numérico). Mandar o texto num campo
   // "assunto", como o código fazia antes, não grava nada: o chamado cai no
   // padrão e um pedido de troca de roteador vira "Sem Internet".
