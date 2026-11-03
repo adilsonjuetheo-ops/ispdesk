@@ -318,9 +318,16 @@ export class IxcAdaptador extends SgpAdaptador {
   // duplicatas, e dois itens idênticos num seletor não dão para escolher.
   async listarTecnicos() {
     const data = await this.#listar('funcionarios', { rp: '200' });
-    const ativos = (data?.registros || [])
+    const ativos = await Promise.all((data?.registros || [])
       .filter(f => f.ativo !== 'N')
-      .map(f => ({ id: String(f.id), nome: (f.funcionario || f.nome || `Colaborador ${f.id}`).trim() }));
+      .map(async f => ({
+        id: String(f.id),
+        nome: (f.funcionario || f.nome || `Colaborador ${f.id}`).trim(),
+        // A cidade vem junto para a tela separar quem atende a região do
+        // cliente. Num provedor que cobre quatro cidades, mandar técnico de
+        // Araçuaí para um chamado em Itinga é erro caro.
+        cidade: await this.#nomeCidade(f.cidade).catch(() => null),
+      })));
 
     const vezes = new Map();
     for (const t of ativos) vezes.set(t.nome, (vezes.get(t.nome) || 0) + 1);

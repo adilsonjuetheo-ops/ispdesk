@@ -980,7 +980,13 @@ router.get('/:id/chamado/assuntos', async (req, res) => {
       opcional('listarFiliaisChamado', 'filiais'),
       opcional('listarTecnicos', 'técnicos'),
     ]);
-    res.json({ suportado: true, assuntos, filiais, tecnicos });
+    // A cidade do cliente vem do SGP e já está no cadastro (é o que aparece
+    // ao lado do nome no cabeçalho). Serve para a tela destacar os técnicos
+    // que atendem a região, em vez de listar todos em ordem alfabética.
+    const [cli] = await db.select({ cidade: clientes.filialNome })
+      .from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+
+    res.json({ suportado: true, assuntos, filiais, tecnicos, cidadeCliente: cli?.cidade || null });
   } catch (err) {
     console.error('[chamado] Falha ao listar assuntos:', err.message);
     res.status(502).json({ erro: 'Não foi possível carregar os assuntos no sistema do provedor.' });

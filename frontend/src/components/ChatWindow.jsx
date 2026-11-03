@@ -748,6 +748,7 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
   const [assuntos, setAssuntos] = useState([]);
   const [filiais, setFiliais] = useState([]);
   const [tecnicos, setTecnicos] = useState([]);
+  const [cidadeCliente, setCidadeCliente] = useState(null);
   const [idTecnico, setIdTecnico] = useState('');
   const [suportado, setSuportado] = useState(null);
   const [idAssunto, setIdAssunto] = useState('');
@@ -763,6 +764,7 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
         setAssuntos(r.data.assuntos || []);
         setFiliais(r.data.filiais || []);
         setTecnicos(r.data.tecnicos || []);
+        setCidadeCliente(r.data.cidadeCliente || null);
         if (r.data.assuntos?.length === 1) setIdAssunto(r.data.assuntos[0].id);
         // Uma filial só não é escolha: já vai preenchida e o campo nem aparece.
         if (r.data.filiais?.length === 1) setIdFilial(r.data.filiais[0].id);
@@ -772,6 +774,13 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
         setErro(err.response?.data?.erro || 'Não foi possível carregar os assuntos.');
       });
   }, [conversa.id]);
+
+  // Separa os técnicos entre os que ficam na cidade do cliente e o resto.
+  // Comparação normalizada porque a cidade do técnico e a do cliente saem da
+  // mesma tabela do IXC, mas passam por caminhos diferentes até aqui.
+  const limpar = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const daCidade = cidadeCliente ? tecnicos.filter(t => limpar(t.cidade) === limpar(cidadeCliente)) : [];
+  const outros = tecnicos.filter(t => !daCidade.includes(t));
 
   const abrir = async (e) => {
     e.preventDefault();
@@ -845,7 +854,23 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
                 <select value={idTecnico} onChange={e => setIdTecnico(e.target.value)}
                   className="w-full mb-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
                   <option value="">Deixar sem técnico definido</option>
-                  {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                  {/* Quem atende a cidade do cliente vem primeiro, num grupo
+                      próprio. Sem isso, num provedor de quatro cidades a
+                      escolha certa fica perdida no meio da lista alfabética. */}
+                  {daCidade.length > 0 && (
+                    <optgroup label={`Em ${cidadeCliente}`}>
+                      {daCidade.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                    </optgroup>
+                  )}
+                  {outros.length > 0 && (
+                    <optgroup label={daCidade.length ? 'Outras cidades' : 'Equipe'}>
+                      {outros.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.nome}{t.cidade ? ` · ${t.cidade}` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </>
             )}
