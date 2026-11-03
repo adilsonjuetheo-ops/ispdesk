@@ -441,6 +441,22 @@ export class IxcAdaptador extends SgpAdaptador {
       ? assunto.setorPadrao
       : (setorPadrao ? String(setorPadrao) : null);
 
+    // Sem setor, o IXC aplica um padrão próprio — e o chamado pode cair num
+    // setor que ninguém da equipe enxerga. Os usuários do IXC têm
+    // `filtra_setor`, que esconde do próprio operador os chamados de setores
+    // fora do alcance dele: foi o que aconteceu com o 6325 na Microdata, que a
+    // API respondeu ter criado e não aparece nem na grade do ERP.
+    //
+    // Chamado invisível é pior do que chamado que não abre: ninguém atende e
+    // ninguém sabe que existe. Então recusa, dizendo onde configurar.
+    if (!setorEscolhido) {
+      return {
+        erro: 'Falta configurar o setor dos chamados deste provedor. '
+          + 'Em Configurações → Chamado técnico, informe o ID do setor '
+          + '(no IXC: Suporte → Setores). Sem isso o chamado some num setor que a equipe não enxerga.',
+      };
+    }
+
     const data = await this.#inserir('su_oss_chamado', {
       id_cliente: String(cliente.id),
       id_assunto: String(idAssunto),
