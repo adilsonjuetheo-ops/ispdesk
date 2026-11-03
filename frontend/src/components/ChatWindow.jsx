@@ -747,6 +747,8 @@ function TagsBar({ conversa, onUpdate, catalog = [], podeEditar = false }) {
 function ChamadoModal({ conversa, onClose, onAberto }) {
   const [assuntos, setAssuntos] = useState([]);
   const [filiais, setFiliais] = useState([]);
+  const [tecnicos, setTecnicos] = useState([]);
+  const [idTecnico, setIdTecnico] = useState('');
   const [suportado, setSuportado] = useState(null);
   const [idAssunto, setIdAssunto] = useState('');
   const [idFilial, setIdFilial] = useState('');
@@ -760,6 +762,7 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
         setSuportado(r.data.suportado);
         setAssuntos(r.data.assuntos || []);
         setFiliais(r.data.filiais || []);
+        setTecnicos(r.data.tecnicos || []);
         if (r.data.assuntos?.length === 1) setIdAssunto(r.data.assuntos[0].id);
         // Uma filial só não é escolha: já vai preenchida e o campo nem aparece.
         if (r.data.filiais?.length === 1) setIdFilial(r.data.filiais[0].id);
@@ -774,7 +777,7 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
     e.preventDefault();
     setErro(''); setEnviando(true);
     try {
-      const r = await api.post(`/conversations/${conversa.id}/chamado`, { idAssunto, idFilial, mensagem });
+      const r = await api.post(`/conversations/${conversa.id}/chamado`, { idAssunto, idFilial, idTecnico, mensagem });
       alert(`Chamado aberto. Protocolo ${r.data.protocolo}.`);
       onAberto();
     } catch (err) {
@@ -830,6 +833,19 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
                       {f.nome}{f.cidade ? ` · ${f.cidade}` : ''}
                     </option>
                   ))}
+                </select>
+              </>
+            )}
+
+            {tecnicos.length > 0 && (
+              <>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Técnico <span className="text-gray-400">(opcional)</span>
+                </label>
+                <select value={idTecnico} onChange={e => setIdTecnico(e.target.value)}
+                  className="w-full mb-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+                  <option value="">Deixar sem técnico definido</option>
+                  {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
                 </select>
               </>
             )}

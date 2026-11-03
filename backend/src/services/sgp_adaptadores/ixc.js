@@ -302,10 +302,38 @@ export class IxcAdaptador extends SgpAdaptador {
     })));
   }
 
+  // Técnicos para atribuir o chamado.
+  //
+  // id_tecnico aponta para "Colaboradores" (Sistema > Folha de Pagamento), que
+  // na API é `funcionarios` — os campos de CTPS e dependentes não deixam
+  // dúvida. Não é `usuarios`, que são os logins do sistema.
+  //
+  // O IXC só habilita alguém como técnico quando o colaborador recebe um setor,
+  // mas essa relação não é exposta pela API (funcionarios_setor e companhia
+  // respondem "recurso não disponível"). id_setor_padrao não serve de atalho:
+  // no Mataverde só uma pessoa tem, e os chamados já foram atribuídos a cinco.
+  //
+  // Então vai a lista inteira de ativos e quem escolhe é o atendente, que
+  // conhece a equipe. Nome repetido ganha o id ao lado — o cadastro tem
+  // duplicatas, e dois itens idênticos num seletor não dão para escolher.
+  async listarTecnicos() {
+    const data = await this.#listar('funcionarios', { rp: '200' });
+    const ativos = (data?.registros || [])
+      .filter(f => f.ativo !== 'N')
+      .map(f => ({ id: String(f.id), nome: (f.funcionario || f.nome || `Colaborador ${f.id}`).trim() }));
+
+    const vezes = new Map();
+    for (const t of ativos) vezes.set(t.nome, (vezes.get(t.nome) || 0) + 1);
+
+    return ativos
+      .map(t => (vezes.get(t.nome) > 1 ? { ...t, nome: `${t.nome} (${t.id})` } : t))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }
+
   // O IXC guarda o assunto em id_assunto (numérico). Mandar o texto num campo
   // "assunto", como o código fazia antes, não grava nada: o chamado cai no
   // padrão e um pedido de troca de roteador vira "Sem Internet".
-  async abrirChamado({ whatsapp, documento, idAssunto, idFilial, mensagem, prioridade = 'N' }) {
+  async abrirChamado({ whatsapp, documento, idAssunto, idFilial, idTecnico, mensagem, prioridade = 'N' }) {
     const cliente = documento
       ? await this.#buscarClientePorDocumento(documento)
       : await this.#buscarClientePorTelefone(whatsapp);
@@ -320,6 +348,9 @@ export class IxcAdaptador extends SgpAdaptador {
       // Só vai quando a tela mandou: sem filial escolhida, deixa o IXC aplicar
       // o padrão dele em vez de a gente chutar a primeira.
       ...(idFilial ? { id_filial: String(idFilial) } : {}),
+      // Sem técnico escolhido o IXC deixa em 0, que é o estado normal de
+      // chamado ainda não distribuído — não é erro.
+      ...(idTecnico ? { id_tecnico: String(idTecnico) } : {}),
     });
     if (data?.type === 'success') return { protocolo: String(data.id) };
     return { erro: data?.message || 'O IXC recusou a abertura do chamado.' };

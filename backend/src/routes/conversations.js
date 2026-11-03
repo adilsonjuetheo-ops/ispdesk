@@ -967,16 +967,20 @@ router.get('/:id/chamado/assuntos', async (req, res) => {
     // só, simplesmente não ganha o campo na tela. Por isso a falha aqui não
     // derruba o formulário inteiro — sem assunto não dá para abrir chamado,
     // sem filial dá.
-    const [assuntos, filiais] = await Promise.all([
-      sgp.listarAssuntosChamado(),
-      typeof sgp.listarFiliaisChamado === 'function'
-        ? sgp.listarFiliaisChamado().catch(err => {
-            console.error('[chamado] Falha ao listar filiais:', err.message);
+    const opcional = (metodo, rotulo) =>
+      typeof sgp[metodo] === 'function'
+        ? sgp[metodo]().catch(err => {
+            console.error(`[chamado] Falha ao listar ${rotulo}:`, err.message);
             return [];
           })
-        : [],
+        : Promise.resolve([]);
+
+    const [assuntos, filiais, tecnicos] = await Promise.all([
+      sgp.listarAssuntosChamado(),
+      opcional('listarFiliaisChamado', 'filiais'),
+      opcional('listarTecnicos', 'técnicos'),
     ]);
-    res.json({ suportado: true, assuntos, filiais });
+    res.json({ suportado: true, assuntos, filiais, tecnicos });
   } catch (err) {
     console.error('[chamado] Falha ao listar assuntos:', err.message);
     res.status(502).json({ erro: 'Não foi possível carregar os assuntos no sistema do provedor.' });
@@ -984,7 +988,7 @@ router.get('/:id/chamado/assuntos', async (req, res) => {
 });
 
 router.post('/:id/chamado', async (req, res) => {
-  const { idAssunto, idFilial, mensagem, prioridade } = req.body;
+  const { idAssunto, idFilial, idTecnico, mensagem, prioridade } = req.body;
   if (!idAssunto) return res.status(400).json({ erro: 'Escolha o assunto do chamado' });
   if (!mensagem?.trim()) return res.status(400).json({ erro: 'Descreva o problema' });
 
@@ -1007,6 +1011,7 @@ router.post('/:id/chamado', async (req, res) => {
       documento: conversa.documentoValidado || null,
       idAssunto,
       idFilial: idFilial || null,
+      idTecnico: idTecnico || null,
       mensagem: mensagem.trim(),
       prioridade: prioridade || 'N',
     });
