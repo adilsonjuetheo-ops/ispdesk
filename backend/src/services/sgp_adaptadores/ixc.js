@@ -482,22 +482,54 @@ export class IxcAdaptador extends SgpAdaptador {
     // testando contra a base da Microdata, porque a documentação pública da API
     // não cobre su_oss_chamado.
     //
-    // origem_endereco 'C' é o endereço do cliente. 'CC' seria o do contrato e
-    // obriga a mandar id_contrato junto; 'C' resolve sem essa dependência.
+    // De onde sai o endereço da visita, conforme o assunto manda:
+    //   'C'  endereço do cliente
+    //   'CC' endereço do contrato — e aí o IXC exige id_contrato junto
+    //   'L'  endereço do login
+    // Respeitar isso importa: é o provedor dizendo onde o técnico deve ir.
+    // Sem contrato ativo para acompanhar o 'CC', cai no endereço do cliente em
+    // vez de recusar — endereço aproximado é melhor que chamado não aberto.
+    const origemAssunto = assunto?.enderecoPadrao || 'C';
+    const contratos = origemAssunto === 'CC'
+      ? (await this.#contratosDoCliente(cliente.id).catch(() => null)) || []
+      : [];
+    const contrato = contratos.find(c => c.status === 'A') || contratos[0] || null;
+    const origemEndereco = origemAssunto === 'CC' && !contrato ? 'C' : origemAssunto;
+
+    // O IXC não copia o endereço do cliente para a O.S. quando a criação vem
+    // pela API — o chamado 6328 nasceu com o campo vazio. O.S. sem endereço é
+    // inútil para quem vai à rua, então montamos aqui, no mesmo formato que a
+    // tela do ERP grava: "MG Araçuaí 39600-000 CANOEIRO - RUA X, 529".
+    const cidadeNome = await this.#nomeCidade(cliente.cidade).catch(() => null);
+    const logradouro = [cliente.endereco, cliente.numero].filter(Boolean).join(', ');
+    const enderecoOs = [
+      cidadeNome, cliente.cep, cliente.bairro,
+    ].filter(Boolean).join(' ') + (logradouro ? ` - ${logradouro}` : '');
+
     const data = await this.#inserir('su_oss_chamado', {
       id_cliente: String(cliente.id),
       id_assunto: String(idAssunto),
+      // Endereço e coordenadas só quando existem: campo vazio é melhor do que
+      // string com sobras de separador.
+      ...(enderecoOs.trim() ? { endereco: enderecoOs.trim() } : {}),
+      ...(cliente.bairro ? { bairro: cliente.bairro } : {}),
+      ...(cliente.complemento ? { complemento: cliente.complemento } : {}),
+      ...(cliente.cidade ? { id_cidade: String(cliente.cidade) } : {}),
+      ...(cliente.latitude ? { latitude: String(cliente.latitude) } : {}),
+      ...(cliente.longitude ? { longitude: String(cliente.longitude) } : {}),
       mensagem,
       prioridade: prioridade || assunto?.prioridadePadrao || 'N',
       status: 'A',
       tipo: 'C',
       liberado: '1',
-      origem_endereco: 'C',
+      origem_endereco: origemEndereco,
+      // id_contrato_kit, e não id_contrato: o IXC recusa o segundo dizendo que
+      // o contrato é obrigatório, mesmo recebendo-o.
+      ...(origemEndereco === 'CC' && contrato ? { id_contrato_kit: String(contrato.id) } : {}),
       origem_os_aberta: 'M',
       melhor_horario_agenda: 'Q',
       id_filial: String(idFilial || (await this.#primeiraFilial()) || '1'),
       ...(setorEscolhido ? { setor: setorEscolhido } : {}),
-      origem_endereco: assunto?.enderecoPadrao || 'C',
       // Sem técnico escolhido o IXC deixa em 0, que é o estado normal de
       // chamado ainda não distribuído — não é erro.
       ...(idTecnico ? { id_tecnico: String(idTecnico) } : {}),
