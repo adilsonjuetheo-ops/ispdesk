@@ -76,11 +76,23 @@ export class IxcAdaptador extends SgpAdaptador {
   }
 
   // Gravação: POST sem o header ixcsoft.
+  // Gravação vai em formulário, não em JSON.
+  //
+  // Esta linha custou uma tarde. A listagem aceita JSON, então o insert parecia
+  // aceitar também — e aceitava: respondia "Registro inserido com sucesso" com
+  // um id, sem gravar nada. O corpo JSON simplesmente não era lido, e o IXC
+  // inseria um registro vazio que a própria validação dele descartava depois.
+  // Com form-urlencoded os campos chegam e os erros viram específicos.
   async #inserir(recurso, body = {}) {
+    const form = new URLSearchParams();
+    for (const [k, v] of Object.entries(body)) {
+      if (v !== undefined && v !== null) form.append(k, String(v));
+    }
+
     const res = await fetch(await this.#url(recurso), {
       method: 'POST',
-      headers: this.#headers(),
-      body: JSON.stringify(body),
+      headers: { ...this.#headers(), 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`IXC HTTP ${res.status} em ${recurso}`);
@@ -366,6 +378,13 @@ export class IxcAdaptador extends SgpAdaptador {
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }
 
+  // O IXC exige filial na criação do chamado. Provedor com uma só — que é o
+  // caso de todos até agora — não deve ter que configurar isso à mão.
+  async #primeiraFilial() {
+    const filiais = await this.listarFiliaisChamado().catch(() => []);
+    return filiais[0]?.id || null;
+  }
+
   // Chamados do provedor, para a tela de acompanhamento.
   //
   // O IXC devolve só ids — cliente, assunto, técnico. Os nomes são resolvidos
@@ -459,17 +478,26 @@ export class IxcAdaptador extends SgpAdaptador {
       };
     }
 
+    // Os campos abaixo o IXC exige na criação e não deduz sozinho — descobertos
+    // testando contra a base da Microdata, porque a documentação pública da API
+    // não cobre su_oss_chamado.
+    //
+    // origem_endereco 'C' é o endereço do cliente. 'CC' seria o do contrato e
+    // obriga a mandar id_contrato junto; 'C' resolve sem essa dependência.
     const data = await this.#inserir('su_oss_chamado', {
       id_cliente: String(cliente.id),
       id_assunto: String(idAssunto),
       mensagem,
       prioridade: prioridade || assunto?.prioridadePadrao || 'N',
       status: 'A',
+      tipo: 'C',
+      liberado: '1',
+      origem_endereco: 'C',
+      origem_os_aberta: 'M',
+      melhor_horario_agenda: 'Q',
+      id_filial: String(idFilial || (await this.#primeiraFilial()) || '1'),
       ...(setorEscolhido ? { setor: setorEscolhido } : {}),
       origem_endereco: assunto?.enderecoPadrao || 'C',
-      // Só vai quando a tela mandou: sem filial escolhida, deixa o IXC aplicar
-      // o padrão dele em vez de a gente chutar a primeira.
-      ...(idFilial ? { id_filial: String(idFilial) } : {}),
       // Sem técnico escolhido o IXC deixa em 0, que é o estado normal de
       // chamado ainda não distribuído — não é erro.
       ...(idTecnico ? { id_tecnico: String(idTecnico) } : {}),
