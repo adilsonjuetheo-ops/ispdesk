@@ -137,6 +137,7 @@ export const TOOLS_PADRAO = [
         id_cliente:  { type: 'string', description: 'ID interno do cliente no SGP' },
         id_contrato: { type: 'string', description: 'ID do contrato do cliente' },
         detalhes:    { type: 'string', description: 'Descrição do problema relatado' },
+        assunto:     { type: 'string', description: 'Tipo do problema em poucas palavras, como "sem internet", "conexão lenta", "troca de roteador" ou "ativação". O sistema encaixa no assunto equivalente cadastrado no provedor.' },
       },
       required: ['id_cliente', 'id_contrato', 'detalhes'],
     },

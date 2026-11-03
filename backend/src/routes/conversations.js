@@ -7,7 +7,7 @@ import multer from 'multer';
 import { enviarMensagem, uploadMidia, enviarMidia, enviarTemplate } from '../services/whatsapp.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { enviarNps } from '../services/nps.js';
-import { buscarDadosCliente } from '../services/sgp.js';
+import { buscarDadosCliente, criarSgp } from '../services/sgp.js';
 import { sugerirResposta } from '../services/ai.js';
 import { normalizarTelefoneBR } from '../services/telefone.js';
 import { criarRateLimit } from '../middleware/security.js';
@@ -946,6 +946,70 @@ router.post('/:id/note', async (req, res) => {
 });
 
 // Transferir conversa para outro agente
+// Chamado técnico aberto pelo atendente, sem sair do painel.
+//
+// Até aqui só o bot abria chamado, pela ferramenta da IA. O atendente que
+// assumisse a conversa tinha que ir ao IXC, procurar o cliente de novo e
+// copiar o relato na mão.
+router.get('/:id/chamado/assuntos', async (req, res) => {
+  const [conversa] = await db.select().from(conversas).where(eq(conversas.id, req.params.id)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (!podeAcessarConversa(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  const sgp = criarSgp(tenant);
+  if (!sgp || typeof sgp.listarAssuntosChamado !== 'function') {
+    return res.json({ suportado: false, assuntos: [] });
+  }
+
+  try {
+    res.json({ suportado: true, assuntos: await sgp.listarAssuntosChamado() });
+  } catch (err) {
+    console.error('[chamado] Falha ao listar assuntos:', err.message);
+    res.status(502).json({ erro: 'Não foi possível carregar os assuntos no sistema do provedor.' });
+  }
+});
+
+router.post('/:id/chamado', async (req, res) => {
+  const { idAssunto, mensagem, prioridade } = req.body;
+  if (!idAssunto) return res.status(400).json({ erro: 'Escolha o assunto do chamado' });
+  if (!mensagem?.trim()) return res.status(400).json({ erro: 'Descreva o problema' });
+
+  const [conversa] = await db.select().from(conversas).where(eq(conversas.id, req.params.id)).limit(1);
+  if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
+  if (!podeAcessarConversa(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
+
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  const sgp = criarSgp(tenant);
+  if (!sgp || typeof sgp.abrirChamado !== 'function') {
+    return res.status(400).json({ erro: 'O sistema deste provedor não permite abrir chamado por aqui.' });
+  }
+
+  const [cliente] = await db.select().from(clientes).where(eq(clientes.id, conversa.clienteId)).limit(1);
+
+  let r;
+  try {
+    r = await sgp.abrirChamado({
+      whatsapp: cliente?.whatsapp,
+      documento: conversa.documentoValidado || null,
+      idAssunto,
+      mensagem: mensagem.trim(),
+      prioridade: prioridade || 'N',
+    });
+  } catch (err) {
+    console.error('[chamado] Falha ao abrir:', err.message);
+    return res.status(502).json({ erro: `O sistema do provedor recusou: ${err.message}` });
+  }
+  if (r?.erro) return res.status(502).json({ erro: r.erro });
+
+  // Fica na conversa como mensagem de sistema: assim o protocolo e quem abriu
+  // ficam registrados onde a próxima pessoa vai procurar, sem ninguém anotar.
+  const registro = `[Sistema] Chamado técnico aberto por ${req.user.nome} — protocolo ${r.protocolo}.`;
+  await db.insert(mensagens).values({ conversaId: conversa.id, origem: 'nota', conteudo: registro });
+
+  res.json({ protocolo: r.protocolo });
+});
+
 router.post('/:id/transfer', async (req, res) => {
   const { id } = req.params;
   const { agenteId } = req.body;

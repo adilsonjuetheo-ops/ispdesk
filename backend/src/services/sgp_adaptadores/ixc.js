@@ -254,6 +254,59 @@ export class IxcAdaptador extends SgpAdaptador {
     return linhas.join('\n');
   }
 
+  // --- Chamado técnico --------------------------------------------------
+
+  // Os assuntos são cadastrados por provedor — no Mataverde são quatro, noutro
+  // IXC serão outros. Por isso a lista vem da API em vez de ficar fixa no
+  // código: formulário com opção que não existe lá abre chamado no lugar errado.
+  async listarAssuntosChamado() {
+    const data = await this.#listar('su_oss_assunto', { rp: '100' });
+    return (data?.registros || [])
+      .map(r => ({ id: String(r.id), nome: r.assunto || r.descricao || `Assunto ${r.id}` }))
+      .filter(a => a.nome);
+  }
+
+  // Encaixa o texto que a IA escreveu no assunto cadastrado pelo provedor.
+  // Acentos e caixa saem da comparação porque "CONEXÃO LENTA" no IXC e
+  // "conexao lenta" vindo do modelo são a mesma coisa. Sem par razoável,
+  // devolve o primeiro da lista: chamado no assunto errado ainda é melhor do
+  // que chamado que não abre.
+  async #idDoAssunto(texto) {
+    const lista = await this.listarAssuntosChamado().catch(() => []);
+    if (!lista.length) return '1';
+
+    const limpar = t => String(t || '').toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    const alvo = limpar(texto);
+    if (!alvo) return lista[0].id;
+
+    const exato = lista.find(a => limpar(a.nome) === alvo);
+    if (exato) return exato.id;
+
+    const parcial = lista.find(a => limpar(a.nome).includes(alvo) || alvo.includes(limpar(a.nome)));
+    return (parcial || lista[0]).id;
+  }
+
+  // O IXC guarda o assunto em id_assunto (numérico). Mandar o texto num campo
+  // "assunto", como o código fazia antes, não grava nada: o chamado cai no
+  // padrão e um pedido de troca de roteador vira "Sem Internet".
+  async abrirChamado({ whatsapp, documento, idAssunto, mensagem, prioridade = 'N' }) {
+    const cliente = documento
+      ? await this.#buscarClientePorDocumento(documento)
+      : await this.#buscarClientePorTelefone(whatsapp);
+    if (!cliente) return { erro: 'Cliente não encontrado no IXC.' };
+
+    const data = await this.#inserir('su_oss_chamado', {
+      id_cliente: String(cliente.id),
+      id_assunto: String(idAssunto),
+      mensagem,
+      prioridade,
+      status: 'A',
+    });
+    if (data?.type === 'success') return { protocolo: String(data.id) };
+    return { erro: data?.message || 'O IXC recusou a abertura do chamado.' };
+  }
+
   async buscarContexto(whatsapp) {
     const cliente = await this.#buscarClientePorTelefone(whatsapp);
     if (!cliente) {
@@ -566,10 +619,17 @@ export class IxcAdaptador extends SgpAdaptador {
       }
 
       case 'abrir_chamado_tecnico': {
+        // O IXC guarda o assunto em id_assunto, numérico. O código antigo
+        // mandava um texto fixo num campo "assunto" que não existe no
+        // registro: nada era gravado e todo chamado caía no assunto padrão,
+        // fosse sem internet ou troca de roteador.
+        const idAssunto = await this.#idDoAssunto(toolInput.assunto);
         const data = await this.#inserir('su_oss_chamado', {
           id_cliente: toolInput.id_cliente,
+          id_assunto: idAssunto,
           mensagem: toolInput.detalhes,
-          assunto: 'Solicitação via WhatsApp',
+          prioridade: 'N',
+          status: 'A',
         });
         if (data.type === 'success') {
           return `Chamado aberto! Protocolo: ${data.id}. Nossa equipe entrará em contato.`;

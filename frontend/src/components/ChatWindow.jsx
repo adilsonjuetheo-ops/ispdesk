@@ -12,7 +12,7 @@ import {
   ImageIcon, Mic, Search, StickyNote, ArrowRightLeft, Tag,
   Check, CheckCheck, Bold, Italic, Strikethrough, Code,
   List, ListOrdered, Plus, ArrowLeft, Video, Sparkles, Maximize2, Clock,
-  MoreHorizontal, PanelRight, Play, Pause, BellRing, ChevronDown, Download, AlertTriangle,
+  MoreHorizontal, PanelRight, Play, Pause, BellRing, ChevronDown, Download, AlertTriangle, Wrench,
 } from 'lucide-react';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -740,6 +740,99 @@ function TagsBar({ conversa, onUpdate, catalog = [], podeEditar = false }) {
   );
 }
 
+// Abertura de chamado no sistema do provedor, sem sair da conversa.
+//
+// Os assuntos vêm do SGP e não de uma lista fixa: cada provedor cadastra os
+// seus, e opção que não existe lá abriria chamado no lugar errado.
+function ChamadoModal({ conversa, onClose, onAberto }) {
+  const [assuntos, setAssuntos] = useState([]);
+  const [suportado, setSuportado] = useState(null);
+  const [idAssunto, setIdAssunto] = useState('');
+  const [mensagem, setMensagem] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    api.get(`/conversations/${conversa.id}/chamado/assuntos`)
+      .then(r => {
+        setSuportado(r.data.suportado);
+        setAssuntos(r.data.assuntos || []);
+        if (r.data.assuntos?.length === 1) setIdAssunto(r.data.assuntos[0].id);
+      })
+      .catch(err => {
+        setSuportado(false);
+        setErro(err.response?.data?.erro || 'Não foi possível carregar os assuntos.');
+      });
+  }, [conversa.id]);
+
+  const abrir = async (e) => {
+    e.preventDefault();
+    setErro(''); setEnviando(true);
+    try {
+      const r = await api.post(`/conversations/${conversa.id}/chamado`, { idAssunto, mensagem });
+      alert(`Chamado aberto. Protocolo ${r.data.protocolo}.`);
+      onAberto();
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Não foi possível abrir o chamado.');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <form onSubmit={abrir} className="w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+            <Wrench className="w-4 h-4 text-blue-600" /> Abrir chamado técnico
+          </h3>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+          Para {conversa.clienteNome || conversa.clienteWhatsapp}, no sistema do provedor.
+        </p>
+
+        {suportado === null && <p className="text-sm text-gray-500">Carregando assuntos...</p>}
+
+        {suportado === false && (
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            O sistema deste provedor não permite abrir chamado por aqui.
+          </p>
+        )}
+
+        {suportado && (
+          <>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Assunto</label>
+            <select value={idAssunto} onChange={e => setIdAssunto(e.target.value)}
+              className="w-full mb-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+              <option value="">Escolha...</option>
+              {assuntos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+            </select>
+
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">O que está acontecendo</label>
+            <textarea rows={4} value={mensagem} onChange={e => setMensagem(e.target.value)}
+              placeholder="Relato do cliente, com o que já foi testado..."
+              className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm resize-none" />
+          </>
+        )}
+
+        {erro && <p className="text-xs text-red-500 mt-2">{erro}</p>}
+
+        <div className="flex justify-end gap-2 mt-4">
+          <button type="button" onClick={onClose}
+            className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:underline">Cancelar</button>
+          <button type="submit" disabled={!suportado || enviando || !idAssunto || !mensagem.trim()}
+            className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+            {enviando ? 'Abrindo...' : 'Abrir chamado'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function TransferModal({ conversa, onClose, onTransferred }) {
   const [agentes, setAgentes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -815,6 +908,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   const { user } = useAuth();
   const [msgs, setMsgs] = useState([]);
   const [modeloAberto, setModeloAberto] = useState(false);
+  const [chamadoAberto, setChamadoAberto] = useState(false);
 
   // A Meta conta a janela de 24h a partir da última mensagem DO CLIENTE, não da
   // última atividade da conversa. Calculado aqui com o que a tela já tem, sem
@@ -1360,6 +1454,11 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setMenuAberto(false)} />
                     <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1">
+                      <button onClick={() => { setMenuAberto(false); setChamadoAberto(true); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <Wrench className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                        Abrir chamado técnico
+                      </button>
                       <button onClick={() => { setMenuAberto(false); setShowTransfer(true); }}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                         <ArrowRightLeft className="w-4 h-4 text-gray-400 dark:text-gray-500" />
@@ -1758,6 +1857,14 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
           a janela fechada sozinho e mostra os modelos aprovados, com os campos
           de variável. A rota reaproveita a conversa que já existe em vez de
           abrir outra, então o modelo entra nesta mesma thread. */}
+      {chamadoAberto && (
+        <ChamadoModal
+          conversa={conversa}
+          onClose={() => setChamadoAberto(false)}
+          onAberto={() => { setChamadoAberto(false); carregarMsgs(); }}
+        />
+      )}
+
       {modeloAberto && (
         <NovaConversaModal
           telefoneInicial={conversa.clienteWhatsapp || ''}
