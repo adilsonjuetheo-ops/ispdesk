@@ -95,7 +95,17 @@ app.use('/api/contracts', contractsRouter);
 app.use('/api/lembretes', lembretesRouter);
 app.use('/api/incidentes', incidentesRouter);
 
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+// Marca de quando este processo subiu. Frontend e backend sao aplicacoes
+// separadas no Coolify e podem subir em momentos diferentes — ja perdi tempo
+// investigando bug que era so o backend ainda rodando codigo antigo, sem jeito
+// de confirmar daqui.
+const SUBIU_EM = new Date().toISOString();
+
+app.get('/api/health', (req, res) => res.json({
+  ok: true,
+  subiuEm: SUBIU_EM,
+  commit: (process.env.SOURCE_COMMIT || '').slice(0, 7) || null,
+}));
 
 app.use((err, req, res, next) => {
   if (err?.name === 'MulterError') {
