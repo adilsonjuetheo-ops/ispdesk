@@ -439,10 +439,14 @@ export class IxcAdaptador extends SgpAdaptador {
   // O IXC guarda o assunto em id_assunto (numérico). Mandar o texto num campo
   // "assunto", como o código fazia antes, não grava nada: o chamado cai no
   // padrão e um pedido de troca de roteador vira "Sem Internet".
-  async abrirChamado({ whatsapp, documento, idAssunto, idFilial, idTecnico, setorPadrao, mensagem, prioridade = 'N' }) {
-    const cliente = documento
-      ? await this.#buscarClientePorDocumento(documento)
-      : await this.#buscarClientePorTelefone(whatsapp);
+  async abrirChamado({ idCliente, whatsapp, documento, idAssunto, idFilial, idTecnico, setorPadrao, mensagem, prioridade = 'N' }) {
+    // idCliente vem da ferramenta da IA, que já tem o id interno do contexto do
+    // SGP; o painel manda telefone ou documento e a busca acontece aqui.
+    const cliente = idCliente
+      ? await this.#clientePorId(idCliente)
+      : documento
+        ? await this.#buscarClientePorDocumento(documento)
+        : await this.#buscarClientePorTelefone(whatsapp);
     if (!cliente) return { erro: 'Cliente não encontrado no IXC.' };
 
     // O assunto escolhido define setor e origem de endereço. Sem valor
@@ -458,7 +462,9 @@ export class IxcAdaptador extends SgpAdaptador {
     // Microdata os setores são 2 e 4; o 1 que eu mandava não existe.
     const setorEscolhido = (assunto?.setorPadrao && assunto.setorPadrao !== '0')
       ? assunto.setorPadrao
-      : (setorPadrao ? String(setorPadrao) : null);
+      : (setorPadrao || this.tenant?.chamadoSetorPadrao
+          ? String(setorPadrao || this.tenant.chamadoSetorPadrao)
+          : null);
 
     // Sem setor, o IXC aplica um padrão próprio — e o chamado pode cair num
     // setor que ninguém da equipe enxerga. Os usuários do IXC têm
@@ -496,27 +502,20 @@ export class IxcAdaptador extends SgpAdaptador {
     const contrato = contratos.find(c => c.status === 'A') || contratos[0] || null;
     const origemEndereco = origemAssunto === 'CC' && !contrato ? 'C' : origemAssunto;
 
-    // O IXC não copia o endereço do cliente para a O.S. quando a criação vem
-    // pela API — o chamado 6328 nasceu com o campo vazio. O.S. sem endereço é
-    // inútil para quem vai à rua, então montamos aqui, no mesmo formato que a
-    // tela do ERP grava: "MG Araçuaí 39600-000 CANOEIRO - RUA X, 529".
-    const cidadeNome = await this.#nomeCidade(cliente.cidade).catch(() => null);
-    const logradouro = [cliente.endereco, cliente.numero].filter(Boolean).join(', ');
-    const enderecoOs = [
-      cidadeNome, cliente.cep, cliente.bairro,
-    ].filter(Boolean).join(' ') + (logradouro ? ` - ${logradouro}` : '');
-
+    // NÃO adicionar campos aqui sem testar contra um IXC de verdade.
+    //
+    // Este payload é exatamente o que foi provado criar e persistir (chamado
+    // 6328 na Microdata). Numa tentativa de preencher o endereço da O.S.,
+    // acrescentei endereco/bairro/complemento/id_cidade/latitude/longitude sem
+    // testar — todos campos que existem nos registros reais — e a criação
+    // voltou a responder sucesso sem gravar. O IXC não reclama: só engole.
+    //
+    // Falta descobrir qual deles quebra. Enquanto isso, a O.S. nasce sem
+    // endereço preenchido, o que é ruim para o técnico mas melhor do que
+    // chamado que não existe.
     const data = await this.#inserir('su_oss_chamado', {
       id_cliente: String(cliente.id),
       id_assunto: String(idAssunto),
-      // Endereço e coordenadas só quando existem: campo vazio é melhor do que
-      // string com sobras de separador.
-      ...(enderecoOs.trim() ? { endereco: enderecoOs.trim() } : {}),
-      ...(cliente.bairro ? { bairro: cliente.bairro } : {}),
-      ...(cliente.complemento ? { complemento: cliente.complemento } : {}),
-      ...(cliente.cidade ? { id_cidade: String(cliente.cidade) } : {}),
-      ...(cliente.latitude ? { latitude: String(cliente.latitude) } : {}),
-      ...(cliente.longitude ? { longitude: String(cliente.longitude) } : {}),
       mensagem,
       prioridade: prioridade || assunto?.prioridadePadrao || 'N',
       status: 'A',
@@ -534,7 +533,24 @@ export class IxcAdaptador extends SgpAdaptador {
       // chamado ainda não distribuído — não é erro.
       ...(idTecnico ? { id_tecnico: String(idTecnico) } : {}),
     });
-    if (data?.type === 'success') return { protocolo: String(data.id) };
+    if (data?.type === 'success') {
+      // O IXC responde "Registro inserido com sucesso" com um id mesmo quando
+      // não grava nada — foi assim que os chamados 6325 a 6329 viraram
+      // protocolos que não existiam, e o atendente avisou o cliente de uma
+      // visita que ninguém ia fazer. Ler de volta custa uma consulta e é a
+      // única forma de saber que o registro ficou.
+      const confere = await this.#listar('su_oss_chamado', {
+        qtype: 'su_oss_chamado.id', query: String(data.id), oper: '=', rp: '1',
+      }).catch(() => null);
+
+      if (confere?.registros?.length) return { protocolo: String(data.id) };
+
+      console.error(`[IXC] Chamado ${data.id} veio como sucesso mas não está na base.`);
+      return {
+        erro: 'O sistema do provedor respondeu que criou o chamado, mas ele não aparece na base. '
+          + 'Nada foi registrado — abra pelo IXC desta vez e avise o suporte do ISPDesk.',
+      };
+    }
 
     // O IXC devolve a recusa com HTML dentro — "Preencha Setor<br />Preencha
     // Origem do endereço". Na tela isso aparecia cru, com as tags à mostra.
@@ -881,18 +897,18 @@ export class IxcAdaptador extends SgpAdaptador {
         // mandava um texto fixo num campo "assunto" que não existe no
         // registro: nada era gravado e todo chamado caía no assunto padrão,
         // fosse sem internet ou troca de roteador.
-        const idAssunto = await this.#idDoAssunto(toolInput.assunto);
-        const data = await this.#inserir('su_oss_chamado', {
-          id_cliente: toolInput.id_cliente,
-          id_assunto: idAssunto,
+        // Mesmo caminho do painel: um payload só, testado contra o IXC de
+        // verdade, com a conferência de que o registro ficou. Antes a IA tinha
+        // uma inserção própria e enxuta, que respondia sucesso sem gravar.
+        const r = await this.abrirChamado({
+          idCliente: toolInput.id_cliente,
+          idAssunto: await this.#idDoAssunto(toolInput.assunto),
           mensagem: toolInput.detalhes,
-          prioridade: 'N',
-          status: 'A',
         });
-        if (data.type === 'success') {
-          return `Chamado aberto! Protocolo: ${data.id}. Nossa equipe entrará em contato.`;
+        if (r.protocolo) {
+          return `Chamado aberto! Protocolo: ${r.protocolo}. Nossa equipe entrará em contato.`;
         }
-        return `Não foi possível abrir o chamado: ${data.message}`;
+        return `Não foi possível abrir o chamado: ${r.erro}`;
       }
 
       default:
