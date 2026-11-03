@@ -1467,7 +1467,10 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
             </div>
           </div>
           {/* Uma ação primária por estado; as raras vão para o menu. Antes eram
-              quatro botões de peso parecido disputando o mesmo canto. */}
+              quatro botões de peso parecido disputando o mesmo canto.
+              Abrir chamado saiu do menu porque não é rara num suporte de
+              provedor — fica visível, mas com peso menor que Assumir e
+              Encerrar, e sem o rótulo em tela estreita. */}
           <div className="flex gap-2 items-center shrink-0">
             {podeAtuar && !eHumano && (
               <button onClick={handleAsumir} disabled={acao}
@@ -1483,6 +1486,14 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
             )}
 
             {podeAtuar && (
+              <button onClick={() => setChamadoAberto(true)} title="Abrir chamado técnico"
+                className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 dark:border-gray-700 dark:text-gray-400 dark:hover:border-blue-800 dark:hover:text-blue-400 dark:hover:bg-blue-950 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                <Wrench className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">Chamado</span>
+              </button>
+            )}
+
+            {podeAtuar && (
               <div className="relative">
                 <button onClick={() => setMenuAberto(v => !v)} title="Mais ações"
                   aria-label="Mais ações" aria-expanded={menuAberto}
@@ -1493,11 +1504,6 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setMenuAberto(false)} />
                     <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1">
-                      <button onClick={() => { setMenuAberto(false); setChamadoAberto(true); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <Wrench className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                        Abrir chamado técnico
-                      </button>
                       <button onClick={() => { setMenuAberto(false); setShowTransfer(true); }}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                         <ArrowRightLeft className="w-4 h-4 text-gray-400 dark:text-gray-500" />
