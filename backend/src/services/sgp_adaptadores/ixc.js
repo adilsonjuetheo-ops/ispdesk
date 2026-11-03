@@ -262,7 +262,19 @@ export class IxcAdaptador extends SgpAdaptador {
   async listarAssuntosChamado() {
     const data = await this.#listar('su_oss_assunto', { rp: '100' });
     return (data?.registros || [])
-      .map(r => ({ id: String(r.id), nome: r.assunto || r.descricao || `Assunto ${r.id}` }))
+      .filter(r => r.ativo !== 'N')
+      .map(r => ({
+        id: String(r.id),
+        nome: r.assunto || r.descricao || `Assunto ${r.id}`,
+        // Cada assunto traz o setor e a origem de endereço que o IXC espera.
+        // Alguns provedores exigem os dois no cadastro do chamado — a
+        // Microdata recusou com "Preencha Setor / Preencha Origem do
+        // endereço" — e não há tabela de setores exposta pela API para
+        // oferecer ao atendente. Então sai daqui, que é a fonte do IXC.
+        setorPadrao: String(r.setor_su_oss_chamado || ''),
+        enderecoPadrao: String(r.endereco_padrao || ''),
+        prioridadePadrao: String(r.prioridade_padrao || 'N'),
+      }))
       .filter(a => a.nome);
   }
 
@@ -346,12 +358,20 @@ export class IxcAdaptador extends SgpAdaptador {
       : await this.#buscarClientePorTelefone(whatsapp);
     if (!cliente) return { erro: 'Cliente não encontrado no IXC.' };
 
+    // O assunto escolhido define setor e origem de endereço. Sem valor
+    // cadastrado, cai nos únicos que aparecem nos chamados reais: setor 1 e
+    // origem "C" (endereço do cliente).
+    const assunto = (await this.listarAssuntosChamado().catch(() => []))
+      .find(a => a.id === String(idAssunto));
+
     const data = await this.#inserir('su_oss_chamado', {
       id_cliente: String(cliente.id),
       id_assunto: String(idAssunto),
       mensagem,
-      prioridade,
+      prioridade: prioridade || assunto?.prioridadePadrao || 'N',
       status: 'A',
+      setor: assunto?.setorPadrao && assunto.setorPadrao !== '0' ? assunto.setorPadrao : '1',
+      origem_endereco: assunto?.enderecoPadrao || 'C',
       // Só vai quando a tela mandou: sem filial escolhida, deixa o IXC aplicar
       // o padrão dele em vez de a gente chutar a primeira.
       ...(idFilial ? { id_filial: String(idFilial) } : {}),
@@ -360,7 +380,14 @@ export class IxcAdaptador extends SgpAdaptador {
       ...(idTecnico ? { id_tecnico: String(idTecnico) } : {}),
     });
     if (data?.type === 'success') return { protocolo: String(data.id) };
-    return { erro: data?.message || 'O IXC recusou a abertura do chamado.' };
+
+    // O IXC devolve a recusa com HTML dentro — "Preencha Setor<br />Preencha
+    // Origem do endereço". Na tela isso aparecia cru, com as tags à mostra.
+    const limpo = String(data?.message || '')
+      .replace(/<br\s*\/?>/gi, ' · ')
+      .replace(/<[^>]+>/g, '')
+      .trim();
+    return { erro: limpo || 'O IXC recusou a abertura do chamado.' };
   }
 
   async buscarContexto(whatsapp) {
