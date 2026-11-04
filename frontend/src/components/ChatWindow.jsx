@@ -779,8 +779,17 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
   // Comparação normalizada porque a cidade do técnico e a do cliente saem da
   // mesma tabela do IXC, mas passam por caminhos diferentes até aqui.
   const limpar = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-  const daCidade = cidadeCliente ? tecnicos.filter(t => limpar(t.cidade) === limpar(cidadeCliente)) : [];
-  const outros = tecnicos.filter(t => !daCidade.includes(t));
+  const mesmaCidade = t => cidadeCliente && limpar(t.cidade) === limpar(cidadeCliente);
+
+  // A divisão que importa não é por cidade, é por quem o IXC aceita. Só quem
+  // está vinculado a um setor pode receber a O.S., e essa relação não vem pela
+  // API — mas quem já recebeu chamado antes, provadamente está. Na Microdata
+  // são 4 colaboradores cadastrados e um só com histórico: escolher qualquer
+  // outro fazia a gravação do chamado ser descartada em silêncio.
+  // Dentro de cada grupo, quem fica na cidade do cliente vem primeiro.
+  const porCidade = (a, b) => (mesmaCidade(b) ? 1 : 0) - (mesmaCidade(a) ? 1 : 0);
+  const comHistorico = tecnicos.filter(t => t.osAtribuidas > 0).sort(porCidade);
+  const semHistorico = tecnicos.filter(t => !t.osAtribuidas).sort(porCidade);
 
   const abrir = async (e) => {
     e.preventDefault();
@@ -855,26 +864,29 @@ ${r.data.aviso}` : ''));
                   Técnico <span className="text-gray-400">(opcional)</span>
                 </label>
                 {/* O IXC só aceita quem está vinculado ao setor da O.S., e essa
-                    relação não vem pela API — não dá para filtrar o seletor. O
-                    aviso evita a surpresa; se recusar, o chamado abre sem
-                    técnico em vez de não abrir. */}
+                    relação não vem pela API — não dá para filtrar o seletor com
+                    certeza. O histórico é o melhor indício que existe, e se
+                    ainda assim recusar, o chamado abre sem técnico. */}
                 <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-1">
-                    Precisa estar vinculado ao setor no IXC. Se não estiver, o chamado abre sem técnico.
+                  Precisa estar vinculado ao setor no IXC. Se não estiver, o chamado abre sem técnico.
                 </p>
                 <select value={idTecnico} onChange={e => setIdTecnico(e.target.value)}
                   className="w-full mb-3 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
                   <option value="">Deixar sem técnico definido</option>
-                  {/* Quem atende a cidade do cliente vem primeiro, num grupo
-                      próprio. Sem isso, num provedor de quatro cidades a
-                      escolha certa fica perdida no meio da lista alfabética. */}
-                  {daCidade.length > 0 && (
-                    <optgroup label={`Em ${cidadeCliente}`}>
-                      {daCidade.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                  {comHistorico.length > 0 && (
+                    <optgroup label="Já recebem chamados">
+                      {comHistorico.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.nome}{t.cidade ? ` · ${t.cidade}` : ''}
+                        </option>
+                      ))}
                     </optgroup>
                   )}
-                  {outros.length > 0 && (
-                    <optgroup label={daCidade.length ? 'Outras cidades' : 'Equipe'}>
-                      {outros.map(t => (
+                  {semHistorico.length > 0 && (
+                    <optgroup label={comHistorico.length
+                      ? 'Sem histórico — o IXC pode recusar'
+                      : 'Equipe'}>
+                      {semHistorico.map(t => (
                         <option key={t.id} value={t.id}>
                           {t.nome}{t.cidade ? ` · ${t.cidade}` : ''}
                         </option>

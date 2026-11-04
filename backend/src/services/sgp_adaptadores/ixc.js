@@ -194,6 +194,53 @@ export class IxcAdaptador extends SgpAdaptador {
     return data?.registros?.[0]?.nome || null;
   }
 
+  // A sigla do estado, que entra na linha de endereço da O.S.
+  async #siglaUf(id) {
+    if (!id || !/^\d+$/.test(String(id))) return null;
+    const data = await this.#listar('uf', {
+      qtype: 'uf.id', query: String(id), oper: '=', rp: '1',
+    }).catch(() => null);
+    const r = data?.registros?.[0];
+    return r?.uf || r?.sigla || null;
+  }
+
+  // O endereço da visita, montado como o IXC monta na tela dele.
+  //
+  // A API não compõe esse campo: gravando por aqui com origem no contrato, a
+  // O.S. nasce com contrato e login preenchidos e o endereço em branco — o
+  // técnico recebe a ordem sem saber para onde ir. Foi o que aconteceu com os
+  // chamados 6331, 6332, 6336 e 6337.
+  //
+  // O formato sai de uma O.S. que o próprio IXC gerou (a 6324):
+  //   "MG Araçuaí 39600-000 CANOEIRO - RUA FRANKLIN FULGENCIO, 529"
+  //   ou seja: UF cidade CEP bairro - logradouro, número
+  // Os contratos daqui têm `endereco_padrao_cliente = 'S'` e os próprios
+  // campos vazios, então a fonte é o cadastro do cliente, não o do contrato.
+  //
+  // Cada pedaço entra só se existir: cliente sem complemento não deve virar
+  // "RUA X, 10 - " com sobra de pontuação.
+  async #enderecoDaOs(cliente) {
+    const [cidade, uf] = await Promise.all([
+      this.#nomeCidade(cliente.cidade).catch(() => null),
+      this.#siglaUf(cliente.uf).catch(() => null),
+    ]);
+
+    const regiao = [uf, cidade, cliente.cep, cliente.bairro].filter(Boolean).join(' ');
+    const rua = [cliente.endereco, cliente.numero].filter(Boolean).join(', ');
+    const linha = [regiao, rua].filter(Boolean).join(' - ');
+
+    const campos = {
+      endereco: linha,
+      bairro: cliente.bairro,
+      complemento: cliente.complemento,
+      latitude: cliente.latitude,
+      longitude: cliente.longitude,
+    };
+    return Object.fromEntries(
+      Object.entries(campos).filter(([, v]) => String(v || '').trim())
+    );
+  }
+
   // Monta contexto completo a partir do registro de cliente já buscado
   async #buildContexto(c) {
     const contratos = (await this.#contratosDoCliente(c.id)) || [];
@@ -439,12 +486,55 @@ export class IxcAdaptador extends SgpAdaptador {
         cidade: await this.#nomeCidade(f.cidade).catch(() => null),
       })));
 
+    // Quem o IXC aceita como técnico não é quem está no cadastro de
+    // colaboradores: é quem está vinculado a um setor. Essa relação a API não
+    // expõe — funcionarios_setor e companhia respondem "recurso não
+    // disponível" — e escolher alguém de fora faz o IXC descartar a gravação
+    // do chamado em silêncio, respondendo sucesso.
+    //
+    // O histórico responde o que a API esconde: na Microdata, dos 4
+    // colaboradores cadastrados só um já recebeu O.S. em toda a base. Os
+    // outros três são escolhas que sempre vão falhar, e o atendente não tem
+    // como saber disso olhando a lista.
+    const historico = await this.#listar('su_oss_chamado', {
+      rp: '300', qtype: 'su_oss_chamado.id', query: '0', oper: '>',
+    }).catch(() => null);
+
+    const atribuidas = new Map();
+    for (const c of historico?.registros || []) {
+      const id = String(c.id_tecnico || '0');
+      if (id !== '0') atribuidas.set(id, (atribuidas.get(id) || 0) + 1);
+    }
+
     const vezes = new Map();
     for (const t of ativos) vezes.set(t.nome, (vezes.get(t.nome) || 0) + 1);
 
     return ativos
-      .map(t => (vezes.get(t.nome) > 1 ? { ...t, nome: `${t.nome} (${t.id})` } : t))
-      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      .map(t => ({
+        ...t,
+        nome: vezes.get(t.nome) > 1 ? `${t.nome} (${t.id})` : t.nome,
+        osAtribuidas: atribuidas.get(t.id) || 0,
+      }))
+      // Quem já atende vem primeiro, do mais atuante para o menos. Sem
+      // histórico nenhum — provedor novo, base recém-migrada — a ordem
+      // alfabética volta a valer sozinha, porque aí todos empatam em zero.
+      .sort((a, b) => b.osAtribuidas - a.osAtribuidas
+        || a.nome.localeCompare(b.nome, 'pt-BR'));
+  }
+
+  // O login PPPoE do contrato. A O.S. guarda o id dele em `id_login`, e é por
+  // esse campo que a grade do IXC mostra as colunas Login e Senha MD5 — o que
+  // o técnico usa para testar a conexão em campo. Sem ele a O.S. chega sem
+  // nada disso.
+  async #loginDoContrato(idContrato) {
+    if (!idContrato) return null;
+    const data = await this.#listar('radusuarios', {
+      qtype: 'radusuarios.id_contrato', query: String(idContrato), oper: '=', rp: '10',
+    }).catch(() => null);
+
+    const logins = data?.registros || [];
+    const escolhido = logins.find(l => l.ativo === 'S') || logins[0];
+    return escolhido?.id ? String(escolhido.id) : null;
   }
 
   // O IXC exige filial na criação do chamado. Provedor com uma só — que é o
@@ -577,11 +667,26 @@ export class IxcAdaptador extends SgpAdaptador {
     // Sem contrato ativo para acompanhar o 'CC', cai no endereço do cliente em
     // vez de recusar — endereço aproximado é melhor que chamado não aberto.
     const origemAssunto = assunto?.enderecoPadrao || 'C';
-    const contratos = origemAssunto === 'CC'
+
+    // 'M' quer dizer endereço digitado à mão na tela do IXC. Nem o painel nem
+    // o bot coletam endereço, então 'M' vindo daqui garante O.S. sem endereço
+    // nenhum — foi o que aconteceu com os chamados 6331, 6332 e 6336, que
+    // chegaram ao técnico sem dizer para onde ir.
+    //
+    // Na base da Microdata 188 das 191 O.S. usam 'CC', e em 187 delas o
+    // próprio IXC compôs o endereço a partir do contrato. Sem ninguém para
+    // digitar, o contrato é a melhor fonte que existe: 'M' vira 'CC' quando o
+    // cliente tem contrato, e 'C' quando não tem. Quem precisar de um endereço
+    // diferente — instalação em imóvel novo, por exemplo — corrige na O.S.,
+    // que é melhor do que partir do vazio.
+    const dependeDoEndereco = origemAssunto === 'CC' || origemAssunto === 'M';
+    const contratos = dependeDoEndereco
       ? (await this.#contratosDoCliente(cliente.id).catch(() => null)) || []
       : [];
     const contrato = contratos.find(c => c.status === 'A') || contratos[0] || null;
-    const origemEndereco = origemAssunto === 'CC' && !contrato ? 'C' : origemAssunto;
+    const origemEndereco = dependeDoEndereco
+      ? (contrato ? 'CC' : 'C')
+      : origemAssunto;
 
     // A cidade da O.S. Sem ela o chamado nasce fora de qualquer cidade: não
     // entra no filtro por cidade do IXC nem no daqui, e quem distribui não
@@ -599,6 +704,8 @@ export class IxcAdaptador extends SgpAdaptador {
     const idCidade = /^[1-9][0-9]*$/.test(String(cliente.cidade || ''))
       ? String(cliente.cidade)
       : null;
+    const idLogin = contrato ? await this.#loginDoContrato(contrato.id) : null;
+    const endereco = await this.#enderecoDaOs(cliente).catch(() => ({}));
     const data = await this.#inserir('su_oss_chamado', {
       id_cliente: String(cliente.id),
       id_assunto: String(idAssunto),
@@ -611,6 +718,8 @@ export class IxcAdaptador extends SgpAdaptador {
       // id_contrato_kit, e não id_contrato: o IXC recusa o segundo dizendo que
       // o contrato é obrigatório, mesmo recebendo-o.
       ...(origemEndereco === 'CC' && contrato ? { id_contrato_kit: String(contrato.id) } : {}),
+      ...(idLogin ? { id_login: idLogin } : {}),
+      ...endereco,
       ...(idCidade ? { id_cidade: idCidade } : {}),
       origem_os_aberta: 'M',
       melhor_horario_agenda: 'Q',
