@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Plus, X, Loader2, Pencil, UserX, MapPin } from 'lucide-react';
+import { Plus, X, Loader2, Pencil, UserX, MapPin, HardHat } from 'lucide-react';
 
 const FORM_VAZIO = { nome: '', email: '', senha: '', confirmar: '', role: 'agente', filialId: '', ixcTecnicoId: '', ativo: true };
 
@@ -87,6 +87,14 @@ export default function Agents() {
 
   const filialNome = id => filiais.find(f => f.id === id)?.nome;
 
+  // O nome do colaborador vem do SGP; se a consulta falhou, mostra o id em vez
+  // de "—" — número cru ainda dá para conferir no IXC, travessão não diz nada.
+  const colaboradorNome = id =>
+    colaboradores.find(c => String(c.id) === String(id))?.nome || `ID ${id}`;
+
+  const atendimento = agentes.filter(ag => ag.role !== 'tecnico');
+  const campo = agentes.filter(ag => ag.role === 'tecnico');
+
   if (loading) return <div className="p-8 text-gray-500">Carregando...</div>;
 
   return (
@@ -103,65 +111,28 @@ export default function Agents() {
           </button>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200">
-          <table className="w-full">
-            <thead>
-              <tr className="text-gray-500 text-xs uppercase border-b border-gray-200">
-                <th className="text-left px-5 py-3">Funcionário</th>
-                <th className="text-left px-5 py-3">Filial</th>
-                <th className="text-left px-5 py-3">Papel</th>
-                <th className="text-left px-5 py-3">Status</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {agentes.map(ag => (
-                <tr key={ag.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-xs">
-                        {ag.nome[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{ag.nome}</p>
-                        <p className="text-xs text-gray-500">{ag.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3">
-                    {ag.filialId ? (
-                      <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded flex items-center gap-1 w-fit">
-                        <MapPin className="w-3 h-3" />{filialNome(ag.filialId) || '—'}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-500">Todas</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded capitalize">{ag.role}</span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${ag.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                      {ag.ativo ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <div className="flex gap-2 justify-end">
-                      <button onClick={() => abrirEditar(ag)} className="text-gray-500 hover:text-blue-600">
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      {ag.ativo && (
-                        <button onClick={() => handleDesativar(ag)} className="text-gray-500 hover:text-red-500">
-                          <UserX className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* Atendimento e campo são duas equipes com acesso diferente, e numa
+            lista só o admin perdia de vista quem enxerga conversa de cliente
+            e quem não enxerga. O recorte na tela é o mesmo que o backend
+            aplica. */}
+        <Tabela titulo="Atendimento" lista={atendimento}
+          descricao="Entram no painel: conversas, contatos, chamados e o que o papel de cada um permitir."
+          coluna={{ titulo: 'Filial', render: ag => (ag.filialId
+            ? <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                <MapPin className="w-3 h-3" />{filialNome(ag.filialId) || '—'}
+              </span>
+            : <span className="text-xs text-gray-500">Todas</span>) }}
+          onEditar={abrirEditar} onDesativar={handleDesativar} vazio="Nenhum atendente cadastrado." />
+
+        <Tabela titulo="Equipe de campo" lista={campo}
+          descricao="Abrem direto na fila de chamados pelo celular. Não enxergam conversa, contato nem financeiro — e o bloqueio é no servidor, não só no menu."
+          coluna={{ titulo: 'Colaborador no provedor', render: ag => (ag.ixcTecnicoId
+            ? <span className="text-xs bg-amber-50 text-amber-800 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                <HardHat className="w-3 h-3" />{colaboradorNome(ag.ixcTecnicoId)}
+              </span>
+            : <span className="text-xs text-red-600">Sem vínculo — fila vazia</span>) }}
+          onEditar={abrirEditar} onDesativar={handleDesativar}
+          vazio="Nenhum técnico de campo ainda. Cadastre em Novo funcionário, escolhendo o papel Técnico de campo." />
 
         {modal && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -256,6 +227,76 @@ export default function Agents() {
         )}
       </div>
     </div>
+  );
+}
+
+function Tabela({ titulo, descricao, lista, coluna, onEditar, onDesativar, vazio }) {
+  return (
+    <section className="mb-8">
+      <div className="flex items-baseline gap-2">
+        <h2 className="text-sm font-semibold text-gray-800">{titulo}</h2>
+        <span className="text-xs text-gray-400 tabular-nums">{lista.length}</span>
+      </div>
+      <p className="text-xs text-gray-500 mt-0.5 mb-3 max-w-prose">{descricao}</p>
+
+      {lista.length === 0 ? (
+        <p className="text-sm text-gray-500 bg-white rounded-xl border border-gray-200 px-5 py-6">{vazio}</p>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="text-gray-500 text-xs uppercase border-b border-gray-200">
+                <th className="text-left px-5 py-3">Funcionário</th>
+                <th className="text-left px-5 py-3">{coluna.titulo}</th>
+                <th className="text-left px-5 py-3">Papel</th>
+                <th className="text-left px-5 py-3">Status</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {lista.map(ag => (
+                <tr key={ag.id} className="border-b border-gray-100 last:border-0">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-xs shrink-0">
+                        {ag.nome[0].toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800">{ag.nome}</p>
+                        <p className="text-xs text-gray-500">{ag.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">{coluna.render(ag)}</td>
+                  <td className="px-5 py-3">
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                      {ag.role === 'tecnico' ? 'Técnico de campo' : ag.role}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${ag.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                      {ag.ativo ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={() => onEditar(ag)} className="text-gray-500 hover:text-blue-600" aria-label="Editar">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      {ag.ativo && (
+                        <button onClick={() => onDesativar(ag)} className="text-gray-500 hover:text-red-500" aria-label="Desativar">
+                          <UserX className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 

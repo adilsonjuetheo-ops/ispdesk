@@ -71,6 +71,49 @@ function guardar(chave, user) {
   sessoes.set(chave, { user, expira: Date.now() + SESSAO_TTL_MS });
 }
 
+// O que o técnico de campo alcança no backend.
+//
+// Ele não é um atendente com menos botões: não entra no painel. O React já
+// esconde o inbox dele, mas esconder tela não protege nada — o token dele é um
+// token válido, e `/api/conversations` só exigia estar autenticado. Com um
+// curl ele leria a conversa de todo mundo do provedor, incluindo endereço,
+// CPF, fatura e o que o cliente contou ao atendente.
+//
+// Lista de permissão, não de bloqueio: rota nova nasce fechada para ele. Se um
+// dia o app de campo precisar de mais alguma coisa, ela entra aqui de propósito
+// e não por esquecimento.
+const ROTAS_DO_TECNICO = [
+  '/api/campo',  // a fila dele e o registro de atendimento
+  '/api/auth',   // sair e trocar a própria senha
+];
+
+function tecnicoPodeAcessar(req) {
+  let caminho = String(req.originalUrl || req.url || '').split('?')[0];
+  // Compara o caminho decodificado: senão `%2f..%2f` passaria pela conferência
+  // como texto e chegaria ao router já decodificado.
+  try {
+    caminho = decodeURIComponent(caminho);
+  } catch {
+    return false;
+  }
+  // Caminho torto é recusado, não interpretado. Quem está no app de campo não
+  // tem motivo para montar URL com ".." — e adivinhar a intenção de uma é
+  // exatamente como se abre buraco.
+  if (caminho.includes('..') || caminho.includes('\\')) return false;
+  return ROTAS_DO_TECNICO.some(p => caminho === p || caminho.startsWith(`${p}/`));
+}
+
+// Único ponto em que a requisição passa a ter usuário. Todo router usa
+// `autenticar`, então o corte aqui vale para o sistema inteiro — não há rota
+// por onde escapar.
+function conceder(req, res, next, user) {
+  req.user = user;
+  if (user.role === 'tecnico' && !tecnicoPodeAcessar(req)) {
+    return res.status(403).json({ erro: 'Esta área não faz parte do app de campo.' });
+  }
+  return next();
+}
+
 export async function autenticar(req, res, next) {
   const token = tokenDaRequisicao(req);
   if (!token) {
@@ -81,10 +124,7 @@ export async function autenticar(req, res, next) {
 
     const chave = `${payload.role === 'superadmin' ? 'super' : 'tenant'}:${payload.id}`;
     const emCache = doCache(chave);
-    if (emCache) {
-      req.user = emCache;
-      return next();
-    }
+    if (emCache) return conceder(req, res, next, emCache);
 
     if (payload.role === 'superadmin') {
       const [admin] = await db.select({
@@ -96,8 +136,7 @@ export async function autenticar(req, res, next) {
       if (!admin) return res.status(401).json({ erro: 'Usuário não está mais ativo' });
       const userSuper = { ...payload, ...admin, role: 'superadmin' };
       guardar(chave, userSuper);
-      req.user = userSuper;
-      return next();
+      return conceder(req, res, next, userSuper);
     }
 
     const [usuario] = await db.select({
@@ -127,8 +166,7 @@ export async function autenticar(req, res, next) {
 
     const { ativo, tenantAtivo, ...userAtual } = usuario;
     guardar(chave, userAtual);
-    req.user = userAtual;
-    next();
+    return conceder(req, res, next, userAtual);
   } catch (err) {
     if (err?.name === 'JsonWebTokenError' || err?.name === 'TokenExpiredError') {
       return res.status(401).json({ erro: 'Token inválido ou expirado' });

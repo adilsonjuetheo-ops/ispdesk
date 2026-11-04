@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
+import api from '../../lib/api.js';
 import { HardHat, LogOut } from 'lucide-react';
 
 // Casca do app de campo. Sem barra lateral, sem menu, sem navegação: o técnico
@@ -7,6 +8,15 @@ import { HardHat, LogOut } from 'lucide-react';
 // a fila dele.
 export default function CampoLayout() {
   const { user, logout } = useAuth();
+
+  // Limpar o localStorage não encerra a sessão: o cookie é HttpOnly e vive no
+  // servidor. Sem esta chamada, "Sair" só apagava a tela — o celular
+  // continuava autenticado, e num aparelho que a equipe compartilha isso é
+  // sessão aberta na mão de quem pegar depois.
+  const sair = async () => {
+    await api.post('/auth/logout').catch(() => {});
+    logout();
+  };
 
   return (
     <div className="min-h-[100dvh] bg-gray-50 dark:bg-gray-950 flex flex-col">
@@ -24,7 +34,7 @@ export default function CampoLayout() {
           </div>
         </div>
         {/* 44px de alvo: dedo, no sol, dentro do carro. */}
-        <button onClick={logout} title="Sair"
+        <button onClick={sair} title="Sair"
           className="w-11 h-11 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors shrink-0">
           <LogOut className="w-5 h-5" />
         </button>
