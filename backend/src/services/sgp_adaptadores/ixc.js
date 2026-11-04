@@ -573,16 +573,21 @@ export class IxcAdaptador extends SgpAdaptador {
   // aqui porque uma tela com "id_assunto: 2" não serve a ninguém. O cliente sai
   // um por um, mas passa pelo cache da instância e o teto de 80 mantém isso em
   // alguns segundos; é tela que se abre, não que fica em polling.
-  async listarChamados({ limite = 80 } = {}) {
+  // idTecnico filtra no IXC, não aqui: o técnico de campo puxa isso pelo
+  // celular e não faz sentido baixar as 184 O.S. do provedor para mostrar as
+  // seis dele.
+  async listarChamados({ limite = 80, idTecnico = null } = {}) {
     // Sem filtro de status na consulta: o IXC usa vários — aberto, análise,
     // encaminhado, assumido, deslocamento, execução, agendado, finalizado — e
     // filtrar por 'A' escondia chamado recém-criado que nasceu noutro estado.
     // Foi o que aconteceu com o 6325. Traz os mais recentes e quem separa é a
     // tela, que mostra o status de cada um.
+    const filtro = idTecnico
+      ? { qtype: 'su_oss_chamado.id_tecnico', query: String(idTecnico), oper: '=' }
+      : { qtype: 'su_oss_chamado.id', query: '0', oper: '>' };
+
     const data = await this.#listar('su_oss_chamado', {
-      qtype: 'su_oss_chamado.id',
-      query: '0',
-      oper: '>',
+      ...filtro,
       rp: String(limite),
       sortname: 'su_oss_chamado.id',
       sortorder: 'desc',
@@ -614,6 +619,16 @@ export class IxcAdaptador extends SgpAdaptador {
         abertoEm: c.data_abertura && !c.data_abertura.startsWith('0000') ? c.data_abertura : null,
         agendadoPara: c.data_agenda && !c.data_agenda.startsWith('0000') ? c.data_agenda : null,
         mensagem: c.mensagem || '',
+        // Daqui para baixo é o que só o técnico de campo usa: ele precisa
+        // chegar no lugar. Latitude e longitude vêm do cadastro do cliente e
+        // muitas vezes são a única pista útil na zona rural, onde "rua e
+        // número" não leva ninguém a lugar nenhum.
+        protocolo: c.protocolo || null,
+        endereco: c.endereco || null,
+        complemento: c.complemento || null,
+        referencia: c.referencia || null,
+        latitude: c.latitude || null,
+        longitude: c.longitude || null,
       };
     }));
   }

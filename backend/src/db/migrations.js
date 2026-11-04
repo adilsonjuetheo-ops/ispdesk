@@ -214,6 +214,12 @@ export async function runMigrations() {
     `;
     await sql`CREATE INDEX IF NOT EXISTS idx_cobranca_envios_tenant ON cobranca_envios(tenant_id, enviado_em DESC)`;
 
+    // Liga o usuário do ISPDesk ao colaborador do IXC. Sem isso o técnico de
+    // campo entra e não vê chamado nenhum: as O.S. são atribuídas pelo id do
+    // colaborador lá, não pelo e-mail daqui, e os dois cadastros não se
+    // conhecem. Fica em texto porque cada SGP numera do seu jeito.
+    await sql`ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS ixc_tecnico_id text`;
+
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

@@ -107,6 +107,7 @@ export async function autenticar(req, res, next) {
       email: tenantUsers.email,
       nome: tenantUsers.nome,
       role: tenantUsers.role,
+      ixcTecnicoId: tenantUsers.ixcTecnicoId,
       // Só a versão, nunca a foto: isto viaja em toda requisição autenticada.
       fotoVersao: tenantUsers.fotoVersao,
       ativo: tenantUsers.ativo,
@@ -147,6 +148,16 @@ export function apenasSuper(req, res, next) {
 export function apenasAdmin(req, res, next) {
   if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
     return res.status(403).json({ erro: 'Acesso restrito a administradores' });
+  }
+  next();
+}
+
+// A fila de campo é do técnico. Admin e superadmin passam porque precisam ver
+// a tela que entregaram ao time — mas só enxergam O.S. se tiverem colaborador
+// vinculado, igual a qualquer um.
+export function apenasCampo(req, res, next) {
+  if (!['tecnico', 'admin', 'superadmin'].includes(req.user.role)) {
+    return res.status(403).json({ erro: 'Acesso restrito à equipe de campo' });
   }
   next();
 }

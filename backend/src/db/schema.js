@@ -122,7 +122,12 @@ export const tenantUsers = pgTable('tenant_users', {
   email:     text('email').notNull(),
   senhaHash: text('senha_hash').notNull(),
   role:      text('role').default('agente'),
+  // Papéis: superadmin, admin, agente e tecnico. O técnico de campo não entra
+  // no inbox — ele só enxerga a fila de O.S. dele, pelo celular.
   ativo:     boolean('ativo').default(true),
+  // Id do colaborador correspondente no SGP do provedor (no IXC, a tabela
+  // funcionarios). É por ele que a O.S. é atribuída lá.
+  ixcTecnicoId: text('ixc_tecnico_id'),
   // Foto do atendente, guardada como data URI igual ao logo do provedor — o
   // projeto não tem storage de arquivo e não vale criar um para um avatar.
   // O frontend reduz para 96px antes de enviar, então são poucos KB.

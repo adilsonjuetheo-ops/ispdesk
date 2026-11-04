@@ -3,12 +3,13 @@ import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
 import { Plus, X, Loader2, Pencil, UserX, MapPin } from 'lucide-react';
 
-const FORM_VAZIO = { nome: '', email: '', senha: '', confirmar: '', role: 'agente', filialId: '', ativo: true };
+const FORM_VAZIO = { nome: '', email: '', senha: '', confirmar: '', role: 'agente', filialId: '', ixcTecnicoId: '', ativo: true };
 
 export default function Agents() {
   const { user } = useAuth();
   const [agentes, setAgentes] = useState([]);
   const [filiais, setFiliais] = useState([]);
+  const [colaboradores, setColaboradores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -22,6 +23,11 @@ export default function Agents() {
   useEffect(() => {
     carregar();
     api.get(`/tenants/${user.tenantId}/filiais`).then(r => setFiliais(r.data.filter(f => f.ativo)));
+    // Falha calada de propósito: provedor sem SGP ligado continua cadastrando
+    // agente normalmente, só não tem técnico de campo para vincular.
+    api.get('/campo/colaboradores')
+      .then(r => setColaboradores(r.data.colaboradores || []))
+      .catch(() => setColaboradores([]));
   }, []);
 
   const abrirNovo = () => {
@@ -33,7 +39,7 @@ export default function Agents() {
 
   const abrirEditar = ag => {
     setEditando(ag);
-    setForm({ nome: ag.nome, email: ag.email, senha: '', confirmar: '', role: ag.role, filialId: ag.filialId || '', ativo: ag.ativo });
+    setForm({ nome: ag.nome, email: ag.email, senha: '', confirmar: '', role: ag.role, filialId: ag.filialId || '', ixcTecnicoId: ag.ixcTecnicoId || '', ativo: ag.ativo });
     setErro('');
     setModal(true);
   };
@@ -43,10 +49,19 @@ export default function Agents() {
     setErro('');
     if ((!editando || form.senha) && form.senha.length < 10) return setErro('Senha mínimo 10 caracteres');
     if (form.senha && form.senha !== form.confirmar) return setErro('Senhas não conferem');
+    // Técnico sem colaborador vinculado entra num app vazio e acha que quebrou.
+    // Melhor barrar aqui do que explicar depois.
+    if (form.role === 'tecnico' && !form.ixcTecnicoId) {
+      return setErro('Escolha o colaborador correspondente no sistema do provedor');
+    }
 
     setSaving(true);
     try {
-      const payload = { nome: form.nome, email: form.email, role: form.role, filialId: form.filialId || null, ativo: form.ativo };
+      const payload = {
+        nome: form.nome, email: form.email, role: form.role,
+        filialId: form.filialId || null, ativo: form.ativo,
+        ixcTecnicoId: form.role === 'tecnico' ? form.ixcTecnicoId : null,
+      };
       if (form.senha) payload.senha = form.senha;
 
       if (editando) {
@@ -170,8 +185,38 @@ export default function Agents() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
                     <option value="agente">Agente</option>
                     <option value="admin">Admin</option>
+                    <option value="tecnico">Técnico de campo</option>
                   </select>
+                  {form.role === 'tecnico' && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Abre direto na fila de chamados pelo celular. Não vê conversas nem financeiro.
+                    </p>
+                  )}
                 </div>
+
+                {/* O vínculo é o que faz a fila existir: as O.S. são atribuídas
+                    ao colaborador no sistema do provedor, e sem ele o técnico
+                    entra e não vê nada. */}
+                {form.role === 'tecnico' && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Colaborador no sistema do provedor*</label>
+                    <select value={form.ixcTecnicoId}
+                      onChange={e => setForm(f => ({ ...f, ixcTecnicoId: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                      <option value="">Escolha...</option>
+                      {colaboradores.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome}{c.osAtribuidas ? ` — ${c.osAtribuidas} O.S.` : ' — nunca recebeu O.S.'}
+                        </option>
+                      ))}
+                    </select>
+                    {!colaboradores.length && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Nenhum colaborador encontrado no sistema do provedor.
+                      </p>
+                    )}
+                  </div>
+                )}
                 {filiais.length > 0 && (
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Filial / Cidade</label>

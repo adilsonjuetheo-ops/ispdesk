@@ -18,8 +18,10 @@ import Incidentes from './pages/tenant/Incidentes.jsx';
 import Contratos from './pages/tenant/Contratos.jsx';
 import Chamados from './pages/tenant/Chamados.jsx';
 import Resultados from './pages/tenant/Resultados.jsx';
+import Fila from './pages/campo/Fila.jsx';
 import SuperAdminLayout from './components/layout/SuperAdminLayout.jsx';
 import TenantLayout from './components/layout/TenantLayout.jsx';
+import CampoLayout from './components/layout/CampoLayout.jsx';
 
 function ProtectedRoute({ children, roles }) {
   const { user } = useAuth();
@@ -32,6 +34,9 @@ function RootRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'superadmin') return <Navigate to="/admin/dashboard" replace />;
+  // O técnico de campo não tem inbox. Mandá-lo para lá seria jogá-lo numa tela
+  // que ele não pode abrir, e o ProtectedRoute o devolveria para cá em laço.
+  if (user.role === 'tecnico') return <Navigate to="/campo" replace />;
   return <Navigate to="/inbox" replace />;
 }
 
@@ -52,6 +57,16 @@ export default function App() {
           <Route path="tenants" element={<Tenants />} />
           <Route path="tenants/:id" element={<TenantDetail />} />
           <Route path="cobrancas" element={<Cobrancas />} />
+        </Route>
+
+        {/* App do técnico de campo. Admin entra também, para conseguir ver a
+            tela que entregou ao time sem precisar de uma conta de técnico. */}
+        <Route element={
+          <ProtectedRoute roles={['tecnico', 'admin', 'superadmin']}>
+            <CampoLayout />
+          </ProtectedRoute>
+        }>
+          <Route path="/campo" element={<Fila />} />
         </Route>
 
         <Route element={

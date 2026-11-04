@@ -25,6 +25,7 @@ router.get('/', async (req, res) => {
     email: tenantUsers.email,
     role: tenantUsers.role,
     filialId: tenantUsers.filialId,
+    ixcTecnicoId: tenantUsers.ixcTecnicoId,
     ativo: tenantUsers.ativo,
     criadoEm: tenantUsers.criadoEm,
   }).from(tenantUsers).where(eq(tenantUsers.tenantId, req.params.tenantId));
@@ -32,15 +33,20 @@ router.get('/', async (req, res) => {
   res.json(agentes);
 });
 
+// O vínculo com o colaborador do SGP só faz sentido para quem vai a campo.
+// Guardar num agente de inbox seria dado morto que um dia confunde alguém.
+const vinculoDoRole = (role, ixcTecnicoId) =>
+  role === 'tecnico' ? (String(ixcTecnicoId || '').trim() || null) : null;
+
 router.post('/', async (req, res) => {
-  const { nome, email, senha, role, filialId } = req.body;
+  const { nome, email, senha, role, filialId, ixcTecnicoId } = req.body;
   if (!nome || !email || !senha) return res.status(400).json({ erro: 'nome, email e senha obrigatórios' });
   if (senha.length < 10) return res.status(400).json({ erro: 'Senha mínimo 10 caracteres' });
   if (!await filialValida(req.params.tenantId, filialId)) {
     return res.status(400).json({ erro: 'Filial inválida para este provedor' });
   }
 
-  const roleValido = ['agente', 'admin'].includes(role) ? role : 'agente';
+  const roleValido = ['agente', 'admin', 'tecnico'].includes(role) ? role : 'agente';
   const senhaHash = await bcrypt.hash(senha, 12);
 
   try {
@@ -51,12 +57,14 @@ router.post('/', async (req, res) => {
       senhaHash,
       role: roleValido,
       filialId: filialId || null,
+      ixcTecnicoId: vinculoDoRole(roleValido, ixcTecnicoId),
     }).returning({
       id: tenantUsers.id,
       nome: tenantUsers.nome,
       email: tenantUsers.email,
       role: tenantUsers.role,
       filialId: tenantUsers.filialId,
+      ixcTecnicoId: tenantUsers.ixcTecnicoId,
       ativo: tenantUsers.ativo,
       criadoEm: tenantUsers.criadoEm,
     });
@@ -70,11 +78,17 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-  const { nome, email, senha, role, ativo, filialId } = req.body;
+  const { nome, email, senha, role, ativo, filialId, ixcTecnicoId } = req.body;
   if (filialId !== undefined && !await filialValida(req.params.tenantId, filialId)) {
     return res.status(400).json({ erro: 'Filial inválida para este provedor' });
   }
+  if (role !== undefined && !['agente', 'admin', 'tecnico'].includes(role)) {
+    return res.status(400).json({ erro: 'Papel inválido' });
+  }
   const updates = { nome, email, role, ativo, filialId: filialId || null };
+  // Deixar de ser técnico tem que limpar o vínculo junto, senão o registro
+  // guarda um colaborador que ninguém mais vê na tela para corrigir.
+  if (role !== undefined) updates.ixcTecnicoId = vinculoDoRole(role, ixcTecnicoId);
 
   if (senha) {
     if (senha.length < 10) return res.status(400).json({ erro: 'Senha mínimo 10 caracteres' });
@@ -92,10 +106,14 @@ router.put('/:id', async (req, res) => {
       email: tenantUsers.email,
       role: tenantUsers.role,
       filialId: tenantUsers.filialId,
+      ixcTecnicoId: tenantUsers.ixcTecnicoId,
       ativo: tenantUsers.ativo,
     });
 
   if (!agente) return res.status(404).json({ erro: 'Agente não encontrado' });
+  // A sessão fica 30s em cache. Trocar o papel de alguém só valia no minuto
+  // seguinte — e agora papel decide qual app a pessoa vê, não só quais botões.
+  invalidarSessao(req.params.id);
   res.json(agente);
 });
 

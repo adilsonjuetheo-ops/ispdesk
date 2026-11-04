@@ -20,6 +20,7 @@ import whatsappRouter from './routes/whatsapp.js';
 import contractsRouter from './routes/contracts.js';
 import lembretesRouter from './routes/lembretes.js';
 import incidentesRouter from './routes/incidentes.js';
+import campoRouter from './routes/campo.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
 import { agendarLembretesVencendo } from './jobs/lembretesVencendo.js';
@@ -94,6 +95,7 @@ app.use('/api/nps', npsRouter);
 app.use('/api/contracts', contractsRouter);
 app.use('/api/lembretes', lembretesRouter);
 app.use('/api/incidentes', incidentesRouter);
+app.use('/api/campo', campoRouter);
 
 // Marca de quando este processo subiu. Frontend e backend sao aplicacoes
 // separadas no Coolify e podem subir em momentos diferentes — ja perdi tempo
