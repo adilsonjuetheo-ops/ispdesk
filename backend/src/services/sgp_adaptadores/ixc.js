@@ -25,6 +25,9 @@ const STATUS_CHAMADO = {
   C: 'Cancelado',
 };
 
+const AVISO_SEM_TECNICO =
+  'Aberto sem técnico: o colaborador escolhido não está vinculado ao setor desta O.S. no IXC. Atribua por lá.';
+
 export class IxcAdaptador extends SgpAdaptador {
 
   #urlValidada = null;
@@ -505,7 +508,19 @@ export class IxcAdaptador extends SgpAdaptador {
   // O IXC guarda o assunto em id_assunto (numérico). Mandar o texto num campo
   // "assunto", como o código fazia antes, não grava nada: o chamado cai no
   // padrão e um pedido de troca de roteador vira "Sem Internet".
-  async abrirChamado({ idCliente, whatsapp, documento, idAssunto, idFilial, idTecnico, setorPadrao, mensagem, prioridade = 'N' }) {
+  // Repete a abertura sem o técnico. Recebe os argumentos originais inteiros:
+  // a versão anterior remontava a chamada à mão e esquecia o idCliente, então
+  // toda retentativa vinda do bot — que identifica o cliente por id, não por
+  // telefone — morria em "Cliente não encontrado no IXC".
+  async #reabrirSemTecnico(argumentos) {
+    return this.abrirChamado({ ...argumentos, idTecnico: null });
+  }
+
+  async abrirChamado(argumentos) {
+    const {
+      idCliente, whatsapp, documento, idAssunto, idFilial, idTecnico,
+      setorPadrao, mensagem, prioridade = 'N',
+    } = argumentos;
     // idCliente vem da ferramenta da IA, que já tem o id interno do contexto do
     // SGP; o painel manda telefone ou documento e a busca acontece aqui.
     const cliente = idCliente
@@ -624,6 +639,19 @@ export class IxcAdaptador extends SgpAdaptador {
 `
         + `       resposta: ${JSON.stringify(data).slice(0, 400)}`
       );
+
+      // Colaborador fora do setor da O.S. nem sempre vira recusa com mensagem:
+      // às vezes o IXC responde sucesso, devolve um id e descarta a gravação
+      // inteira, calado. O técnico é o único campo opcional do payload, então
+      // é ele o suspeito óbvio de uma gravação que some. Tentar de novo sem
+      // ele entrega o mesmo desfecho que a tela já promete — "se não estiver
+      // vinculado, o chamado abre sem técnico" — e chamado sem técnico é
+      // muito melhor do que chamado que não existe.
+      if (idTecnico) {
+        const semTecnico = await this.#reabrirSemTecnico(argumentos);
+        if (semTecnico?.protocolo) return { ...semTecnico, aviso: AVISO_SEM_TECNICO };
+      }
+
       return {
         erro: 'O sistema do provedor respondeu que criou o chamado, mas ele não aparece na base. '
           + 'Nada foi registrado — abra pelo IXC desta vez e avise o suporte do ISPDesk.',
@@ -645,15 +673,8 @@ export class IxcAdaptador extends SgpAdaptador {
     // Então abre sem técnico e avisa, para alguém atribuir no IXC.
     const eRecusaDeTecnico = idTecnico && /colaborador|setor dessa|vinculado/i.test(limpo);
     if (eRecusaDeTecnico) {
-      const semTecnico = await this.abrirChamado({
-        whatsapp, documento, idAssunto, idFilial, setorPadrao, mensagem, prioridade,
-      });
-      if (semTecnico?.protocolo) {
-        return {
-          ...semTecnico,
-          aviso: 'Aberto sem técnico: o colaborador escolhido não está vinculado ao setor desta O.S. no IXC. Atribua por lá.',
-        };
-      }
+      const semTecnico = await this.#reabrirSemTecnico(argumentos);
+      if (semTecnico?.protocolo) return { ...semTecnico, aviso: AVISO_SEM_TECNICO };
     }
 
     return { erro: limpo || 'O IXC recusou a abertura do chamado.' };
