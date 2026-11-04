@@ -314,11 +314,51 @@ export class IxcAdaptador extends SgpAdaptador {
       .filter(a => a.nome);
   }
 
+  // Vocabulário de cada família de assunto: à esquerda como o provedor batiza
+  // o assunto no IXC, à direita como o cliente descreve o problema. Os nomes
+  // cadastrados variam muito entre provedores ("Manutenção", "Suporte",
+  // "Visita técnica", "Corretiva"), então a ponte é por família, não por
+  // nome exato.
+  static #FAMILIAS = [
+    {
+      familia: 'suporte',
+      nomes: ['manutencao', 'suporte', 'reparo', 'defeito', 'corretiva',
+        'assistencia', 'visita tecnica', 'conserto', 'reclamacao', 'tecnico'],
+      sintomas: ['sem internet', 'sem conexao', 'sem acesso', 'sem sinal', 'sem link',
+        'nao navega', 'nao conecta', 'nao funciona', 'caiu', 'caindo', 'queda', 'quedas',
+        'oscila', 'instavel', 'lento', 'lentidao', 'travando', 'intermitente',
+        'roteador', 'modem', 'onu', 'equipamento', 'aparelho', 'cabo', 'fibra',
+        'rompimento', 'rompida', 'wifi', 'wi-fi', 'sinal', 'troca', 'trocar'],
+    },
+    {
+      familia: 'instalacao',
+      nomes: ['instalacao', 'ativacao', 'habilitacao', 'nova instalacao'],
+      sintomas: ['instalacao', 'instalar', 'ativacao', 'ativar', 'novo ponto',
+        'ponto adicional', 'habilitar', 'primeiro acesso', 'cliente novo'],
+    },
+    {
+      familia: 'mudanca',
+      nomes: ['mudanca', 'transferencia', 'mudanca de endereco'],
+      sintomas: ['mudanca', 'mudar de endereco', 'mudei', 'transferencia',
+        'transferir', 'outro endereco', 'nova casa'],
+    },
+  ];
+
   // Encaixa o texto que a IA escreveu no assunto cadastrado pelo provedor.
   // Acentos e caixa saem da comparação porque "CONEXÃO LENTA" no IXC e
-  // "conexao lenta" vindo do modelo são a mesma coisa. Sem par razoável,
-  // devolve o primeiro da lista: chamado no assunto errado ainda é melhor do
-  // que chamado que não abre.
+  // "conexao lenta" vindo do modelo são a mesma coisa.
+  //
+  // O que não pode voltar é o primeiro da lista quando nada casa. Era o que
+  // acontecia: na Microdata os assuntos são Instalação, Manutenção e Mudança
+  // de endereço, nessa ordem, e o modelo escreve o sintoma ("sem internet"),
+  // que não é substring de nenhum deles. Resultado: todo chamado do bot nascia
+  // como INSTALAÇÃO. Foi assim que o 6331, um cliente sem conexão, virou ordem
+  // de instalação e seguiu para a fila errada.
+  //
+  // Então: nome exato, depois substring, depois a família do sintoma, e só
+  // então um padrão — que é suporte, nunca instalação. Abrir manutenção
+  // indevida gera uma visita a mais; abrir instalação indevida manda o técnico
+  // montar um ponto que já existe.
   async #idDoAssunto(texto) {
     const lista = await this.listarAssuntosChamado().catch(() => []);
     if (!lista.length) return '1';
@@ -326,13 +366,32 @@ export class IxcAdaptador extends SgpAdaptador {
     const limpar = t => String(t || '').toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
     const alvo = limpar(texto);
-    if (!alvo) return lista[0].id;
+
+    const daFamilia = familia => {
+      const { nomes } = IxcAdaptador.#FAMILIAS.find(f => f.familia === familia);
+      return lista.find(a => nomes.some(n => limpar(a.nome).includes(n)));
+    };
+    // Sem texto nenhum o problema é de suporte: a IA só abre chamado quando o
+    // cliente relata algo que não funciona.
+    const padrao = () => daFamilia('suporte') || lista[0];
+
+    if (!alvo) return padrao().id;
 
     const exato = lista.find(a => limpar(a.nome) === alvo);
     if (exato) return exato.id;
 
     const parcial = lista.find(a => limpar(a.nome).includes(alvo) || alvo.includes(limpar(a.nome)));
-    return (parcial || lista[0]).id;
+    if (parcial) return parcial.id;
+
+    // O sintoma que o cliente descreveu aponta a família; a família aponta o
+    // assunto que este provedor cadastrou para ela.
+    for (const f of IxcAdaptador.#FAMILIAS) {
+      if (!f.sintomas.some(s => alvo.includes(s))) continue;
+      const achado = daFamilia(f.familia);
+      if (achado) return achado.id;
+    }
+
+    return padrao().id;
   }
 
   // Filiais ativas, com a cidade ao lado — "MICRODATA ITINGA · Itinga" diz mais
@@ -509,17 +568,22 @@ export class IxcAdaptador extends SgpAdaptador {
     const contrato = contratos.find(c => c.status === 'A') || contratos[0] || null;
     const origemEndereco = origemAssunto === 'CC' && !contrato ? 'C' : origemAssunto;
 
-    // NÃO adicionar campos aqui sem testar contra um IXC de verdade.
+    // A cidade da O.S. Sem ela o chamado nasce fora de qualquer cidade: não
+    // entra no filtro por cidade do IXC nem no daqui, e quem distribui não
+    // sabe para onde mandar o técnico. Dos 191 chamados da Microdata só 3
+    // estão com id_cidade 0, e um deles era justamente o que o bot abriu.
     //
-    // Este payload é exatamente o que foi provado criar e persistir (chamado
-    // 6328 na Microdata). Numa tentativa de preencher o endereço da O.S.,
-    // acrescentei endereco/bairro/complemento/id_cidade/latitude/longitude sem
-    // testar — todos campos que existem nos registros reais — e a criação
-    // voltou a responder sucesso sem gravar. O IXC não reclama: só engole.
+    // No cadastro do cliente o campo se chama `cidade` e já guarda o id; na
+    // O.S. ele se chama `id_cidade`. Era essa a troca de nome que faltava.
     //
-    // Falta descobrir qual deles quebra. Enquanto isso, a O.S. nasce sem
-    // endereço preenchido, o que é ruim para o técnico mas melhor do que
-    // chamado que não existe.
+    // UM CAMPO POR VEZ, e sempre testado contra um IXC de verdade. Numa
+    // tentativa anterior acrescentei endereco/bairro/complemento/id_cidade/
+    // latitude/longitude de uma vez, sem testar, e a criação voltou a
+    // responder sucesso sem gravar — o IXC não reclama, só engole. Com seis
+    // campos novos juntos não havia como saber qual deles quebrou.
+    const idCidade = /^[1-9][0-9]*$/.test(String(cliente.cidade || ''))
+      ? String(cliente.cidade)
+      : null;
     const data = await this.#inserir('su_oss_chamado', {
       id_cliente: String(cliente.id),
       id_assunto: String(idAssunto),
@@ -532,6 +596,7 @@ export class IxcAdaptador extends SgpAdaptador {
       // id_contrato_kit, e não id_contrato: o IXC recusa o segundo dizendo que
       // o contrato é obrigatório, mesmo recebendo-o.
       ...(origemEndereco === 'CC' && contrato ? { id_contrato_kit: String(contrato.id) } : {}),
+      ...(idCidade ? { id_cidade: idCidade } : {}),
       origem_os_aberta: 'M',
       melhor_horario_agenda: 'Q',
       id_filial: String(idFilial || (await this.#primeiraFilial()) || '1'),
