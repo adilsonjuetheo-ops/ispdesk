@@ -2,7 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../../lib/api.js';
 import {
   RefreshCw, MapPin, Phone, Navigation, Clock, AlertTriangle, CheckCircle2, Wrench,
+  NotebookPen, X, Loader2, Info,
 } from 'lucide-react';
+
+const LIMITE_RELATO = 2000;
 
 // "2026-11-04 08:30:00" vem do IXC sem fuso — é o relógio do provedor.
 function quando(valor) {
@@ -28,7 +31,123 @@ function linkMapa(c) {
   return texto ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(texto)}` : null;
 }
 
-function Cartao({ c }) {
+// Folha de registro do atendimento.
+//
+// O que ela NÃO tem é um botão "Finalizar", e é de propósito: `status` é
+// somente-leitura na API do IXC, que ignora o valor enviado e ainda responde
+// sucesso. Um botão de finalizar aqui diria "pronto" ao técnico e deixaria a
+// O.S. aberta para sempre. Então o texto na tela promete exatamente o que
+// acontece — o relato e a hora vão para a O.S., o status fica com o
+// escritório. Recurso que falta é contratempo; promessa que o sistema não
+// cumpre é perda de confiança no app todo.
+// Pega a posição do celular sem travar o registro. Recusa de permissão, GPS
+// desligado, dentro de casa de alvenaria sem sinal — qualquer uma delas devolve
+// null e o relato vai do mesmo jeito. Teto de 8s: o técnico está esperando.
+function posicaoAtual() {
+  if (!navigator.geolocation) return Promise.resolve(null);
+  return new Promise(resolve => {
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  });
+}
+
+function FolhaRegistro({ chamado, onFechar, onSalvo }) {
+  const [texto, setTexto] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  // Visível e desmarcável. O escritório vê de onde o atendimento foi
+  // registrado, e o técnico tem que saber disso antes de apertar o botão —
+  // mandar a posição dele calado seria outra coisa.
+  const [enviarLocal, setEnviarLocal] = useState(true);
+
+  const salvar = async e => {
+    e.preventDefault();
+    setErro('');
+    setSalvando(true);
+    try {
+      const pos = enviarLocal ? await posicaoAtual() : null;
+      const r = await api.post(`/campo/chamados/${chamado.id}/atendimento`, {
+        mensagem: texto.trim(),
+        ...(pos || {}),
+      });
+      onSalvo(chamado.id, r.data?.mensagemResposta || '', r.data?.aviso || '');
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Não foi possível registrar agora. Tente de novo.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center sm:justify-center">
+      <form onSubmit={salvar}
+        className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl border-t sm:border border-gray-200 dark:border-gray-800 max-h-[92dvh] overflow-y-auto"
+        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <div className="flex items-start justify-between gap-3 p-4 border-b border-gray-200 dark:border-gray-800">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100">Registrar atendimento</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+              #{chamado.id} · {chamado.clienteNome}
+            </p>
+          </div>
+          <button type="button" onClick={onFechar} aria-label="Fechar"
+            className="w-11 h-11 -mt-1.5 -mr-1.5 flex items-center justify-center rounded-lg text-gray-400 shrink-0">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <textarea value={texto} onChange={e => setTexto(e.target.value.slice(0, LIMITE_RELATO))}
+            rows={6} autoFocus
+            placeholder="O que você encontrou e o que fez. Ex.: troquei o conector no poste, sinal voltou para -18 dBm, cliente navegando."
+            className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-950 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y" />
+          <p className="text-xs text-gray-400 text-right tabular-nums">{texto.length}/{LIMITE_RELATO}</p>
+
+          <label className="flex items-start gap-2.5 py-1 cursor-pointer">
+            <input type="checkbox" checked={enviarLocal} onChange={e => setEnviarLocal(e.target.checked)}
+              className="w-5 h-5 mt-0.5 shrink-0 accent-blue-600" />
+            <span className="text-sm text-gray-700 dark:text-gray-200">
+              Anexar onde eu estou agora
+              <span className="block text-xs text-gray-500 dark:text-gray-400">
+                Fica no histórico da O.S., junto do relato.
+              </span>
+            </span>
+          </label>
+
+          {/* A frase que evita a reclamação de amanhã. */}
+          <div className="flex gap-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 px-3 py-2.5">
+            <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed">
+              O relato vai para a O.S. no sistema do provedor com a sua assinatura e a hora.
+              O chamado continua como <strong>{chamado.statusRotulo}</strong> — quem finaliza é o escritório.
+            </p>
+          </div>
+
+          {erro && (
+            <p className="text-sm text-red-600 dark:text-red-400">{erro}</p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onFechar}
+              className="flex-1 min-h-[48px] rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium">
+              Cancelar
+            </button>
+            <button type="submit" disabled={salvando || texto.trim().length < 3}
+              className="flex-1 min-h-[48px] rounded-lg bg-blue-600 disabled:opacity-50 text-white text-sm font-medium flex items-center justify-center gap-2">
+              {salvando && <Loader2 className="w-4 h-4 animate-spin" />}
+              Registrar
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function Cartao({ c, onRegistrar }) {
   const mapa = linkMapa(c);
   const agenda = quando(c.agendadoPara);
 
@@ -94,6 +213,19 @@ function Cartao({ c }) {
         </p>
       )}
 
+      {/* O que já foi registrado, para ele não repetir o que escreveu de
+          manhã nem o que o colega escreveu antes. */}
+      {c.mensagemResposta && (
+        <div className="mt-3 rounded-lg bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 px-3 py-2">
+          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Atendimento registrado
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line mt-1">
+            {c.mensagemResposta}
+          </p>
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap gap-2">
         {c.clienteWhatsapp && (
           <a href={`tel:${c.clienteWhatsapp.replace(/\D/g, '')}`}
@@ -107,6 +239,13 @@ function Cartao({ c }) {
             <Navigation className="w-4 h-4" /> Como chegar
           </a>
         )}
+        {!c.finalizado && (
+          <button onClick={() => onRegistrar(c)}
+            className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium">
+            <NotebookPen className="w-4 h-4" />
+            {c.mensagemResposta ? 'Registrar mais' : 'Registrar atendimento'}
+          </button>
+        )}
       </div>
     </article>
   );
@@ -118,6 +257,8 @@ export default function Fila() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   const [verFinalizados, setVerFinalizados] = useState(false);
+  const [registrando, setRegistrando] = useState(null);
+  const [aviso, setAviso] = useState('');
 
   const carregar = () => {
     setCarregando(true);
@@ -132,6 +273,15 @@ export default function Fila() {
   };
 
   useEffect(carregar, []);
+
+  // Atualiza só o cartão que mudou, em vez de recarregar a fila. Recarregar
+  // custa uma volta inteira no IXC — 100 O.S. mais o cadastro de cada cliente
+  // — e ele está no 4G, na rua, com o celular na mão.
+  const aplicarRegistro = (id, mensagemResposta, avisoDoServidor) => {
+    setChamados(lista => lista.map(c => (c.id === id ? { ...c, mensagemResposta } : c)));
+    setRegistrando(null);
+    setAviso(avisoDoServidor || `Atendimento registrado na O.S. #${id}.`);
+  };
 
   // Agendado primeiro, e dentro disso o mais cedo na frente: é a ordem em que
   // ele vai trabalhar. Urgente sobe. O resto fica abaixo, por id.
@@ -180,6 +330,16 @@ export default function Fila() {
         </div>
       )}
 
+      {aviso && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950 px-4 py-3 mb-4 flex items-start justify-between gap-3">
+          <p className="text-sm text-emerald-800 dark:text-emerald-300">{aviso}</p>
+          <button onClick={() => setAviso('')} aria-label="Fechar aviso"
+            className="text-emerald-700 dark:text-emerald-400 shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Fila vazia sem explicação faz o técnico achar que o app quebrou. Se
           falta o vínculo com o colaborador do IXC, a tela diz isso. */}
       {estado.vinculado === false && estado.suportado && (
@@ -214,8 +374,14 @@ export default function Fila() {
       )}
 
       <div className="space-y-3">
-        {visiveis.map(c => <Cartao key={c.id} c={c} />)}
+        {visiveis.map(c => <Cartao key={c.id} c={c} onRegistrar={setRegistrando} />)}
       </div>
+
+      {registrando && (
+        <FolhaRegistro chamado={registrando}
+          onFechar={() => setRegistrando(null)}
+          onSalvo={aplicarRegistro} />
+      )}
     </div>
   );
 }

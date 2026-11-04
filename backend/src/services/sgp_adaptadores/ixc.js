@@ -109,6 +109,64 @@ export class IxcAdaptador extends SgpAdaptador {
     return json;
   }
 
+  // Edição: PUT com JSON — o inverso exato da inserção, que é POST com
+  // formulário.
+  //
+  // Esta inversão não é intuitiva e custou outra tarde. Form-urlencoded no PUT
+  // não é lido: o IXC responde "Preencha Filial / Status / Assunto / Setor /
+  // Prioridade / Origem do endereço" reclamando justamente dos campos que
+  // acabaram de ser enviados. E o header `ixcsoft: editar`, que o nome promete,
+  // INSERE — responde "Registro inserido com sucesso!" e cria registro novo.
+  // Foi assim que nasceram O.S. duplicadas durante o teste.
+  //
+  // O charset explícito também é obrigatório: sem ele, acento vira "?".
+  async #editar(recurso, id, body = {}) {
+    const url = `${await this.#url(recurso)}/${encodeURIComponent(String(id))}`;
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { ...this.#headers(), 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`IXC HTTP ${res.status} ao editar ${recurso}`);
+    return res.json();
+  }
+
+  // O IXC grava em Latin-1, e não avisa.
+  //
+  // Acento português passa inteiro — ligação, não, José, Araçuaí, 25°C — mas o
+  // que está fora dessa tabela vira "?" DENTRO do banco. Testado em
+  // 04/11/2026: travessão (—) e reticências (…) sumiram assim, e o
+  // `charset=utf-8` do cabeçalho não salva. O teclado do celular oferece
+  // justamente esses caracteres, e emoji é questão de tempo.
+  //
+  // Então troca pelo equivalente antes de gravar. Isso importa também para a
+  // conferência pós-gravação: comparar o texto digitado com o que o IXC
+  // devolveu acusaria "não gravou" num relato que gravou perfeitamente.
+  #latin1(texto) {
+    const trocas = {
+      '—': '-', '–': '-', '…': '...', ' ': ' ',
+      '‘': "'", '’': "'", '“': '"', '”': '"',
+      '•': '*', '→': '->',
+    };
+    return String(texto || '')
+      .replace(/[—–… ‘’“”•→]/g, c => trocas[c])
+      // O resto que não cabe em Latin-1 (emoji, símbolo técnico) sai fora.
+      // "?" espalhado pelo meio do relato não ajuda quem vai ler depois.
+      .replace(/[^\n\t\x20-\x7E¡-ÿ]/g, '');
+  }
+
+  // "AAAA-MM-DD HH:MM:SS" no relógio de Brasília, que é o que o IXC grava nos
+  // registros dele. UTC deixaria tudo três horas à frente das datas vizinhas.
+  #agoraIxc() {
+    return new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    }).format(new Date()).replace(/,/g, '').replace(/\s+/g, ' ').trim();
+  }
+
   // O boleto em PDF sai por POST autenticado — não há URL pública que sirva de
   // anexo (o gateway_link da fatura devolve a página de pagamento em HTML).
   // Sem tipo_boleto=arquivo o IXC responde 200 com corpo vazio.
@@ -619,6 +677,10 @@ export class IxcAdaptador extends SgpAdaptador {
         abertoEm: c.data_abertura && !c.data_abertura.startsWith('0000') ? c.data_abertura : null,
         agendadoPara: c.data_agenda && !c.data_agenda.startsWith('0000') ? c.data_agenda : null,
         mensagem: c.mensagem || '',
+        // O que já foi registrado de atendimento. Vai para a tela do técnico
+        // para ele não repetir o que o colega (ou ele mesmo, de manhã) já
+        // escreveu.
+        mensagemResposta: c.mensagem_resposta || '',
         // Daqui para baixo é o que só o técnico de campo usa: ele precisa
         // chegar no lugar. Latitude e longitude vêm do cadastro do cliente e
         // muitas vezes são a única pista útil na zona rural, onde "rua e
@@ -631,6 +693,160 @@ export class IxcAdaptador extends SgpAdaptador {
         longitude: c.longitude || null,
       };
     }));
+  }
+
+  // Registrar o atendimento numa O.S. — o que o técnico faz pelo celular
+  // quando termina a visita.
+  //
+  // NÃO finaliza o chamado, e isso não é escolha de produto: o status da O.S.
+  // não pode ser mudado pela API. Fechado por dois caminhos independentes,
+  // testados em 04/11/2026:
+  //
+  //   1. PUT em su_oss_chamado com status novo (AS, DS, EX, F, C) — os cinco
+  //      foram ignorados em silêncio, com o IXC respondendo "Registro
+  //      atualizado com sucesso!" e o status ficando onde estava.
+  //   2. Inserção em su_oss_chamado_mensagem, que é como o IXC registra a
+  //      mudança de estado internamente — status 'F' é recusado na cara
+  //      ("Para finalizar Ordem de Serviço utilize o botão respectivo
+  //      [Finalizar]") e AS/DS/EX/AG são aceitos mas inertes: o registro
+  //      entra e a O.S. não se move.
+  //
+  // Um botão "Finalizar" aqui diria "pronto" ao técnico e deixaria a O.S.
+  // aberta para sempre no IXC. Então grava só o que grava de verdade e quem
+  // vira o status é o escritório. A tela diz isso ao técnico com essas
+  // palavras; promessa que o sistema não cumpre é pior que recurso que falta.
+  //
+  // Grava nos DOIS lugares em que o próprio IXC grava quando alguém usa o
+  // botão Finalizar: `mensagem_resposta` na O.S. (é a coluna que o escritório
+  // lê — 20 de 20 O.S. finalizadas da base têm) e uma interação na aba
+  // "Mensagens/Interações", que é onde a equipe acompanha. Só a interação
+  // carrega latitude/longitude, e nas 1.000 interações da base elas estão
+  // todas vazias: o IXC tem o campo e ninguém usa.
+  async registrarAtendimento({
+    idChamado, idTecnico, mensagem, autor = null, latitude = null, longitude = null,
+  }) {
+    const texto = this.#latin1(mensagem).trim();
+    if (!texto) return { erro: 'Escreva o que foi feito no atendimento.' };
+
+    const data = await this.#listar('su_oss_chamado', {
+      qtype: 'su_oss_chamado.id', query: String(idChamado), oper: '=', rp: '1',
+    });
+    const os = data?.registros?.[0];
+    if (!os) return { erro: 'Chamado não encontrado no sistema do provedor.' };
+
+    // O técnico só escreve na O.S. dele. A conferência é indispensável mesmo
+    // com o id do colaborador saindo da sessão: o número do chamado chega pela
+    // URL, e sem isto bastaria trocá-lo para escrever no atendimento do colega.
+    if (idTecnico && String(os.id_tecnico || '') !== String(idTecnico)) {
+      return { erro: 'Este chamado não está atribuído a você.' };
+    }
+
+    if (['F', 'C'].includes(String(os.status || ''))) {
+      return { erro: 'Este chamado já foi encerrado no sistema do provedor.' };
+    }
+
+    // Acrescenta, nunca substitui. O campo é um só e a tela do IXC também
+    // escreve nele; sobrescrever apagaria o que o escritório anotou.
+    const agora = this.#agoraIxc();
+    const anterior = String(os.mensagem_resposta || '').trim();
+    // Separador com hífen, não travessão: travessão não existe em Latin-1 e
+    // ficaria "[Adilson Manoel ? 2026-11-04 ...]" na O.S.
+    const entrada = `[${[this.#latin1(autor), agora].filter(Boolean).join(' - ')}]\n${texto}`;
+    const novo = [anterior, entrada].filter(Boolean).join('\n\n');
+
+    const zerada = v => !v || String(v).startsWith('0000');
+    const r = await this.#editar('su_oss_chamado', os.id, {
+      // Estes sete o IXC exige em toda edição, mesmo que nenhum deles mude —
+      // sem eles recusa com "Preencha ...". `id_cliente` entrou por último,
+      // depois de a gravação voltar com "Cliente é um campo obrigatório!"
+      // numa O.S. que obviamente já tinha cliente. Vão de volta como estão: a
+      // O.S. sai daqui com o mesmo status com que entrou.
+      id_cliente: String(os.id_cliente || ''),
+      id_filial: String(os.id_filial || ''),
+      status: String(os.status || ''),
+      id_assunto: String(os.id_assunto || ''),
+      setor: String(os.setor || ''),
+      prioridade: String(os.prioridade || 'N'),
+      origem_endereco: String(os.origem_endereco || 'C'),
+
+      mensagem_resposta: novo,
+      // O primeiro registro marca quando o atendimento começou; os seguintes
+      // preservam. `data_fechamento` passa a ser a hora do último relato, que
+      // é o sinal que o escritório tem de que o técnico terminou em campo —
+      // já que o status não pode vir daqui.
+      data_inicio: zerada(os.data_inicio) ? agora : os.data_inicio,
+      data_fechamento: agora,
+    });
+
+    if (r?.type !== 'success') {
+      const limpo = String(r?.message || '')
+        .replace(/<br\s*\/?>/gi, ' · ')
+        .replace(/<[^>]+>/g, '')
+        .trim();
+      return { erro: limpo || 'O IXC recusou o registro do atendimento.' };
+    }
+
+    // "Registro atualizado com sucesso!" é exatamente o que o IXC responde
+    // quando descarta o que recebeu — foi assim que o status somente-leitura
+    // apareceu. A resposta não prova nada; ler de volta prova.
+    const normalizar = t => String(t || '').replace(/\r/g, '').trim();
+    const confere = await this.#listar('su_oss_chamado', {
+      qtype: 'su_oss_chamado.id', query: String(os.id), oper: '=', rp: '1',
+    }).catch(() => null);
+    const salvo = confere?.registros?.[0];
+
+    if (!salvo || !normalizar(salvo.mensagem_resposta).includes(normalizar(texto).slice(0, 60))) {
+      console.error(`[IXC] Atendimento da O.S. ${os.id} veio como sucesso e não está gravado.`);
+      return {
+        erro: 'O sistema do provedor respondeu que gravou, mas o relato não está lá. '
+          + 'Nada foi registrado — anote e avise o escritório.',
+      };
+    }
+
+    // A interação, que é onde a equipe acompanha a O.S. — e o único lugar que
+    // aceita a coordenada. `status` vai como o status atual de propósito: um
+    // valor diferente seria aceito e ignorado, e deixaria no histórico um
+    // registro dizendo que a O.S. mudou de estado quando ela não mudou.
+    //
+    // Falha aqui não derruba o atendimento: o relato já está na O.S., que é o
+    // que importa para o cliente. Volta como aviso.
+    let aviso = null;
+    const coord = v => (Number.isFinite(Number(v)) && Number(v) !== 0 ? String(v) : null);
+    const lat = coord(latitude);
+    const lon = coord(longitude);
+
+    const interacao = await this.#inserir('su_oss_chamado_mensagem', {
+      id_chamado: String(os.id),
+      status: String(os.status || ''),
+      // 1 é abertura e 6 é finalização (que a API não pode fazer); 2 é
+      // alteração, que é o que isto é de fato.
+      id_evento: '2',
+      data: agora,
+      mensagem: `${this.#latin1(autor) || 'Técnico'}: ${texto}`,
+      ...(os.id_tecnico && os.id_tecnico !== '0' ? { id_tecnico: String(os.id_tecnico) } : {}),
+      finaliza_processo: 'N',
+      tipo_cobranca: 'NENHUM',
+      // gps_time é o único campo de data do IXC que não aceita data: ele
+      // espera epoch em MILISSEGUNDOS e converte sozinho. Mandar
+      // "2026-11-04 18:27:34" grava 1969-12-31, e epoch em segundos grava
+      // 1970-01-21. Com Date.now() a hora sai certa.
+      ...(lat && lon ? { latitude: lat, longitude: lon, gps_time: Date.now() } : {}),
+    }).catch(err => {
+      console.error(`[IXC] Falha ao registrar interação da O.S. ${os.id}:`, err.message);
+      return null;
+    });
+
+    if (interacao?.type !== 'success') {
+      aviso = 'O relato entrou na O.S., mas não apareceu no histórico de interações do sistema do provedor.';
+    }
+
+    return {
+      ok: true,
+      registradoEm: agora,
+      comLocalizacao: !!(lat && lon) && interacao?.type === 'success',
+      mensagemResposta: salvo.mensagem_resposta || novo,
+      ...(aviso ? { aviso } : {}),
+    };
   }
 
   // O IXC guarda o assunto em id_assunto (numérico). Mandar o texto num campo
