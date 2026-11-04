@@ -233,6 +233,9 @@ export class IxcAdaptador extends SgpAdaptador {
       endereco: linha,
       bairro: cliente.bairro,
       complemento: cliente.complemento,
+      // O ponto de referência costuma ser a única pista em zona rural, onde
+      // rua e número não levam ninguém a lugar nenhum.
+      referencia: cliente.referencia,
       latitude: cliente.latitude,
       longitude: cliente.longitude,
     };
@@ -522,6 +525,26 @@ export class IxcAdaptador extends SgpAdaptador {
         || a.nome.localeCompare(b.nome, 'pt-BR'));
   }
 
+  // O protocolo de atendimento, no formato que o IXC gera na tela dele:
+  // 14 dígitos de data e hora mais 6 de desempate — "20261103175943512770".
+  // A API não gera nenhum, e a O.S. aberta por aqui ficava com a coluna
+  // Protocolo vazia na grade e nas impressões, única entre as 191 da base.
+  //
+  // A hora é a de Brasília, que é o relógio gravado nos registros do IXC;
+  // usar UTC deixaria o protocolo três horas à frente da data de abertura ao
+  // lado dele.
+  #protocoloNovo() {
+    const agora = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    }).format(new Date()).replace(/\D/g, '');
+
+    const desempate = String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
+    return `${agora}${desempate}`;
+  }
+
   // O login PPPoE do contrato. A O.S. guarda o id dele em `id_login`, e é por
   // esse campo que a grade do IXC mostra as colunas Login e Senha MD5 — o que
   // o técnico usa para testar a conexão em campo. Sem ele a O.S. chega sem
@@ -720,6 +743,7 @@ export class IxcAdaptador extends SgpAdaptador {
       ...(origemEndereco === 'CC' && contrato ? { id_contrato_kit: String(contrato.id) } : {}),
       ...(idLogin ? { id_login: idLogin } : {}),
       ...endereco,
+      protocolo: this.#protocoloNovo(),
       ...(idCidade ? { id_cidade: idCidade } : {}),
       origem_os_aberta: 'M',
       melhor_horario_agenda: 'Q',
