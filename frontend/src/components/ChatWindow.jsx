@@ -5,6 +5,7 @@ import { useEquipe, indexarPorNome } from '../hooks/useEquipe.js';
 import NovaConversaModal from './NovaConversaModal.jsx';
 import AvatarAtendente from './AvatarAtendente.jsx';
 import { useAuth } from '../hooks/useAuth.js';
+import { planoTemChamado } from '../lib/planos.js';
 import { usePolling } from '../hooks/usePolling.js';
 import { useNotificationSound } from '../hooks/useNotificationSound.js';
 import {
@@ -751,6 +752,10 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
   const [cidadeCliente, setCidadeCliente] = useState(null);
   const [idTecnico, setIdTecnico] = useState('');
   const [suportado, setSuportado] = useState(null);
+  // "Não suportado" tem duas causas diferentes e o atendente precisa saber
+  // qual: o SGP do provedor não expõe chamado, ou o plano não inclui. Uma não
+  // tem solução, a outra tem.
+  const [motivo, setMotivo] = useState(null);
   const [idAssunto, setIdAssunto] = useState('');
   const [idFilial, setIdFilial] = useState('');
   const [mensagem, setMensagem] = useState('');
@@ -761,6 +766,7 @@ function ChamadoModal({ conversa, onClose, onAberto }) {
     api.get(`/conversations/${conversa.id}/chamado/assuntos`)
       .then(r => {
         setSuportado(r.data.suportado);
+        setMotivo(r.data.motivo || null);
         setAssuntos(r.data.assuntos || []);
         setFiliais(r.data.filiais || []);
         setTecnicos(r.data.tecnicos || []);
@@ -827,7 +833,9 @@ ${r.data.aviso}` : ''));
 
         {suportado === false && (
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            O sistema deste provedor não permite abrir chamado por aqui.
+            {motivo === 'plano'
+              ? 'A abertura de chamado técnico não está disponível no seu plano. Fale com o suporte do ISPDesk para habilitar.'
+              : 'O sistema deste provedor não permite abrir chamado por aqui.'}
           </p>
         )}
 
@@ -1205,6 +1213,10 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
   // Encerrada também pode ser respondida — enviar mensagem reabre a conversa.
   const podeAtuar = true;
   const eHumano = conversa.status === 'humano';
+  // Abrir chamado é do Enterprise para cima. Esconder o botão evita o pior
+  // caminho: o atendente preencher o formulário inteiro para ouvir "não".
+  // O backend recusa de qualquer jeito — aqui é só cortesia.
+  const temChamado = user?.role === 'superadmin' || planoTemChamado(user?.plano);
 
   const handleAsumir = async () => {
     setAcao(true);
@@ -1532,7 +1544,7 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
               </button>
             )}
 
-            {podeAtuar && (
+            {podeAtuar && temChamado && (
               <button onClick={() => setChamadoAberto(true)} title="Abrir chamado técnico"
                 className="flex items-center gap-1.5 border border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 dark:border-gray-700 dark:text-gray-400 dark:hover:border-blue-800 dark:hover:text-blue-400 dark:hover:bg-blue-950 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
                 <Wrench className="w-3.5 h-3.5 shrink-0" />

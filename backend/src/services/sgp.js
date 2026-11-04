@@ -3,6 +3,7 @@ import { IxcAdaptador }      from './sgp_adaptadores/ixc.js';
 import { MkAuthAdaptador }   from './sgp_adaptadores/mkauth.js';
 import { GenericoAdaptador } from './sgp_adaptadores/generico.js';
 import { SgpTsmxAdaptador }  from './sgp_adaptadores/sgpTsmx.js';
+import { planoTemChamado }   from '../config/planos.js';
 
 const ADAPTADORES = {
   atlaz:    AtlazAdaptador,
@@ -61,14 +62,37 @@ export async function buscarContextoPorDocumentoSgp(tenant, documento) {
   }
 }
 
+// Ferramentas que não são de todo plano.
+//
+// O corte é feito tirando a ferramenta da lista, não pedindo no prompt que o
+// modelo não a use: o que ele não enxerga ele não chama, e isso vale mais que
+// qualquer instrução. A checagem em executarTool é a segunda tranca — uma
+// conversa antiga pode trazer a chamada no histórico depois de o plano mudar.
+const TOOLS_POR_PLANO = {
+  abrir_chamado_tecnico: tenant => planoTemChamado(tenant.plano),
+};
+
+export function toolLiberada(tenant, nome) {
+  const exige = TOOLS_POR_PLANO[nome];
+  return !exige || exige(tenant);
+}
+
 export function getTools(tenant) {
   const sgp = criarSgp(tenant);
-  return sgp ? sgp.tools() : [];
+  if (!sgp) return [];
+  return sgp.tools().filter(t => toolLiberada(tenant, t.name));
 }
 
 export async function executarTool(toolName, toolInput, tenant) {
   const sgp = criarSgp(tenant);
   if (!sgp) return 'SGP não configurado para este provedor.';
+  // Importa que a recusa não soe como pane: o cliente que ouve "falha no
+  // sistema" volta amanhã cobrando o chamado que ninguém abriu.
+  if (!toolLiberada(tenant, toolName)) {
+    return 'Esta ação não está habilitada para este provedor. NÃO é falha técnica e não adianta tentar de novo: '
+      + 'quem abre o chamado é a equipe. Diga ao cliente que vai passar o caso para um atendente, sem mencionar '
+      + 'erro ou sistema fora do ar, e escreva ACTION:HANDOFF:problema técnico — abertura de chamado é com a equipe';
+  }
   try {
     if (toolName === 'buscar_por_documento') {
       const doc = (toolInput.documento || '').replace(/\D/g, '');

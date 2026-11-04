@@ -12,6 +12,7 @@ import { sugerirResposta } from '../services/ai.js';
 import { normalizarTelefoneBR } from '../services/telefone.js';
 import { criarRateLimit } from '../middleware/security.js';
 import { audioPrecisaConverter, converterParaOggOpus, converterParaMp3 } from '../services/audio.js';
+import { planoTemChamado } from '../config/planos.js';
 
 // O player de áudio faz várias requisições Range pra descobrir a duração
 // antes de tocar — sem isso, cada uma rebaixaria o arquivo inteiro da Meta
@@ -968,12 +969,29 @@ router.post('/:id/note', async (req, res) => {
 // Até aqui só o bot abria chamado, pela ferramenta da IA. O atendente que
 // assumisse a conversa tinha que ir ao IXC, procurar o cliente de novo e
 // copiar o relato na mão.
+//
+// Abrir chamado é recurso do Enterprise para cima — é a única ação do painel
+// que escreve na base do provedor. O superadmin passa por cima porque é quem
+// dá suporte aos provedores e precisa reproduzir o problema deles.
+const ERRO_PLANO_CHAMADO =
+  'A abertura de chamado técnico não está disponível no seu plano. '
+  + 'Fale com o suporte do ISPDesk para habilitar.';
+
+function podeAbrirChamado(req, tenant) {
+  return req.user.role === 'superadmin' || planoTemChamado(tenant?.plano);
+}
+
 router.get('/:id/chamado/assuntos', async (req, res) => {
   const [conversa] = await db.select().from(conversas).where(eq(conversas.id, req.params.id)).limit(1);
   if (!conversa) return res.status(404).json({ erro: 'Conversa não encontrada' });
   if (!podeAcessarConversa(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
 
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  // O plano é lido do tenant, não do token: quem troca de plano hoje não fica
+  // com o acesso de ontem até o próximo login.
+  if (!podeAbrirChamado(req, tenant)) {
+    return res.json({ suportado: false, motivo: 'plano', assuntos: [] });
+  }
   const sgp = criarSgp(tenant);
   if (!sgp || typeof sgp.listarAssuntosChamado !== 'function') {
     return res.json({ suportado: false, assuntos: [] });
@@ -1020,6 +1038,9 @@ router.post('/:id/chamado', async (req, res) => {
   if (!podeAcessarConversa(req, conversa)) return res.status(403).json({ erro: 'Acesso negado' });
 
   const [tenant] = await db.select().from(tenants).where(eq(tenants.id, conversa.tenantId)).limit(1);
+  if (!podeAbrirChamado(req, tenant)) {
+    return res.status(403).json({ erro: ERRO_PLANO_CHAMADO });
+  }
   const sgp = criarSgp(tenant);
   if (!sgp || typeof sgp.abrirChamado !== 'function') {
     return res.status(400).json({ erro: 'O sistema deste provedor não permite abrir chamado por aqui.' });

@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import api from '../../lib/api.js';
+import { useAuth } from '../../hooks/useAuth.js';
+import { planoTemChamado } from '../../lib/planos.js';
 import { Wrench, RefreshCw, MapPin, User } from 'lucide-react';
 
 // O IXC tem quase dez status. Em vez de reproduzir todos como abas, a tela
@@ -22,6 +24,10 @@ function dataBr(valor) {
 }
 
 export default function Chamados() {
+  const { user } = useAuth();
+  // Consultar chamado é de todo plano; abrir é do Enterprise para cima. Quem
+  // não abre não deve ler um texto que manda procurar um botão inexistente.
+  const podeAbrir = user?.role === 'superadmin' || planoTemChamado(user?.plano);
   const [chamados, setChamados] = useState([]);
   const [suportado, setSuportado] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -71,7 +77,8 @@ export default function Chamados() {
               <Wrench className="w-5 h-5 text-blue-600" /> Chamados técnicos
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Direto do sistema do provedor. Abrir um novo é pelo botão na conversa do cliente.
+              Direto do sistema do provedor.
+              {podeAbrir ? ' Abrir um novo é pelo botão na conversa do cliente.' : ''}
             </p>
           </div>
           <button onClick={carregar} disabled={carregando}

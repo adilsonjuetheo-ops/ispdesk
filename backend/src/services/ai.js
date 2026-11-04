@@ -240,6 +240,12 @@ export async function processarMensagem(tenant, conversa, historico, novaMensage
 
   // 2. System prompt com contexto SGP injetado
   const temSgp = !!(tenant.sgpTipo && tenant.sgpApiKey);
+  // As ferramentas sobem antes do prompt porque o prompt depende delas. Abrir
+  // chamado não é de todo plano, e o que o assistente anuncia tem que bater
+  // com o que ele consegue fazer: prometer chamado sem a ferramenta produz
+  // exatamente a mensagem de "falha no sistema" que não deveria existir.
+  const tools = getTools(tenant);
+  const podeAbrirChamado = tools.some(t => t.name === 'abrir_chamado_tecnico');
   const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'full', timeStyle: 'short' });
   // Fora do horário de atendimento humano o assistente segue atendendo, mas não
   // pode prometer que alguém da equipe assume a conversa agora.
@@ -250,7 +256,7 @@ export async function processarMensagem(tenant, conversa, historico, novaMensage
   const blocoForaHorario = semAtendente ? `
 ATENDIMENTO HUMANO INDISPONÍVEL AGORA:
 - Neste momento não há nenhum atendente humano de plantão — só você.
-- Resolva normalmente tudo que estiver ao seu alcance (consultas, 2ª via, desbloqueio, chamados).
+- Resolva normalmente tudo que estiver ao seu alcance (consultas, 2ª via, desbloqueio${podeAbrirChamado ? ', chamados' : ''}).
 - Se precisar transferir, transfira mesmo assim: a conversa fica registrada na fila da equipe.
 - Ao transferir, avise que um atendente responde ${atendimento.proximoRetorno || 'no próximo horário de atendimento'}.
 - Nunca diga que vai chamar alguém "agora" nem prometa retorno imediato.${instrucaoForaHorario ? `
@@ -282,7 +288,10 @@ INSTRUÇÕES IMPORTANTES:
 - Se não conseguir resolver o problema: escreva ACTION:HANDOFF:motivo detalhado
 - TROCA DE SENHA (do wi-fi, do roteador ou de acesso): transfira SEMPRE, sem tentar ensinar. Não explique passo a passo, não peça marca ou modelo do aparelho, não peça a senha atual e não mande link de configuração. Diga apenas que um atendente vai fazer isso com o cliente e escreva ACTION:HANDOFF:troca de senha — requer atendente
 - Se a situação for incomum e exigir julgamento mais cuidadoso (reclamação grave, negociação fora do script, ambiguidade real) e você não estiver seguro de como agir: não adivinhe nem transfira ainda — escreva sozinho, sem mais nada, ACTION:ESCALATE. Isso pede uma segunda opinião antes de responder ao cliente, não é o mesmo que transferir para um humano. Não use para o dia a dia — consulta, 2ª via, desbloqueio e dúvidas comuns você resolve normalmente.
-${temSgp ? `- Use apenas os dados fornecidos pelo SGP nesta conversa. Nunca invente informações.
+${temSgp && !podeAbrirChamado ? `- VOCÊ NÃO ABRE CHAMADO TÉCNICO. Quando o caso exigir visita, agendamento ou análise da equipe técnica, diga que vai passar para um atendente e escreva ACTION:HANDOFF:problema técnico — abertura de chamado é com a equipe.
+- Não prometa chamado, ordem de serviço, protocolo nem prazo de visita, e não diga que "vai abrir" nada. Também não diga que houve falha, erro ou instabilidade no sistema: não há falha nenhuma, isso só não é feito por você.
+- O resto do atendimento técnico continua seu: entender o problema, checar os dados do SGP e orientar o que o cliente pode testar sozinho.
+` : ''}${temSgp ? `- Use apenas os dados fornecidos pelo SGP nesta conversa. Nunca invente informações.
 - Nunca diga que vai "verificar" — você já tem os dados, use-os diretamente.
 - Os dados do SGP são a fotografia de AGORA, e a situação muda no meio da conversa. Se eles contradizem algo que você disse antes — a fatura vencida sumiu, o acesso aparece liberado —, o normal é que o cliente tenha resolvido naquele instante, pagando. Não é erro seu.
 - NUNCA se retrate nem peça desculpas por isso, e nunca diga que não havia fatura vencida ou bloqueio. A dívida existia; negar isso confunde justamente quem acabou de pagar e faz ele duvidar se o pagamento valeu. Trate pelo que é: o pagamento entrou, o acesso foi liberado. Siga adiante.
@@ -348,8 +357,7 @@ ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclu
       content: m.conteudo,
     }));
 
-  // 4. Tools disponíveis para este tenant (dependem do SGP configurado)
-  const tools = getTools(tenant);
+  // 4. As tools deste tenant já foram montadas lá em cima, junto do prompt.
   const idsAutorizados = extrairIdsAutorizados(contextoSgp);
 
   // 5. Conversa acumulada — mescla mensagens consecutivas do mesmo role
