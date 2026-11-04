@@ -89,14 +89,21 @@ export class IxcAdaptador extends SgpAdaptador {
       if (v !== undefined && v !== null) form.append(k, String(v));
     }
 
+    const corpo = form.toString();
     const res = await fetch(await this.#url(recurso), {
       method: 'POST',
       headers: { ...this.#headers(), 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: form.toString(),
+      body: corpo,
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`IXC HTTP ${res.status} em ${recurso}`);
-    return res.json();
+
+    const json = await res.json();
+    // O corpo enviado volta junto para o chamador poder registrar quando o
+    // IXC disser que gravou e não tiver gravado. Sem isso, a diferença entre
+    // o que funciona no curl e o que o app manda fica invisível.
+    Object.defineProperty(json, '__corpoEnviado', { value: corpo, enumerable: false });
+    return json;
   }
 
   // O boleto em PDF sai por POST autenticado — não há URL pública que sirva de
@@ -545,7 +552,13 @@ export class IxcAdaptador extends SgpAdaptador {
 
       if (confere?.registros?.length) return { protocolo: String(data.id) };
 
-      console.error(`[IXC] Chamado ${data.id} veio como sucesso mas não está na base.`);
+      console.error(
+        `[IXC] Chamado ${data.id} veio como sucesso mas não está na base.
+`
+        + `       corpo enviado: ${data.__corpoEnviado || '(indisponível)'}
+`
+        + `       resposta: ${JSON.stringify(data).slice(0, 400)}`
+      );
       return {
         erro: 'O sistema do provedor respondeu que criou o chamado, mas ele não aparece na base. '
           + 'Nada foi registrado — abra pelo IXC desta vez e avise o suporte do ISPDesk.',
