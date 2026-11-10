@@ -1190,10 +1190,15 @@ export class IxcAdaptador extends SgpAdaptador {
   // PIX realmente vai parar na mensagem.
   #lembreteUsaPix() {
     if (this.tenant?.aceitaPix === false) return false;
-    // Com botão de URL no template, o PIX é justamente o conteúdo da página de
-    // pagamento — precisa ser buscado mesmo que o provedor tenha link da
-    // central configurado, senão a página abre sem o código pra copiar.
-    if (this.tenant?.lembreteFaturaBotaoUrl) return true;
+    // Com botão de URL no template, o PIX é o conteúdo da página de pagamento —
+    // precisa ser buscado mesmo que o provedor tenha link da central
+    // configurado, senão a página abre sem o código pra copiar.
+    //
+    // Aqui não dá pra saber QUAL template vai ser usado, e durante a conversão
+    // (a Meta só aceita uma edição a cada 24h) um já tem botão e o outro não.
+    // Na dúvida, busca: o custo de errar pra mais é uma chamada à API do IXC,
+    // e o de errar pra menos é a página abrindo vazia pro cliente.
+    if (process.env.API_PUBLIC_URL) return true;
     return !this.tenant?.lembreteFaturaLinkAssinante;
   }
 

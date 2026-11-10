@@ -4,7 +4,7 @@ import { eq, and, ne, inArray } from 'drizzle-orm';
 import { criarSgp } from '../services/sgp.js';
 import { enviarTemplate } from '../services/whatsapp.js';
 import { criarLinkFatura } from '../services/faturaLink.js';
-import { detectarFormatoBotao } from '../services/metaTemplates.js';
+import { detectarFormatoPorTemplate } from '../services/metaTemplates.js';
 
 // Quantos dias pra trás da marca de vencido a busca ainda cobre — dá uma folga
 // pra pegar quem ficou de fora se o cron falhar num dia (SGP fora do ar, deploy
@@ -70,7 +70,7 @@ async function registrarMensagemBot(tenant, telefone, texto) {
 // simular: faz tudo menos mandar a mensagem — consulta o SGP, resolve telefone
 // e monta as variáveis. É o único jeito de conferir se a busca de faturas por
 // vencimento está devolvendo o que deveria sem usar cliente real como teste.
-async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo, { simular = false } = {}) {
+async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo, { simular = false, usaBotao = false } = {}) {
   if (!nomeTemplate) return { enviado: false, motivo: 'Template não configurado' };
 
   try {
@@ -103,7 +103,7 @@ async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo, { simul
     // código de pagamento sai da mensagem e vai pra /p/<token>, onde o cliente
     // copia só ele — no WhatsApp, pressionar o balão copia a mensagem inteira,
     // e era isso que impedia o cliente de colar o PIX no banco.
-    if (tenant.lembreteFaturaBotaoUrl) {
+    if (usaBotao) {
       if (!codigoPix && !titulo.link) {
         return { enviado: false, motivo: 'Fatura sem forma de pagamento (nem PIX, nem boleto) — a página do botão ficaria vazia' };
       }
@@ -185,10 +185,10 @@ export async function testarClienteEspecifico(tenant, documento, tipo) {
 
   // Mesmo motivo da varredura: o teste manual é o primeiro lugar onde se nota
   // que a Meta aprovou a edição, e não pode falhar justamente aí.
-  const formatoBotao = await detectarFormatoBotao(tenant, String(process.env.API_PUBLIC_URL || ''));
-  if (formatoBotao !== null) tenant = { ...tenant, lembreteFaturaBotaoUrl: formatoBotao };
+  const formatos = await detectarFormatoPorTemplate(tenant, String(process.env.API_PUBLIC_URL || ''));
+  const usaBotao = formatos?.[nomeTemplate] ?? !!tenant.lembreteFaturaBotaoUrl;
 
-  const r = await enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo);
+  const r = await enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo, { usaBotao });
   return {
     ...r,
     cliente: titulo.clienteNome,
@@ -207,14 +207,24 @@ export async function processarProvedor(tenant, { simular = false } = {}) {
   // template passa a ter 4 variáveis e um botão. Conferir aqui, uma vez por
   // varredura, evita que a varredura inteira falhe esperando alguém lembrar de
   // virar a chave no painel — e grava o que achou, pra o painel não mentir.
-  const formatoBotao = await detectarFormatoBotao(tenant, String(process.env.API_PUBLIC_URL || ''));
-  if (formatoBotao !== null && formatoBotao !== !!tenant.lembreteFaturaBotaoUrl) {
-    console.log(`[lembretes] ${tenant.nome}: templates agora no formato ${formatoBotao ? 'com botão' : 'antigo'}`);
-    tenant = { ...tenant, lembreteFaturaBotaoUrl: formatoBotao };
-    await db.update(tenants)
-      .set({ lembreteFaturaBotaoUrl: formatoBotao })
-      .where(eq(tenants.id, tenant.id))
-      .catch(err => console.error('[lembretes] Falha ao gravar o formato do template:', err.message));
+  const formatos = await detectarFormatoPorTemplate(tenant, String(process.env.API_PUBLIC_URL || ''));
+  const formatoDe = nome => formatos?.[nome] ?? !!tenant.lembreteFaturaBotaoUrl;
+
+  // A flag gravada só vale como "os dois já viraram" — é o que o painel mostra
+  // e o que vale de reserva quando a Meta não responde. A decisão de cada envio
+  // é por template, logo abaixo, porque durante a janela de 24h entre uma
+  // edição e outra os dois formatos convivem.
+  if (formatos) {
+    const todos = [tenant.lembreteFaturaTemplatePre, tenant.lembreteFaturaTemplatePos]
+      .filter(Boolean).every(nome => formatos[nome] === true);
+    if (todos !== !!tenant.lembreteFaturaBotaoUrl) {
+      console.log(`[lembretes] ${tenant.nome}: templates ${todos ? 'todos convertidos' : 'ainda em conversão'}`);
+      tenant = { ...tenant, lembreteFaturaBotaoUrl: todos };
+      await db.update(tenants)
+        .set({ lembreteFaturaBotaoUrl: todos })
+        .where(eq(tenants.id, tenant.id))
+        .catch(err => console.error('[lembretes] Falha ao gravar o formato do template:', err.message));
+    }
   }
 
   const diasPos = Number(tenant.lembreteFaturaDiasPos) || DIAS_POS_PADRAO;
@@ -264,13 +274,13 @@ export async function processarProvedor(tenant, { simular = false } = {}) {
   const listaVenceu5diasNovas = listaVenceu5diasOuMais.filter(t => !jaEnviados.has(String(t.id)));
 
   for (const titulo of listaVenceAmanha) {
-    const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePre, 'pré-vencimento', { simular });
+    const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePre, 'pré-vencimento', { simular, usaBotao: formatoDe(tenant.lembreteFaturaTemplatePre) });
     if (r.simulado) resultado.previa.push({ tipo: 'pré-vencimento', ...r });
     else if (r.enviado) resultado.preEnviadas++;
     else resultado.falhas.push(`${titulo.clienteNome} (pré-vencimento): ${r.motivo}`);
   }
   for (const titulo of listaVenceu5diasNovas) {
-    const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePos, 'pós-vencimento', { simular });
+    const r = await enviarLembrete(tenant, sgp, titulo, tenant.lembreteFaturaTemplatePos, 'pós-vencimento', { simular, usaBotao: formatoDe(tenant.lembreteFaturaTemplatePos) });
     if (r.simulado) {
       resultado.previa.push({ tipo: 'pós-vencimento', ...r });
     } else if (r.enviado) {

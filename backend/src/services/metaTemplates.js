@@ -90,34 +90,38 @@ export function corpoSemVariavelPagamento(texto) {
   return limpas.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-// Descobre, na Meta, se os templates de lembrete do provedor já estão no
-// formato com botão de pagamento.
+// Descobre, na Meta, quais templates de lembrete já estão no formato com botão
+// de pagamento. Devolve um mapa { nomeDoTemplate: true|false }.
 //
-// Existe porque a aprovação é assíncrona e fora do nosso controle: no instante
-// em que a Meta aprova, o template passa a ter 4 variáveis e um botão, e um
-// envio no formato antigo quebra com "number of parameters does not match" —
-// de madrugada, no cron, sem ninguém olhando. Perguntar uma vez por varredura
-// é uma chamada por provedor por dia, e tira a quebra da mesa.
+// É por template, e não por provedor, porque a Meta só aceita uma edição a cada
+// 24h: o pré-vencimento é aprovado hoje e o pós só amanhã. Durante essa janela
+// os dois convivem, um com 4 variáveis e botão, outro com 5 — tratar os dois
+// como um bloco só faria o que já estava convertido falhar com "number of
+// parameters does not match".
 //
-// Devolve null quando não deu pra saber (sem WABA, sem token, Meta fora do
-// ar). Null não é "não": quem chama continua com o que estava gravado.
-export async function detectarFormatoBotao(tenant, baseUrl) {
+// Devolve null quando não deu pra saber (sem WABA, sem token, Meta fora do ar).
+// Null não é "não": quem chama continua com o que estava gravado.
+export async function detectarFormatoPorTemplate(tenant, baseUrl) {
   const base = String(baseUrl || '').replace(/\/+$/, '');
   const nomes = [tenant?.lembreteFaturaTemplatePre, tenant?.lembreteFaturaTemplatePos].filter(Boolean);
   if (!base || !nomes.length || !tenant?.wabaId || !tenant?.whatsappToken) return null;
 
   try {
     const lista = await listarTemplates(tenant);
-    const usados = nomes.map(n => lista.find(t => t.name === n)).filter(Boolean);
-    if (usados.length !== nomes.length) return null;
+    const mapa = {};
 
-    // Só vale como "formato novo" se TODOS estiverem aprovados e com o botão.
-    // Com um só convertido, o outro ainda espera 5 variáveis.
-    return usados.every(t => {
-      if (t.status !== 'APPROVED') return false;
+    for (const nome of nomes) {
+      const t = lista.find(x => x.name === nome);
+      // Template que não achamos não vira false: isso mandaria o formato antigo
+      // pra um template que pode já estar convertido. Fica de fora do mapa, e
+      // quem chama cai no valor gravado.
+      if (!t) continue;
+      if (t.status !== 'APPROVED') { mapa[nome] = false; continue; }
       const botoes = (t.components || []).find(c => c.type === 'BUTTONS')?.buttons || [];
-      return botoes.some(b => b.type === 'URL' && String(b.url || '').startsWith(`${base}/p/`));
-    });
+      mapa[nome] = botoes.some(b => b.type === 'URL' && String(b.url || '').startsWith(`${base}/p/`));
+    }
+
+    return Object.keys(mapa).length ? mapa : null;
   } catch (err) {
     console.warn('[templates] Não deu pra conferir o formato na Meta:', err.message);
     return null;
