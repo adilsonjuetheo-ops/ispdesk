@@ -70,6 +70,13 @@ export const tenants = pgTable('tenants', {
   // Quantos dias depois do vencimento sai o lembrete de cobrança. Era fixo em
   // 5 para todo mundo; a UaiFibra cobra a partir de 15.
   lembreteFaturaDiasPos:       integer('lembrete_fatura_dias_pos').default(5),
+  // true = o template de lembrete tem botao de URL no lugar do codigo PIX no
+  // corpo. O WhatsApp nao deixa selecionar parte do texto de uma mensagem:
+  // pressionar o balao copia tudo, e o cliente nao conseguia copiar so o PIX.
+  // Com o botao, o corpo vai com 4 variaveis e o link da pagina de pagamento
+  // vai no botao. Mantido como flag porque a troca depende da Meta aprovar a
+  // edicao do template: ate la o provedor continua no formato de 5 variaveis.
+  lembreteFaturaBotaoUrl:      boolean('lembrete_fatura_botao_url').default(false),
   // false = conversa em atendimento humano nunca é encerrada pela varredura de
   // inatividade (fica aberta até o atendente resolver e fechar manualmente).
   // Default true preserva o comportamento de sempre pra quem não pediu isso.
@@ -348,3 +355,34 @@ export const cobrancaEnvios = pgTable('cobranca_envios', {
   erro:      text('erro'),
   enviadoEm: timestamp('enviado_em').defaultNow(),
 });
+
+// Pagina publica de pagamento de uma fatura, enderecada por token.
+//
+// Existe por causa de um limite do WhatsApp: nao da para copiar um pedaco do
+// texto de uma mensagem. Com o codigo PIX no corpo do lembrete, o cliente que
+// segurava o balao copiava a mensagem inteira e colava lixo no app do banco.
+// O template passou a levar um botao apontando para /p/<token>, e e aqui que
+// mora o que essa pagina mostra.
+//
+// Guarda uma copia dos dados da fatura em vez de consultar o SGP na hora: a
+// pagina e aberta pelo cliente, sem autenticacao, e nao pode virar um caminho
+// de fora para dentro do IXC (nem depender dele estar no ar para abrir).
+export const faturaLinks = pgTable('fatura_links', {
+  token:       text('token').primaryKey(),
+  tenantId:    uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  tituloId:    text('titulo_id'),
+  clienteNome: text('cliente_nome'),
+  descricao:   text('descricao'),
+  valor:       text('valor'),
+  vencimento:  text('vencimento'), // AAAA-MM-DD, como vem do SGP
+  codigoPix:   text('codigo_pix'),
+  linkBoleto:  text('link_boleto'),
+  aberturas:   integer('aberturas').default(0),
+  criadoEm:    timestamp('criado_em').defaultNow(),
+  expiraEm:    timestamp('expira_em'),
+}, (t) => ({
+  // O mesmo titulo recebe lembrete no D-1 e de novo no pos-vencimento. Sem
+  // isso seriam dois tokens para a mesma fatura, e o primeiro link ficaria
+  // com o PIX velho depois que o segundo atualizasse o valor corrigido.
+  porTitulo: uniqueIndex('idx_fatura_link_titulo').on(t.tenantId, t.tituloId),
+}));

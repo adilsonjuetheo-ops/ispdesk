@@ -1,6 +1,7 @@
 import { db } from '../db/index.js';
 import { mensagens, conversas, webhookLog } from '../db/schema.js';
 import { and, lt, isNotNull, inArray } from 'drizzle-orm';
+import { limparLinksExpirados } from '../services/faturaLink.js';
 
 const DIAS_RETENCAO = 90;
 const LOTE = 200;
@@ -19,6 +20,10 @@ async function limparWebhookLog() {
 
 export async function executarLimpeza() {
   await limparWebhookLog().catch(e => console.error('[Limpeza] Erro no webhook_log:', e.message));
+
+  // Páginas de pagamento vencidas. Guardar nome de cliente e código PIX pra
+  // sempre não serve a ninguém: passado o prazo a página já nem abre.
+  await limparLinksExpirados().catch(e => console.error('[Limpeza] Erro nos links de fatura:', e.message));
 
   const corte = new Date();
   corte.setDate(corte.getDate() - DIAS_RETENCAO);

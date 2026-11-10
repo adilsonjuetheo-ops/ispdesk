@@ -3,6 +3,8 @@ import { tenants, clientes, conversas, mensagens, lembreteFaturaEnviados } from 
 import { eq, and, ne, inArray } from 'drizzle-orm';
 import { criarSgp } from '../services/sgp.js';
 import { enviarTemplate } from '../services/whatsapp.js';
+import { criarLinkFatura } from '../services/faturaLink.js';
+import { detectarFormatoBotao } from '../services/metaTemplates.js';
 
 // Quantos dias pra trás da marca de vencido a busca ainda cobre — dá uma folga
 // pra pegar quem ficou de fora se o cron falhar num dia (SGP fora do ar, deploy
@@ -86,12 +88,7 @@ async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo, { simul
     // Provedor que não trabalha com PIX não pode ter o código do SGP caindo
     // aqui: o lembrete mandaria justamente o que a 2ª via já deixou de mandar.
     const codigoPix = tenant.aceitaPix === false ? null : titulo.codigoPix;
-    const linkOuPix = tenant.lembreteFaturaLinkAssinante || codigoPix || titulo.link || '';
-    // A Meta recusa parâmetro de texto vazio, e o erro que ela devolve não diz
-    // qual variável faltou. Melhor falhar aqui, com motivo que aparece no painel.
-    if (!linkOuPix) {
-      return { enviado: false, motivo: 'Fatura sem forma de pagamento (nem link da central, nem PIX, nem boleto)' };
-    }
+
     // {{3}} vai sem "R$": os templates aprovados escrevem "no valor de R$ {{3}}",
     // com o cifrão no corpo. Mandar "R$ 89,90" aqui faria o cliente ler
     // "no valor de R$ R$ 89,90".
@@ -100,24 +97,65 @@ async function enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo, { simul
       titulo.demonstrativo || 'Mensalidade',
       valor,
       formatarData(titulo.dataVencimento),
-      linkOuPix,
     ];
 
-    if (simular) {
-      return {
-        enviado: false,
-        simulado: true,
-        cliente: titulo.clienteNome,
-        telefone,
-        valor,
-        vencimento: formatarData(titulo.dataVencimento),
-        // Só o começo: o PIX copia e cola tem 200 caracteres e o que importa
-        // aqui é ver que veio algo, e se é PIX ou link.
-        pagamento: String(linkOuPix).slice(0, 40),
-      };
-    }
+    // Formato novo: o template tem botão de URL e o corpo acaba em {{4}}. O
+    // código de pagamento sai da mensagem e vai pra /p/<token>, onde o cliente
+    // copia só ele — no WhatsApp, pressionar o balão copia a mensagem inteira,
+    // e era isso que impedia o cliente de colar o PIX no banco.
+    if (tenant.lembreteFaturaBotaoUrl) {
+      if (!codigoPix && !titulo.link) {
+        return { enviado: false, motivo: 'Fatura sem forma de pagamento (nem PIX, nem boleto) — a página do botão ficaria vazia' };
+      }
 
-    await enviarTemplate(tenant, telefone, nomeTemplate, tenant.lembreteFaturaIdioma || 'pt_BR', parametros);
+      if (simular) {
+        return {
+          enviado: false,
+          simulado: true,
+          cliente: titulo.clienteNome,
+          telefone,
+          valor,
+          vencimento: formatarData(titulo.dataVencimento),
+          pagamento: codigoPix ? 'botão → página com PIX' : 'botão → página com boleto',
+        };
+      }
+
+      const token = await criarLinkFatura(tenant, titulo, { codigoPix, link: titulo.link });
+      if (!token) return { enviado: false, motivo: 'Não foi possível gerar o link da página de pagamento' };
+
+      await enviarTemplate(
+        tenant, telefone, nomeTemplate, tenant.lembreteFaturaIdioma || 'pt_BR', parametros,
+        { sufixoBotaoUrl: token },
+      );
+    } else {
+      // Formato antigo: o código de pagamento é a {{5}} do corpo. Continua
+      // valendo pra quem ainda não teve a edição do template aprovada.
+      const linkOuPix = tenant.lembreteFaturaLinkAssinante || codigoPix || titulo.link || '';
+      // A Meta recusa parâmetro de texto vazio, e o erro que ela devolve não diz
+      // qual variável faltou. Melhor falhar aqui, com motivo que aparece no painel.
+      if (!linkOuPix) {
+        return { enviado: false, motivo: 'Fatura sem forma de pagamento (nem link da central, nem PIX, nem boleto)' };
+      }
+
+      if (simular) {
+        return {
+          enviado: false,
+          simulado: true,
+          cliente: titulo.clienteNome,
+          telefone,
+          valor,
+          vencimento: formatarData(titulo.dataVencimento),
+          // Só o começo: o PIX copia e cola tem 200 caracteres e o que importa
+          // aqui é ver que veio algo, e se é PIX ou link.
+          pagamento: String(linkOuPix).slice(0, 40),
+        };
+      }
+
+      await enviarTemplate(
+        tenant, telefone, nomeTemplate, tenant.lembreteFaturaIdioma || 'pt_BR',
+        [...parametros, linkOuPix],
+      );
+    }
 
     const resumo = `[Sistema] Lembrete de fatura (${rotulo}) enviado — ${titulo.demonstrativo || 'Mensalidade'}, vencimento ${formatarData(titulo.dataVencimento)}, ${`R$ ${valor}`}.`;
     await registrarMensagemBot(tenant, telefone, resumo);
@@ -145,6 +183,11 @@ export async function testarClienteEspecifico(tenant, documento, tipo) {
   const nomeTemplate = tipo === 'pos' ? tenant.lembreteFaturaTemplatePos : tenant.lembreteFaturaTemplatePre;
   const rotulo = tipo === 'pos' ? 'pós-vencimento' : 'pré-vencimento';
 
+  // Mesmo motivo da varredura: o teste manual é o primeiro lugar onde se nota
+  // que a Meta aprovou a edição, e não pode falhar justamente aí.
+  const formatoBotao = await detectarFormatoBotao(tenant, String(process.env.API_PUBLIC_URL || ''));
+  if (formatoBotao !== null) tenant = { ...tenant, lembreteFaturaBotaoUrl: formatoBotao };
+
   const r = await enviarLembrete(tenant, sgp, titulo, nomeTemplate, rotulo);
   return {
     ...r,
@@ -158,6 +201,20 @@ export async function processarProvedor(tenant, { simular = false } = {}) {
   const sgp = criarSgp(tenant);
   if (!sgp || typeof sgp.listarTitulosPorVencimento !== 'function') {
     return { erro: 'Este SGP não tem suporte a lembretes automáticos.' };
+  }
+
+  // A Meta aprova a edição do template quando quer, e no segundo seguinte o
+  // template passa a ter 4 variáveis e um botão. Conferir aqui, uma vez por
+  // varredura, evita que a varredura inteira falhe esperando alguém lembrar de
+  // virar a chave no painel — e grava o que achou, pra o painel não mentir.
+  const formatoBotao = await detectarFormatoBotao(tenant, String(process.env.API_PUBLIC_URL || ''));
+  if (formatoBotao !== null && formatoBotao !== !!tenant.lembreteFaturaBotaoUrl) {
+    console.log(`[lembretes] ${tenant.nome}: templates agora no formato ${formatoBotao ? 'com botão' : 'antigo'}`);
+    tenant = { ...tenant, lembreteFaturaBotaoUrl: formatoBotao };
+    await db.update(tenants)
+      .set({ lembreteFaturaBotaoUrl: formatoBotao })
+      .where(eq(tenants.id, tenant.id))
+      .catch(err => console.error('[lembretes] Falha ao gravar o formato do template:', err.message));
   }
 
   const diasPos = Number(tenant.lembreteFaturaDiasPos) || DIAS_POS_PADRAO;

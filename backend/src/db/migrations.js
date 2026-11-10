@@ -220,6 +220,31 @@ export async function runMigrations() {
     // conhecem. Fica em texto porque cada SGP numera do seu jeito.
     await sql`ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS ixc_tecnico_id text`;
 
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lembrete_fatura_botao_url boolean DEFAULT false`;
+
+    // Pagina publica de pagamento: o botao do template de lembrete aponta pra
+    // ca. Sem indice unico por titulo, o lembrete pos-vencimento criaria um
+    // segundo token pra mesma fatura e o link do D-1 ficaria com o PIX velho.
+    await sql`
+      CREATE TABLE IF NOT EXISTS fatura_links (
+        token text PRIMARY KEY,
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        titulo_id text,
+        cliente_nome text,
+        descricao text,
+        valor text,
+        vencimento text,
+        codigo_pix text,
+        link_boleto text,
+        aberturas integer DEFAULT 0,
+        criado_em timestamp DEFAULT now(),
+        expira_em timestamp
+      )
+    `;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_fatura_link_titulo ON fatura_links(tenant_id, titulo_id)`;
+    // A varredura de expirados roda por data; sem isso ela varre a tabela toda.
+    await sql`CREATE INDEX IF NOT EXISTS idx_fatura_link_expira ON fatura_links(expira_em)`;
+
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

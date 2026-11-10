@@ -3,6 +3,7 @@ import { db } from '../db/index.js';
 import { tenants, filiais, filialWhatsappExtra } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
+import { listarTemplates, editarTemplate, componentesComBotaoPagamento, corpoSemVariavelPagamento } from '../services/metaTemplates.js';
 
 const router = Router();
 const GRAPH = 'https://graph.facebook.com/v19.0';
@@ -342,6 +343,174 @@ router.get('/status', autenticar, async (req, res) => {
     phoneNumberId: tenant?.whatsappNumberId || null,
     conectadoEm: tenant?.whatsappConectadoEm || null,
   });
+});
+
+
+// ---------------------------------------------------------------------------
+// Templates aprovados
+//
+// Editar um template aprovado é permitido pela Meta (até 10 vezes por mês, uma
+// a cada 24h) e não muda o nome dele — por isso dá pra converter o lembrete de
+// fatura pro formato com botão de pagamento sem mexer no código que envia. A
+// edição volta pra análise, e só passa a valer quando for aprovada.
+// ---------------------------------------------------------------------------
+
+function baseDaPaginaPagamento() {
+  return String(process.env.API_PUBLIC_URL || '').replace(/\/+$/, '');
+}
+
+// Um template está no formato novo quando tem botão de URL apontando pra nossa
+// página. Olhar o componente, e não um campo nosso, evita o caso em que alguém
+// edita o template por fora, pelo WhatsApp Manager, e o painel passa a mentir.
+function temBotaoPagamento(template, base) {
+  const botoes = (template.components || []).find(c => c.type === 'BUTTONS')?.buttons || [];
+  return botoes.some(b => b.type === 'URL' && String(b.url || '').startsWith(`${base}/p/`));
+}
+
+async function tenantDaRequisicao(req) {
+  const tenantId = req.user.tenantId;
+  if (!tenantId) return null;
+  const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  return tenant || null;
+}
+
+router.get('/templates', autenticar, apenasAdmin, async (req, res) => {
+  const tenant = await tenantDaRequisicao(req);
+  if (!tenant) return res.status(403).json({ erro: 'Sem tenant' });
+
+  const base = baseDaPaginaPagamento();
+  try {
+    const lista = await listarTemplates(tenant);
+    res.json({
+      baseUrl: base || null,
+      botaoAtivo: !!tenant.lembreteFaturaBotaoUrl,
+      templatesLembrete: {
+        pre: tenant.lembreteFaturaTemplatePre || null,
+        pos: tenant.lembreteFaturaTemplatePos || null,
+      },
+      templates: lista.map(t => {
+        const corpo = (t.components || []).find(c => c.type === 'BODY')?.text || '';
+        return {
+          id: t.id,
+          nome: t.name,
+          status: t.status,
+          categoria: t.category,
+          idioma: t.language,
+          motivoRecusa: t.rejected_reason || null,
+          corpo,
+          // O painel precisa mostrar o que mudaria antes de mandar pra análise:
+          // enquanto a Meta não responde, não dá pra voltar atrás.
+          corpoSugerido: corpoSemVariavelPagamento(corpo),
+          temVariavelPagamento: corpo.includes('{{5}}'),
+          jaTemBotao: base ? temBotaoPagamento(t, base) : false,
+        };
+      }),
+    });
+  } catch (err) {
+    console.error('[templates] Falha ao listar:', err.message);
+    res.status(502).json({ erro: err.message });
+  }
+});
+
+router.post('/templates/:id/botao-pagamento', autenticar, apenasAdmin, async (req, res) => {
+  const tenant = await tenantDaRequisicao(req);
+  if (!tenant) return res.status(403).json({ erro: 'Sem tenant' });
+
+  const base = baseDaPaginaPagamento();
+  if (!base) {
+    return res.status(500).json({ erro: 'API_PUBLIC_URL não está configurada no servidor — sem ela não dá pra montar a URL do botão.' });
+  }
+
+  const corpo = String(req.body?.corpo || '').trim();
+  const textoBotao = String(req.body?.textoBotao || 'Pagar agora').trim();
+  if (!corpo) return res.status(400).json({ erro: 'Corpo do template vazio.' });
+  if (corpo.includes('{{5}}')) {
+    return res.status(400).json({ erro: 'O corpo ainda tem {{5}}. No formato com botão o corpo vai até {{4}} — o código de pagamento sai do texto.' });
+  }
+  // A Meta recusa numeração com buraco, e o erro dela não diz qual variável
+  // faltou. Melhor barrar aqui, onde dá pra nomear.
+  for (let i = 1; i <= 4; i++) {
+    if (!corpo.includes(`{{${i}}}`)) {
+      return res.status(400).json({ erro: `O corpo precisa usar {{${i}}} — a Meta exige as variáveis em sequência, de {{1}} a {{4}}.` });
+    }
+  }
+  if (textoBotao.length > 25) {
+    return res.status(400).json({ erro: 'O texto do botão passa de 25 caracteres, que é o limite da Meta.' });
+  }
+
+  try {
+    const lista = await listarTemplates(tenant);
+    const alvo = lista.find(t => String(t.id) === String(req.params.id));
+    if (!alvo) return res.status(404).json({ erro: 'Template não encontrado nessa conta do WhatsApp.' });
+
+    // A edição substitui os componentes inteiros, e o envio aponta pro botão de
+    // índice 0. Com botão pré-existente seria preciso escolher entre apagar o
+    // que o provedor criou ou mandar o parâmetro no índice errado — nenhum dos
+    // dois em silêncio.
+    const botoesAtuais = (alvo.components || []).find(c => c.type === 'BUTTONS')?.buttons || [];
+    if (botoesAtuais.length) {
+      return res.status(409).json({
+        erro: `O template "${alvo.name}" já tem ${botoesAtuais.length} botão(ões). Remova pelo WhatsApp Manager antes, ou adicione o botão de pagamento por lá.`,
+      });
+    }
+
+    const componentes = componentesComBotaoPagamento(alvo.components, { corpo, baseUrl: base, textoBotao });
+    await editarTemplate(tenant, alvo.id, componentes);
+
+    res.json({
+      ok: true,
+      nome: alvo.name,
+      // Aprovar é da Meta e leva de minutos a algumas horas. Até lá o provedor
+      // segue no formato antigo — por isso a chave não vira aqui.
+      aviso: 'Edição enviada para análise da Meta. Quando for aprovada, volte aqui e ligue o botão de pagamento.',
+    });
+  } catch (err) {
+    console.error('[templates] Falha ao editar:', err.message);
+    res.status(502).json({ erro: err.message });
+  }
+});
+
+// Vira a chave do formato novo — e só depois de conferir na Meta que os dois
+// templates de lembrete estão aprovados e com o botão. Ligar antes faria todo
+// envio falhar com "number of parameters does not match", de madrugada, sem
+// ninguém olhando.
+router.post('/templates/ativar-botao', autenticar, apenasAdmin, async (req, res) => {
+  const tenant = await tenantDaRequisicao(req);
+  if (!tenant) return res.status(403).json({ erro: 'Sem tenant' });
+
+  const ligar = req.body?.ligar !== false;
+  if (!ligar) {
+    await db.update(tenants).set({ lembreteFaturaBotaoUrl: false }).where(eq(tenants.id, tenant.id));
+    return res.json({ ok: true, botaoAtivo: false });
+  }
+
+  const base = baseDaPaginaPagamento();
+  if (!base) return res.status(500).json({ erro: 'API_PUBLIC_URL não está configurada no servidor.' });
+
+  const nomes = [tenant.lembreteFaturaTemplatePre, tenant.lembreteFaturaTemplatePos].filter(Boolean);
+  if (!nomes.length) return res.status(400).json({ erro: 'Nenhum template de lembrete configurado.' });
+
+  try {
+    const lista = await listarTemplates(tenant);
+    const pendencias = [];
+
+    for (const nome of nomes) {
+      const t = lista.find(x => x.name === nome);
+      if (!t) { pendencias.push(`${nome}: não existe nessa conta.`); continue; }
+      if (t.status !== 'APPROVED') { pendencias.push(`${nome}: está como ${t.status}, ainda não aprovado.`); continue; }
+      if (!temBotaoPagamento(t, base)) { pendencias.push(`${nome}: aprovado, mas sem o botão apontando pra ${base}/p/.`); continue; }
+      const corpo = (t.components || []).find(c => c.type === 'BODY')?.text || '';
+      if (corpo.includes('{{5}}')) pendencias.push(`${nome}: o corpo ainda tem {{5}}.`);
+    }
+
+    if (pendencias.length) return res.status(409).json({ erro: 'Ainda não dá pra ligar o botão.', pendencias });
+
+    await db.update(tenants).set({ lembreteFaturaBotaoUrl: true }).where(eq(tenants.id, tenant.id));
+    res.json({ ok: true, botaoAtivo: true });
+  } catch (err) {
+    console.error('[templates] Falha ao ativar botão:', err.message);
+    res.status(502).json({ erro: err.message });
+  }
 });
 
 export default router;

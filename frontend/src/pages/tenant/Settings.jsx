@@ -548,6 +548,232 @@ function TestarLembretes() {
   );
 }
 
+// Converte os templates de lembrete pro formato com botão de pagamento.
+//
+// O código PIX ficava dentro do corpo da mensagem, e o WhatsApp não deixa
+// copiar um pedaço de um balão: o cliente segurava a mensagem, copiava tudo e
+// colava "Prezado cliente..." no app do banco. No formato novo o corpo vai até
+// {{4}} e o pagamento vira um botão que abre /p/<token>, onde o código está
+// sozinho atrás de um "Copiar".
+//
+// A lista não carrega junto com a página: é uma chamada à Meta, e quase toda
+// visita às Configurações não tem nada a ver com template.
+function TemplatesBotaoPagamento() {
+  const [dados, setDados] = useState(null);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [pendencias, setPendencias] = useState([]);
+  const [rascunhos, setRascunhos] = useState({});
+  const [salvandoId, setSalvandoId] = useState(null);
+  const [aviso, setAviso] = useState('');
+
+  async function carregar() {
+    setCarregando(true);
+    setErro('');
+    setPendencias([]);
+    try {
+      const { data } = await api.get('/whatsapp/templates');
+      setDados(data);
+      const inicial = {};
+      for (const t of data.templates || []) {
+        inicial[t.id] = { corpo: t.corpoSugerido, textoBotao: 'Pagar agora' };
+      }
+      setRascunhos(inicial);
+    } catch (err) {
+      setErro(err.response?.data?.erro || err.message || 'Erro ao carregar templates');
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  async function enviarEdicao(template) {
+    const rascunho = rascunhos[template.id] || {};
+    const confirmado = window.confirm(
+      `Isso envia a edição do template "${template.nome}" para análise da Meta.\n\n` +
+      'Enquanto ela não for aprovada, o lembrete continua saindo no formato antigo. ' +
+      'A Meta permite uma edição a cada 24h por template. Confirma?'
+    );
+    if (!confirmado) return;
+
+    setSalvandoId(template.id);
+    setErro('');
+    setAviso('');
+    try {
+      const { data } = await api.post(`/whatsapp/templates/${template.id}/botao-pagamento`, {
+        corpo: rascunho.corpo,
+        textoBotao: rascunho.textoBotao,
+      });
+      setAviso(data.aviso || 'Edição enviada.');
+      await carregar();
+    } catch (err) {
+      setErro(err.response?.data?.erro || err.message || 'Erro ao enviar edição');
+    } finally {
+      setSalvandoId(null);
+    }
+  }
+
+  async function alternarBotao(ligar) {
+    setCarregando(true);
+    setErro('');
+    setAviso('');
+    setPendencias([]);
+    try {
+      const { data } = await api.post('/whatsapp/templates/ativar-botao', { ligar });
+      setDados(d => ({ ...d, botaoAtivo: data.botaoAtivo }));
+      setAviso(data.botaoAtivo
+        ? 'Pronto: os próximos lembretes saem com o botão de pagamento.'
+        : 'Voltou para o formato antigo, com o código no corpo da mensagem.');
+    } catch (err) {
+      setErro(err.response?.data?.erro || err.message || 'Erro ao alterar');
+      setPendencias(err.response?.data?.pendencias || []);
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  const nomesLembrete = [dados?.templatesLembrete?.pre, dados?.templatesLembrete?.pos].filter(Boolean);
+  const doLembrete = (dados?.templates || []).filter(t => nomesLembrete.includes(t.nome));
+
+  return (
+    <div className="mt-3 border border-gray-200 rounded-lg p-3 space-y-3">
+      <div>
+        <p className="text-sm font-medium text-gray-700">Botão de pagamento no lembrete</p>
+        <p className="text-xs text-gray-500 mt-1">
+          O WhatsApp não deixa copiar só um pedaço de uma mensagem: com o código PIX no texto,
+          o cliente copia o lembrete inteiro. Aqui o código sai do corpo e vira um botão que abre
+          uma página com um "Copiar código PIX".
+        </p>
+      </div>
+
+      {!dados && (
+        <button
+          type="button"
+          onClick={carregar}
+          disabled={carregando}
+          className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm rounded-lg transition-colors flex items-center gap-2"
+        >
+          {carregando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          Carregar templates da Meta
+        </button>
+      )}
+
+      {erro && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 whitespace-pre-wrap">
+          {erro}
+          {pendencias.length > 0 && (
+            <ul className="list-disc list-inside mt-1">
+              {pendencias.map((p, i) => <li key={i}>{p}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+      {aviso && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700">{aviso}</div>
+      )}
+
+      {dados && !dados.baseUrl && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+          O servidor está sem <code className="font-mono">API_PUBLIC_URL</code>. Sem ela não dá pra montar
+          a URL do botão nem servir a página de pagamento.
+        </div>
+      )}
+
+      {dados && (
+        <>
+          <div className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <div className="text-xs text-gray-600">
+              <p className="font-medium text-gray-700">
+                Formato atual: {dados.botaoAtivo ? 'botão de pagamento' : 'código no corpo da mensagem'}
+              </p>
+              {dados.baseUrl && (
+                <p className="font-mono text-[11px] mt-1 break-all">{dados.baseUrl}/p/&#123;&#123;1&#125;&#125;</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => alternarBotao(!dados.botaoAtivo)}
+              disabled={carregando}
+              className="shrink-0 px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700 transition-colors"
+            >
+              {dados.botaoAtivo ? 'Voltar ao formato antigo' : 'Ligar botão'}
+            </button>
+          </div>
+
+          {doLembrete.length === 0 && (
+            <p className="text-xs text-gray-500">
+              Nenhum dos templates configurados acima apareceu na conta do WhatsApp. Confira os nomes.
+            </p>
+          )}
+
+          {doLembrete.map(t => (
+            <div key={t.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-mono text-gray-700 break-all">{t.nome}</span>
+                <span className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full ${
+                  t.status === 'APPROVED' ? 'bg-green-100 text-green-700'
+                  : t.status === 'PENDING' ? 'bg-amber-100 text-amber-700'
+                  : 'bg-red-100 text-red-700'
+                }`}>{t.status}</span>
+              </div>
+              {t.motivoRecusa && t.motivoRecusa !== 'NONE' && (
+                <p className="text-xs text-red-600">Recusado: {t.motivoRecusa}</p>
+              )}
+
+              {t.jaTemBotao ? (
+                <p className="text-xs text-green-700">Já está no formato com botão de pagamento.</p>
+              ) : (
+                <>
+                  <label className="block text-xs text-gray-500">
+                    Corpo sem a variável de pagamento (vai de &#123;&#123;1&#125;&#125; a &#123;&#123;4&#125;&#125;)
+                  </label>
+                  <textarea
+                    value={rascunhos[t.id]?.corpo ?? ''}
+                    onChange={e => setRascunhos(r => ({ ...r, [t.id]: { ...r[t.id], corpo: e.target.value } }))}
+                    rows={8}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="flex-1 min-w-[160px]">
+                      <label className="block text-xs text-gray-500 mb-1">Texto do botão (até 25 caracteres)</label>
+                      <input
+                        value={rascunhos[t.id]?.textoBotao ?? 'Pagar agora'}
+                        maxLength={25}
+                        onChange={e => setRascunhos(r => ({ ...r, [t.id]: { ...r[t.id], textoBotao: e.target.value } }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => enviarEdicao(t)}
+                      disabled={salvandoId === t.id || t.status === 'PENDING'}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      {salvandoId === t.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Enviar edição para análise
+                    </button>
+                  </div>
+                  {t.status === 'PENDING' && (
+                    <p className="text-xs text-amber-700">Já tem uma edição em análise. Espere a Meta responder.</p>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={carregar}
+            disabled={carregando}
+            className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+          >
+            Atualizar status
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TestarLembreteCliente() {
   const [documento, setDocumento] = useState('');
   const [tipo, setTipo] = useState('pre');
@@ -1403,12 +1629,13 @@ export default function Settings() {
                     />
                     {tenant.lembreteFaturaLinkAssinante && (
                       <p className="text-xs text-gray-400 -mt-2">
-                        Preenchido: o link acima substitui o código PIX/boleto na mensagem. Vazio: continua mandando o PIX/boleto normalmente.
+                        Preenchido: o link acima substitui o código PIX/boleto na mensagem. Vazio: continua mandando o PIX/boleto normalmente. No formato com botão de pagamento este campo é ignorado — quem leva o cliente ao pagamento é o botão.
                       </p>
                     )}
                   </div>
                   {tenant.lembreteFaturaAtivo && <TestarLembretes />}
                   {tenant.lembreteFaturaAtivo && <TestarLembreteCliente />}
+                  {tenant.lembreteFaturaAtivo && <TemplatesBotaoPagamento />}
                 </div>
               )}
             </div>

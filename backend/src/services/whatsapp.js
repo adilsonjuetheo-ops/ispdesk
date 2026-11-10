@@ -116,8 +116,32 @@ export async function enviarMidia(tenant, para, mediaId, tipo, nome) {
 
 // Envio de template aprovado pela Meta (mensagem iniciada pelo provedor, fora
 // da janela de 24h de atendimento — ex: lembretes de vencimento de fatura).
-export async function enviarTemplate(tenant, para, nomeTemplate, idioma, parametros = []) {
+export async function enviarTemplate(tenant, para, nomeTemplate, idioma, parametros = [], opcoes = {}) {
   const url = `https://graph.facebook.com/v19.0/${tenant.whatsappNumberId}/messages`;
+
+  const componentes = [];
+  if (parametros.length) {
+    componentes.push({
+      type: 'body',
+      parameters: parametros.map(texto => ({ type: 'text', text: String(texto) })),
+    });
+  }
+  // Botão de URL dinâmica. O que se manda aqui NÃO é a URL inteira: é só o
+  // sufixo que entra no lugar do {{1}} da URL cadastrada no template — mandar
+  // a URL completa produziria o endereço duplicado e um link quebrado.
+  //
+  // `index` é a posição do botão no template, contando de zero. Hoje só existe
+  // um botão nos templates de lembrete, então 0 cobre todos; vira parâmetro no
+  // dia em que algum template tiver dois.
+  if (opcoes.sufixoBotaoUrl) {
+    componentes.push({
+      type: 'button',
+      sub_type: 'url',
+      index: String(opcoes.indiceBotao ?? 0),
+      parameters: [{ type: 'text', text: String(opcoes.sufixoBotaoUrl) }],
+    });
+  }
+
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -131,12 +155,7 @@ export async function enviarTemplate(tenant, para, nomeTemplate, idioma, paramet
       template: {
         name: nomeTemplate,
         language: { code: idioma || 'pt_BR' },
-        ...(parametros.length && {
-          components: [{
-            type: 'body',
-            parameters: parametros.map(texto => ({ type: 'text', text: String(texto) })),
-          }],
-        }),
+        ...(componentes.length && { components: componentes }),
       },
     }),
   });

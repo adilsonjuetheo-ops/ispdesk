@@ -21,6 +21,7 @@ import contractsRouter from './routes/contracts.js';
 import lembretesRouter from './routes/lembretes.js';
 import incidentesRouter from './routes/incidentes.js';
 import campoRouter from './routes/campo.js';
+import paginaRouter from './routes/pagina.js';
 import { agendarLimpeza } from './jobs/limpezaMensagens.js';
 import { agendarEncerramentoInativo } from './jobs/encerramentoInativo.js';
 import { agendarLembretesVencendo } from './jobs/lembretesVencendo.js';
@@ -96,6 +97,17 @@ app.use('/api/contracts', contractsRouter);
 app.use('/api/lembretes', lembretesRouter);
 app.use('/api/incidentes', incidentesRouter);
 app.use('/api/campo', campoRouter);
+
+// Pagina publica de pagamento (/p/<token>), fora de /api porque quem abre e o
+// cliente final pelo botao do lembrete de fatura, no navegador do celular.
+// O limite e por IP e generoso: um cliente recarrega a pagina algumas vezes
+// enquanto cola o codigo no banco, mas varrer token nao pode ser barato.
+app.use('/p', criarRateLimit({
+  janelaMs: 60_000,
+  limite: 30,
+  prefixo: 'pagina',
+  mensagem: 'Muitas tentativas. Aguarde um minuto.',
+}), paginaRouter);
 
 // Marca de quando este processo subiu. Frontend e backend sao aplicacoes
 // separadas no Coolify e podem subir em momentos diferentes — ja perdi tempo

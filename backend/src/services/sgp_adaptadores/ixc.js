@@ -1189,7 +1189,12 @@ export class IxcAdaptador extends SgpAdaptador {
   // isso multiplica por todos os títulos do dia, então só vale buscar quando o
   // PIX realmente vai parar na mensagem.
   #lembreteUsaPix() {
-    return this.tenant?.aceitaPix !== false && !this.tenant?.lembreteFaturaLinkAssinante;
+    if (this.tenant?.aceitaPix === false) return false;
+    // Com botão de URL no template, o PIX é justamente o conteúdo da página de
+    // pagamento — precisa ser buscado mesmo que o provedor tenha link da
+    // central configurado, senão a página abre sem o código pra copiar.
+    if (this.tenant?.lembreteFaturaBotaoUrl) return true;
+    return !this.tenant?.lembreteFaturaLinkAssinante;
   }
 
   async #titulosParaLembrete(faturas) {
