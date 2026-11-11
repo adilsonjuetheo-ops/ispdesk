@@ -224,6 +224,8 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
         </div>
       )}
 
+      {status?.conectado && <PerfilWhatsApp />}
+
       <div className="mt-4 border-t border-gray-100 pt-4">
         <button
           type="button"
@@ -235,6 +237,366 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
         </button>
       </div>
     </section>
+  );
+}
+
+const VERTICAIS_PT = {
+  UNDEFINED: 'Não informada',
+  PROF_SERVICES: 'Serviços profissionais',
+  OTHER: 'Outro',
+  AUTO: 'Automotivo',
+  BEAUTY: 'Beleza e bem-estar',
+  APPAREL: 'Vestuário',
+  EDU: 'Educação',
+  ENTERTAIN: 'Entretenimento',
+  EVENT_PLAN: 'Eventos',
+  FINANCE: 'Finanças e bancos',
+  GROCERY: 'Mercado',
+  GOVT: 'Governo',
+  HOTEL: 'Hotelaria',
+  HEALTH: 'Saúde',
+  NONPROFIT: 'Sem fins lucrativos',
+  RETAIL: 'Varejo',
+  TRAVEL: 'Viagem',
+  RESTAURANT: 'Restaurante',
+  NOT_A_BIZ: 'Não é uma empresa',
+};
+
+// O WhatsApp exibe a foto de perfil sempre recortada em círculo e recusa
+// imagens abaixo de 192x192. Em vez de confiar no arquivo que vier, o painel
+// normaliza antes de mandar: recorta o centro em quadrado, redimensiona pra
+// 640 e achata em JPEG. Isso também mantém o corpo da requisição pequeno — o
+// Express aqui aceita 1 MB, e um print de celular cru estoura isso.
+function prepararFoto(arquivo) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(arquivo);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const lado = 640;
+      const canvas = document.createElement('canvas');
+      canvas.width = lado;
+      canvas.height = lado;
+      const ctx = canvas.getContext('2d');
+      // Fundo branco porque JPEG não tem transparência: sem isto, um PNG
+      // transparente vira fundo preto no perfil.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, lado, lado);
+      const corte = Math.min(img.naturalWidth, img.naturalHeight);
+      ctx.drawImage(
+        img,
+        (img.naturalWidth - corte) / 2, (img.naturalHeight - corte) / 2, corte, corte,
+        0, 0, lado, lado
+      );
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Não foi possível ler essa imagem.'));
+    };
+    img.src = url;
+  });
+}
+
+// Foto, recado, site e endereço do número — o que o cliente vê ao abrir a
+// conversa. Isso não está no painel por capricho: quando o provedor entra como
+// cliente de parceiro, o WhatsApp Manager mostra a conta dele em modo leitura,
+// e trocar a foto por lá exigiria acesso de administrador ao portfólio de
+// negócios de cada cliente.
+//
+// Não carrega junto com a página: é uma chamada à Meta por número, e quase
+// toda visita às Configurações não tem nada a ver com isso.
+function PerfilWhatsApp() {
+  const [dados, setDados] = useState(null);
+  const [ref, setRef] = useState(null);
+  const [form, setForm] = useState({});
+  const [foto, setFoto] = useState(null);       // data URL nova, ainda não salva
+  const [carregando, setCarregando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [aviso, setAviso] = useState('');
+  const fotoRef = useRef(null);
+
+  function doPerfil(perfil) {
+    return {
+      about: perfil?.about || '',
+      description: perfil?.description || '',
+      email: perfil?.email || '',
+      address: perfil?.address || '',
+      vertical: perfil?.vertical || '',
+      site1: perfil?.websites?.[0] || '',
+      site2: perfil?.websites?.[1] || '',
+    };
+  }
+
+  async function carregar(alvo) {
+    setCarregando(true);
+    setErro('');
+    setAviso('');
+    setFoto(null);
+    try {
+      const { data } = await api.get('/whatsapp/perfil', { params: alvo ? { ref: alvo } : {} });
+      setDados(data);
+      setRef(data.ref);
+      setForm(doPerfil(data.perfil));
+    } catch (err) {
+      setErro(err.response?.data?.erro || err.message || 'Erro ao carregar o perfil');
+      // O 502 ainda traz a lista de números: dá pra trocar de número e tentar
+      // de novo sem recarregar a página.
+      if (err.response?.data?.numeros) {
+        setDados(d => ({ ...(d || {}), numeros: err.response.data.numeros }));
+        setRef(err.response.data.ref || null);
+      }
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  async function escolherFoto(e) {
+    const arquivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!arquivo) return;
+    setErro('');
+    setAviso('');
+    try {
+      setFoto(await prepararFoto(arquivo));
+    } catch (err) {
+      setErro(err.message);
+    }
+  }
+
+  async function salvar() {
+    setSalvando(true);
+    setErro('');
+    setAviso('');
+    try {
+      const sites = [form.site1, form.site2].map(s => (s || '').trim()).filter(Boolean);
+      const { data } = await api.post('/whatsapp/perfil', {
+        ref,
+        about: form.about,
+        description: form.description,
+        email: form.email,
+        address: form.address,
+        vertical: form.vertical || undefined,
+        websites: sites,
+        foto: foto || undefined,
+      });
+      setDados(d => ({ ...d, perfil: data.perfil || d?.perfil }));
+      if (data.perfil) setForm(doPerfil(data.perfil));
+      setFoto(null);
+      setAviso(
+        'Perfil atualizado. A foto pode levar alguns minutos para aparecer para quem já tem a conversa aberta.'
+      );
+    } catch (err) {
+      setErro(err.response?.data?.erro || err.message || 'Erro ao salvar o perfil');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  const numeros = dados?.numeros || [];
+  const atual = numeros.find(n => n.ref === ref);
+  const fotoAtual = dados?.perfil?.profile_picture_url || null;
+  const limiteAbout = dados?.limites?.about || 139;
+  const limiteDesc = dados?.limites?.description || 512;
+
+  return (
+    <div className="mt-4 border-t border-gray-100 pt-4">
+      <p className="text-sm font-medium text-gray-700">Perfil do WhatsApp</p>
+      <p className="text-xs text-gray-500 mt-1 mb-3">
+        A foto, o recado e o site que o cliente vê ao abrir a conversa. Dá pra editar por aqui
+        mesmo quando o WhatsApp Manager mostra a conta só em leitura.
+      </p>
+
+      {!dados && (
+        <button
+          type="button"
+          onClick={() => carregar()}
+          disabled={carregando}
+          className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm rounded-lg transition-colors flex items-center gap-2"
+        >
+          {carregando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          Carregar perfil
+        </button>
+      )}
+
+      {erro && (
+        <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700">{erro}</div>
+      )}
+      {aviso && (
+        <div className="mb-3 bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-700">{aviso}</div>
+      )}
+
+      {dados && numeros.length === 0 && (
+        <p className="text-xs text-gray-500">Nenhum número conectado neste provedor.</p>
+      )}
+
+      {dados && numeros.length > 0 && (
+        <div className="space-y-3">
+          {numeros.length > 1 && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Número</label>
+              <select
+                value={ref || ''}
+                onChange={e => carregar(e.target.value)}
+                disabled={carregando || salvando}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+              >
+                {numeros.map(n => (
+                  <option key={n.ref} value={n.ref}>{n.rotulo}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex items-start gap-4">
+            <div className="w-20 h-20 rounded-full border border-gray-200 overflow-hidden bg-gray-50 shrink-0 flex items-center justify-center">
+              {foto || fotoAtual ? (
+                <img src={foto || fotoAtual} alt="Foto do perfil" className="w-full h-full object-cover" />
+              ) : (
+                <Building2 className="w-7 h-7 text-gray-300" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-xs text-gray-500 mb-2">
+                {atual ? `ID do número: ${atual.phoneNumberId}` : ''}
+                <br />
+                O painel recorta no centro e manda em 640×640 — o WhatsApp exibe em círculo.
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => fotoRef.current?.click()}
+                  disabled={salvando}
+                  className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  {fotoAtual ? 'Trocar foto' : 'Escolher foto'}
+                </button>
+                {foto && (
+                  <button
+                    type="button"
+                    onClick={() => setFoto(null)}
+                    className="flex items-center gap-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Descartar
+                  </button>
+                )}
+              </div>
+              {foto && (
+                <p className="text-xs text-amber-600 mt-1.5">
+                  Foto escolhida — só vai para o WhatsApp quando você salvar.
+                </p>
+              )}
+              <input ref={fotoRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={escolherFoto} />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">
+              Recado <span className="text-gray-400">({(form.about || '').length}/{limiteAbout})</span>
+            </label>
+            <input
+              value={form.about || ''}
+              maxLength={limiteAbout}
+              onChange={e => setForm(f => ({ ...f, about: e.target.value }))}
+              placeholder="Internet de verdade pra sua casa"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">
+              Descrição <span className="text-gray-400">({(form.description || '').length}/{limiteDesc})</span>
+            </label>
+            <textarea
+              value={form.description || ''}
+              maxLength={limiteDesc}
+              rows={3}
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">E-mail</label>
+              <input
+                value={form.email || ''}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="contato@provedor.com.br"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Categoria</label>
+              <select
+                value={form.vertical || ''}
+                onChange={e => setForm(f => ({ ...f, vertical: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Não alterar</option>
+                {(dados.verticais || []).map(v => (
+                  <option key={v} value={v}>{VERTICAIS_PT[v] || v}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Site</label>
+              <input
+                value={form.site1 || ''}
+                onChange={e => setForm(f => ({ ...f, site1: e.target.value }))}
+                placeholder="https://provedor.com.br"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Segundo site (opcional)</label>
+              <input
+                value={form.site2 || ''}
+                onChange={e => setForm(f => ({ ...f, site2: e.target.value }))}
+                placeholder="https://central.provedor.com.br"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Endereço</label>
+            <input
+              value={form.address || ''}
+              onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+              placeholder="Rua, número, bairro, cidade"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={salvar}
+              disabled={salvando || carregando}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+            >
+              {salvando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              Salvar perfil
+            </button>
+            <button
+              type="button"
+              onClick={() => carregar(ref)}
+              disabled={salvando || carregando}
+              className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+            >
+              Recarregar da Meta
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

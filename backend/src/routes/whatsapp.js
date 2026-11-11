@@ -4,6 +4,7 @@ import { tenants, filiais, filialWhatsappExtra } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
 import { listarTemplates, editarTemplate, componentesComBotaoPagamento, corpoSemVariavelPagamento } from '../services/metaTemplates.js';
+import { lerPerfil, atualizarPerfil, subirImagem, lerDataUrlDeImagem, LIMITES, VERTICAIS } from '../services/metaPerfil.js';
 
 const router = Router();
 const GRAPH = 'https://graph.facebook.com/v19.0';
@@ -509,6 +510,198 @@ router.post('/templates/ativar-botao', autenticar, apenasAdmin, async (req, res)
     res.json({ ok: true, botaoAtivo: true });
   } catch (err) {
     console.error('[templates] Falha ao ativar botão:', err.message);
+    res.status(502).json({ erro: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Perfil comercial do número (foto, recado, site, endereço)
+//
+// O WhatsApp Manager só libera essa edição pra quem administra o portfólio de
+// negócios dono da WABA. Com o provedor entrando como cliente de parceiro, a
+// tela de lá é só leitura — e pedir acesso ao portfólio de cada cliente não
+// escala. Aqui a escrita vai pela Cloud API, com o token do app, que já está
+// no banco e não depende de quem administra o quê.
+// ---------------------------------------------------------------------------
+
+// Um provedor pode ter o número principal, o de cada filial e os extras. O
+// perfil é por número, então a rota precisa saber de qual se trata — e o token
+// nunca sai daqui, só o id e o rótulo.
+async function numerosDoTenant(tenantId) {
+  const [tenant] = await db.select({
+    whatsappNumberId: tenants.whatsappNumberId,
+    whatsappToken: tenants.whatsappToken,
+  }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+
+  const lista = [];
+  if (tenant?.whatsappNumberId && tenant?.whatsappToken) {
+    lista.push({
+      ref: 'principal',
+      rotulo: 'Número principal',
+      phoneNumberId: tenant.whatsappNumberId,
+      token: tenant.whatsappToken,
+    });
+  }
+
+  const dasFiliais = await db.select({
+    id: filiais.id,
+    nome: filiais.nome,
+    whatsappNumberId: filiais.whatsappNumberId,
+    whatsappToken: filiais.whatsappToken,
+  }).from(filiais).where(eq(filiais.tenantId, tenantId));
+
+  for (const f of dasFiliais) {
+    if (!f.whatsappNumberId || !f.whatsappToken) continue;
+    lista.push({
+      ref: `filial:${f.id}`,
+      rotulo: f.nome || 'Filial',
+      phoneNumberId: f.whatsappNumberId,
+      token: f.whatsappToken,
+    });
+  }
+
+  const extras = await db.select({
+    id: filialWhatsappExtra.id,
+    rotulo: filialWhatsappExtra.rotulo,
+    nomeFilial: filiais.nome,
+    whatsappNumberId: filialWhatsappExtra.whatsappNumberId,
+    whatsappToken: filialWhatsappExtra.whatsappToken,
+  })
+    .from(filialWhatsappExtra)
+    .innerJoin(filiais, eq(filiais.id, filialWhatsappExtra.filialId))
+    .where(eq(filiais.tenantId, tenantId));
+
+  for (const e of extras) {
+    lista.push({
+      ref: `extra:${e.id}`,
+      rotulo: e.rotulo || `${e.nomeFilial || 'Filial'} — número extra`,
+      phoneNumberId: e.whatsappNumberId,
+      token: e.whatsappToken,
+    });
+  }
+
+  return lista;
+}
+
+function semToken(lista) {
+  return lista.map(({ token, ...resto }) => resto);
+}
+
+function validarCamposPerfil(corpo) {
+  const campos = {};
+  const texto = (chave, limite) => {
+    if (corpo[chave] === undefined) return;
+    const v = String(corpo[chave] ?? '').trim();
+    if (v.length > limite) {
+      throw Object.assign(new Error(`O campo "${chave}" passa de ${limite} caracteres (tem ${v.length}).`), { status: 400 });
+    }
+    campos[chave] = v;
+  };
+
+  texto('about', LIMITES.about);
+  texto('address', LIMITES.address);
+  texto('description', LIMITES.description);
+  texto('email', LIMITES.email);
+
+  if (campos.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(campos.email)) {
+    throw Object.assign(new Error('E-mail inválido.'), { status: 400 });
+  }
+
+  if (corpo.websites !== undefined) {
+    const sites = (Array.isArray(corpo.websites) ? corpo.websites : [corpo.websites])
+      .map(s => String(s ?? '').trim())
+      .filter(Boolean);
+    if (sites.length > LIMITES.websites) {
+      throw Object.assign(new Error(`O WhatsApp aceita no máximo ${LIMITES.websites} sites.`), { status: 400 });
+    }
+    for (const s of sites) {
+      if (!/^https?:\/\/.+/i.test(s)) {
+        throw Object.assign(new Error(`O site "${s}" precisa começar com http:// ou https://`), { status: 400 });
+      }
+      if (s.length > LIMITES.website) {
+        throw Object.assign(new Error(`O site "${s.slice(0, 40)}..." passa de ${LIMITES.website} caracteres.`), { status: 400 });
+      }
+    }
+    campos.websites = sites;
+  }
+
+  if (corpo.vertical !== undefined) {
+    const v = String(corpo.vertical || '').trim().toUpperCase();
+    if (v && !VERTICAIS.includes(v)) {
+      throw Object.assign(new Error('Categoria do negócio inválida.'), { status: 400 });
+    }
+    if (v) campos.vertical = v;
+  }
+
+  return campos;
+}
+
+router.get('/perfil', autenticar, apenasAdmin, async (req, res) => {
+  const tenantId = req.user.tenantId;
+  if (!tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+
+  const lista = await numerosDoTenant(tenantId);
+  if (!lista.length) {
+    return res.json({ numeros: [], ref: null, perfil: null, verticais: VERTICAIS, limites: LIMITES });
+  }
+
+  const ref = String(req.query.ref || lista[0].ref);
+  const numero = lista.find(n => n.ref === ref) || lista[0];
+
+  try {
+    const perfil = await lerPerfil(numero);
+    res.json({
+      numeros: semToken(lista),
+      ref: numero.ref,
+      perfil,
+      verticais: VERTICAIS,
+      limites: LIMITES,
+    });
+  } catch (err) {
+    console.error('[whatsapp/perfil] Falha ao ler:', err.message);
+    res.status(502).json({ erro: err.message, numeros: semToken(lista), ref: numero.ref });
+  }
+});
+
+router.post('/perfil', autenticar, apenasAdmin, async (req, res) => {
+  const tenantId = req.user.tenantId;
+  if (!tenantId) return res.status(403).json({ erro: 'Sem tenant' });
+
+  const lista = await numerosDoTenant(tenantId);
+  const ref = String(req.body?.ref || lista[0]?.ref || '');
+  const numero = lista.find(n => n.ref === ref);
+  if (!numero) return res.status(404).json({ erro: 'Número não encontrado neste provedor.' });
+
+  let campos;
+  try {
+    campos = validarCamposPerfil(req.body || {});
+  } catch (err) {
+    return res.status(err.status || 400).json({ erro: err.message });
+  }
+
+  try {
+    if (req.body?.foto) {
+      const { bytes, mimeType } = lerDataUrlDeImagem(req.body.foto);
+      campos.profile_picture_handle = await subirImagem({
+        token: numero.token, bytes, mimeType, nome: `perfil-${numero.phoneNumberId}`,
+      });
+    }
+  } catch (err) {
+    return res.status(400).json({ erro: err.message });
+  }
+
+  if (!Object.keys(campos).length) {
+    return res.status(400).json({ erro: 'Nada pra salvar.' });
+  }
+
+  try {
+    await atualizarPerfil(numero, campos);
+    // Relê em vez de devolver o que foi mandado: a Meta normaliza alguns
+    // campos, e a URL da foto nova só existe depois que ela processa.
+    const perfil = await lerPerfil(numero).catch(() => null);
+    res.json({ ok: true, ref: numero.ref, perfil });
+  } catch (err) {
+    console.error('[whatsapp/perfil] Falha ao salvar:', err.message);
     res.status(502).json({ erro: err.message });
   }
 });
