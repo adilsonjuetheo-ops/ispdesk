@@ -53,6 +53,41 @@ function motivoDaFalha(evento) {
   return null;
 }
 
+// A Meta descontinuou as versoes 2 e 3 do Embedded Signup em 15/10/2026 e
+// lancou a v5 em 20/10, onde a coexistencia (o numero vale no app do celular e
+// na Cloud API ao mesmo tempo) vem ligada por padrao. Sem `version`, quem
+// escolhe a versao e a Meta — e isso pode mudar sozinho de um dia para o outro.
+//
+// Fica em variavel de ambiente para dar pra voltar atras sem mexer no codigo:
+// vazia = o comportamento de hoje; 'v5' = a versao nova.
+const ES_VERSAO = import.meta.env.VITE_META_ES_VERSION || '';
+
+function extrasSignup(featureType = '') {
+  return {
+    setup: {},
+    featureType,
+    // Ignorado da v4 em diante, mas inofensivo e necessario se cairmos numa
+    // versao antiga.
+    sessionInfoVersion: '3',
+    ...(ES_VERSAO ? { version: ES_VERSAO } : {}),
+  };
+}
+
+// Cada versao nomeia os campos do seu jeito: a v3 devolve waba_id e a v5 fala
+// em "messaging account ID". Ler os dois, e aceitar que venham aninhados em
+// .data, evita que uma troca de versao da Meta quebre o cadastro sem ninguem
+// entender por que.
+//
+// Vir vazio nao e fatal: o backend acha a WABA pelo escopo do token e o numero
+// pela WABA (routes/whatsapp.js).
+function dadosDoSignup(sessionInfo) {
+  const d = sessionInfo?.data || sessionInfo || {};
+  return {
+    wabaId: d.waba_id || d.messaging_account_id || null,
+    phoneNumberId: d.phone_number_id || null,
+  };
+}
+
 function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
   const [status, setStatus] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -111,11 +146,7 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
         config_id: import.meta.env.VITE_META_CONFIG_ID,
         response_type: 'code',
         override_default_response_type: true,
-        extras: {
-          setup: {},
-          featureType,
-          sessionInfoVersion: '3',
-        },
+        extras: extrasSignup(featureType),
       });
     } catch (e) {
       setConectando(false);
@@ -127,8 +158,7 @@ function WhatsappSection({ onConectado, mostrarManual, onToggleManual }) {
     try {
       const r = await api.post('/whatsapp/embedded-signup', {
         code,
-        wabaId: sessionInfo?.waba_id || null,
-        phoneNumberId: sessionInfo?.phone_number_id || null,
+        ...dadosDoSignup(sessionInfo),
       });
       setSucesso(`WhatsApp conectado! Número: ${r.data.displayPhone}`);
       carregarStatus();
@@ -1579,8 +1609,7 @@ export default function Settings() {
             return;
           }
           const { code } = response.authResponse;
-          const wabaId = sessionInfo?.waba_id || null;
-          const phoneNumberId = sessionInfo?.phone_number_id || null;
+          const { wabaId, phoneNumberId } = dadosDoSignup(sessionInfo);
           api.post(`/whatsapp/embedded-signup-filial/${filialId}`, { code, wabaId, phoneNumberId })
             .then(() => { carregarFiliais(); resolve(); })
             .catch(err => reject(err));
@@ -1588,7 +1617,7 @@ export default function Settings() {
           config_id: import.meta.env.VITE_META_CONFIG_ID,
           response_type: 'code',
           override_default_response_type: true,
-          extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
+          extras: extrasSignup(''),
         });
       });
     } catch (err) {
@@ -1625,8 +1654,7 @@ export default function Settings() {
             return;
           }
           const { code } = response.authResponse;
-          const wabaId = sessionInfo?.waba_id || null;
-          const phoneNumberId = sessionInfo?.phone_number_id || null;
+          const { wabaId, phoneNumberId } = dadosDoSignup(sessionInfo);
           api.post(`/whatsapp/embedded-signup-filial-extra/${filialId}`, { code, wabaId, phoneNumberId })
             .then(() => { carregarFiliais(); resolve(); })
             .catch(err => reject(err));
@@ -1634,7 +1662,7 @@ export default function Settings() {
           config_id: import.meta.env.VITE_META_CONFIG_ID,
           response_type: 'code',
           override_default_response_type: true,
-          extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
+          extras: extrasSignup(''),
         });
       });
     } catch (err) {
