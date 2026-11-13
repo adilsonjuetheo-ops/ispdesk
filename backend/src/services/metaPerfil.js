@@ -1,4 +1,4 @@
-const GRAPH = 'https://graph.facebook.com/v19.0';
+import { GRAPH } from '../config/meta.js';
 
 // Perfil comercial do número no WhatsApp: a foto que o cliente vê, o recado,
 // o site, o endereço.

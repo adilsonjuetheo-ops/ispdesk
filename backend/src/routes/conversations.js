@@ -10,6 +10,7 @@ import { enviarNps } from '../services/nps.js';
 import { buscarDadosCliente, criarSgp } from '../services/sgp.js';
 import { sugerirResposta } from '../services/ai.js';
 import { normalizarTelefoneBR } from '../services/telefone.js';
+import { GRAPH } from '../config/meta.js';
 import { criarRateLimit } from '../middleware/security.js';
 import { audioPrecisaConverter, converterParaOggOpus, converterParaMp3 } from '../services/audio.js';
 import { planoTemChamado } from '../config/planos.js';
@@ -255,7 +256,7 @@ router.get('/templates', async (req, res) => {
     vistas.add(f.waba);
     try {
       const r = await fetch(
-        `https://graph.facebook.com/v19.0/${f.waba}/message_templates` +
+        `${GRAPH}/${f.waba}/message_templates` +
         `?fields=name,status,category,language,components&limit=50&access_token=${f.token}`
       );
       const d = await r.json();
@@ -850,7 +851,7 @@ router.get('/:id/media/:mediaId', async (req, res) => {
       const wConfig = await resolverWConfig(tenant, conversa);
       if (!wConfig?.whatsappToken) return res.status(400).end();
 
-      const metaRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
+      const metaRes = await fetch(`${GRAPH}/${mediaId}`, {
         headers: { Authorization: `Bearer ${wConfig.whatsappToken}` },
       });
       if (!metaRes.ok) return res.status(502).end();

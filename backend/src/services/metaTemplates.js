@@ -1,4 +1,4 @@
-const GRAPH = 'https://graph.facebook.com/v19.0';
+import { GRAPH } from '../config/meta.js';
 
 // Leitura e edição dos templates aprovados, direto na API de gerenciamento da
 // Meta. Editar não é criar: um template aprovado aceita edição (até 10 por mês,

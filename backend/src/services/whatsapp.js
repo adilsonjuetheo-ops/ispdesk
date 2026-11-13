@@ -1,5 +1,7 @@
+import { GRAPH } from '../config/meta.js';
+
 export async function downloadMidiaBase64(wConfig, mediaId) {
-  const infoRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
+  const infoRes = await fetch(`${GRAPH}/${mediaId}`, {
     headers: { Authorization: `Bearer ${wConfig.whatsappToken}` },
   });
   if (!infoRes.ok) throw new Error(`Meta media info ${infoRes.status}`);
@@ -15,7 +17,7 @@ export async function downloadMidiaBase64(wConfig, mediaId) {
 }
 
 export async function renovarTokenLongoPrazo(tenant) {
-  const url = `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&fb_exchange_token=${tenant.whatsappToken}`;
+  const url = `${GRAPH}/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID}&client_secret=${process.env.META_APP_SECRET}&fb_exchange_token=${tenant.whatsappToken}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(`Renovar token: ${data.error.message}`);
@@ -27,7 +29,7 @@ export async function renovarTokenLongoPrazo(tenant) {
 
 export async function transcreverAudioMeta(tenant, mediaId) {
   // 1. Obtém a URL de download da Meta
-  const infoRes = await fetch(`https://graph.facebook.com/v19.0/${mediaId}`, {
+  const infoRes = await fetch(`${GRAPH}/${mediaId}`, {
     headers: { Authorization: `Bearer ${tenant.whatsappToken}` },
   });
   if (!infoRes.ok) throw new Error(`Meta media info ${infoRes.status}`);
@@ -73,7 +75,7 @@ export async function uploadMidia(tenant, buffer, mimeType, filename) {
   formData.append('type', mimeType);
   formData.append('messaging_product', 'whatsapp');
 
-  const url = `https://graph.facebook.com/v19.0/${tenant.whatsappNumberId}/media`;
+  const url = `${GRAPH}/${tenant.whatsappNumberId}/media`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${tenant.whatsappToken}` },
@@ -87,7 +89,7 @@ export async function uploadMidia(tenant, buffer, mimeType, filename) {
 }
 
 export async function enviarMidia(tenant, para, mediaId, tipo, nome) {
-  const url = `https://graph.facebook.com/v19.0/${tenant.whatsappNumberId}/messages`;
+  const url = `${GRAPH}/${tenant.whatsappNumberId}/messages`;
   const mediaObj = tipo === 'image'
     ? { image: { id: mediaId } }
     : tipo === 'audio'
@@ -117,7 +119,7 @@ export async function enviarMidia(tenant, para, mediaId, tipo, nome) {
 // Envio de template aprovado pela Meta (mensagem iniciada pelo provedor, fora
 // da janela de 24h de atendimento — ex: lembretes de vencimento de fatura).
 export async function enviarTemplate(tenant, para, nomeTemplate, idioma, parametros = [], opcoes = {}) {
-  const url = `https://graph.facebook.com/v19.0/${tenant.whatsappNumberId}/messages`;
+  const url = `${GRAPH}/${tenant.whatsappNumberId}/messages`;
 
   const componentes = [];
   if (parametros.length) {
@@ -167,7 +169,7 @@ export async function enviarTemplate(tenant, para, nomeTemplate, idioma, paramet
 }
 
 export async function enviarMensagem(tenant, para, texto) {
-  const url = `https://graph.facebook.com/v19.0/${tenant.whatsappNumberId}/messages`;
+  const url = `${GRAPH}/${tenant.whatsappNumberId}/messages`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -197,7 +199,7 @@ export async function enviarMensagem(tenant, para, texto) {
 // feito aqui em vez de confiar em quem chama, porque o erro volta como 400
 // genérico e o cliente simplesmente ficaria sem resposta.
 export async function enviarBotoes(tenant, para, texto, botoes) {
-  const url = `https://graph.facebook.com/v19.0/${tenant.whatsappNumberId}/messages`;
+  const url = `${GRAPH}/${tenant.whatsappNumberId}/messages`;
   const vistos = new Set();
   const acoes = botoes
     .filter(b => b?.titulo && !vistos.has(b.titulo) && vistos.add(b.titulo))

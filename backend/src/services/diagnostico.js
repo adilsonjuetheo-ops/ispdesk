@@ -2,8 +2,8 @@ import { db } from '../db/index.js';
 import { tenants, filiais, clientes, mensagens, conversas } from '../db/schema.js';
 import { eq, and, desc, sql, isNotNull } from 'drizzle-orm';
 import { buscarDadosCliente } from './sgp.js';
+import { GRAPH } from '../config/meta.js';
 
-const GRAPH = 'https://graph.facebook.com/v19.0';
 const TIMEOUT_MS = 12000;
 
 // Cada verificação devolve sempre o mesmo formato e nunca lança. Um diagnóstico

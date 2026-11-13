@@ -5,9 +5,9 @@ import { eq, and } from 'drizzle-orm';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
 import { listarTemplates, editarTemplate, componentesComBotaoPagamento, corpoSemVariavelPagamento } from '../services/metaTemplates.js';
 import { lerPerfil, atualizarPerfil, subirImagem, lerDataUrlDeImagem, LIMITES, VERTICAIS } from '../services/metaPerfil.js';
+import { GRAPH } from '../config/meta.js';
 
 const router = Router();
-const GRAPH = 'https://graph.facebook.com/v19.0';
 
 // Troca o code do Embedded Signup por um token de longa duração e resolve
 // wabaId/phoneNumberId — usado tanto pro número principal do tenant/filial
