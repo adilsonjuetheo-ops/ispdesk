@@ -4,22 +4,28 @@ import api from '../../lib/api.js';
 import { labelPlano } from '../../lib/planos.js';
 import {
   CreditCard, CheckCircle, Clock, Ban, RefreshCw,
-  Loader2, ExternalLink, AlertCircle, ThumbsUp,
+  Loader2, ExternalLink, AlertCircle, ThumbsUp, Banknote,
 } from 'lucide-react';
 
+// 'externo' = o provedor acertou a mensalidade por fora (boleto, transferência,
+// combinado direto). O cron de recorrência só enxerga 'ativo' e 'pendente',
+// entao quem esta aqui nao recebe PIX e nao e suspenso por falta dele.
 const STATUS_BADGE = {
   ativo:    'bg-emerald-500/20 text-emerald-300 border border-emerald-700/40',
   pendente: 'bg-amber-500/20 text-amber-300 border border-amber-700/40',
   suspenso: 'bg-red-500/20 text-red-300 border border-red-700/40',
+  externo:  'bg-sky-500/20 text-sky-300 border border-sky-700/40',
   null:     'bg-gray-700/50 text-gray-400 border border-gray-700',
 };
 const STATUS_LABEL = {
   ativo: 'Ativo', pendente: 'PIX pendente', suspenso: 'Suspenso',
+  externo: 'Paga por fora',
 };
 const STATUS_ICON = {
   ativo:    CheckCircle,
   pendente: Clock,
   suspenso: Ban,
+  externo:  Banknote,
 };
 
 
@@ -94,6 +100,7 @@ export default function Cobrancas() {
     ativo:    rows.filter(r => r.statusPagamento === 'ativo').length,
     pendente: rows.filter(r => r.statusPagamento === 'pendente').length,
     suspenso: rows.filter(r => r.statusPagamento === 'suspenso').length,
+    externo:  rows.filter(r => r.statusPagamento === 'externo').length,
     sem:      rows.filter(r => !r.statusPagamento).length,
   };
 
@@ -126,11 +133,12 @@ export default function Cobrancas() {
       )}
 
       {/* Cards de resumo */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-5 gap-3 mb-6">
         {[
           { label: 'Ativos', count: totais.ativo,    cor: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-800/40' },
           { label: 'Pendentes', count: totais.pendente, cor: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-800/40' },
           { label: 'Suspensos', count: totais.suspenso, cor: 'text-red-400',     bg: 'bg-red-500/10 border-red-800/40' },
+          { label: 'Paga por fora', count: totais.externo, cor: 'text-sky-400',  bg: 'bg-sky-500/10 border-sky-800/40' },
           { label: 'Sem cobrança', count: totais.sem, cor: 'text-gray-400',    bg: 'bg-gray-800 border-gray-700' },
         ].map(c => (
           <div key={c.label} className={`rounded-xl border p-4 ${c.bg}`}>

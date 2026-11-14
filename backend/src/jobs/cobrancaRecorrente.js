@@ -10,6 +10,10 @@ async function processarCobrancas() {
   const agora = new Date();
 
   // 1. Tenants ATIVOS com vencimento chegando → gera novo PIX
+  //
+  // Quem paga por fora fica com status 'externo' e não entra em nenhuma das
+  // duas etapas: não recebe PIX aqui, e na etapa 2 não é suspenso por não ter
+  // pago um PIX que nunca foi gerado.
   const paraRenovar = await db.select().from(tenants)
     .where(and(
       eq(tenants.statusPagamento, 'ativo'),

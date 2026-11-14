@@ -41,7 +41,11 @@ export const tenants = pgTable('tenants', {
   exigirDocumento:    boolean('exigir_documento').default(false), // ignora o número do WhatsApp: só identifica por CPF/CNPJ
   plano:              text('plano').default('basic'),
   mpPaymentId:        text('mp_payment_id'),
-  statusPagamento:    text('status_pagamento'), // null | 'pendente' | 'ativo' | 'suspenso'
+  // null | 'trial' | 'pendente' | 'ativo' | 'suspenso' | 'externo'
+  // 'externo' = mensalidade acertada por fora (boleto, transferência, combinado
+  // direto). O cron de recorrência só procura 'ativo' e 'pendente', então quem
+  // está como 'externo' não recebe PIX nem é suspenso por não pagá-lo.
+  statusPagamento:    text('status_pagamento'),
   proximoVencimento:  timestamp('proximo_vencimento'),
   wabaId:             text('waba_id'),
   whatsappConectadoEm: timestamp('whatsapp_conectado_em'),
