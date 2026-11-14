@@ -218,6 +218,22 @@ function buildConteudoMidia(texto, midiaData) {
   return content;
 }
 
+// A API recusa um array de mensagens que termine em `assistant`: isso é
+// prefill — pedir que o modelo continue uma fala dele —, e o Haiku 5.5 não
+// aceita. O array termina assim sempre que a última coisa gravada na conversa
+// não veio do cliente: saudação de boas-vindas, aviso de fora do horário,
+// resposta dividida em blocos, mensagem do atendente antes de devolver ao bot.
+//
+// O Haiku 4.5 aceitava prefill, então isso passou despercebido na troca de
+// modelo: virou erro 400 no webhook, e o efeito visível não era um erro na
+// tela, era o cliente não receber resposta nenhuma.
+function cortarFimAssistente(conversa) {
+  while (conversa.length > 0 && conversa[conversa.length - 1].role !== 'user') {
+    conversa.pop();
+  }
+  return conversa;
+}
+
 export async function processarMensagem(tenant, conversa, historico, novaMensagem, clienteWhatsapp, midiaData = null, atendimento = {}) {
   // Classifica até ter uma tag específica (não "Outros" e não vazia)
   const tagAtual = Array.isArray(conversa.tags) ? conversa.tags[0] : null;
@@ -373,17 +389,30 @@ ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclu
     return acc;
   }, []);
 
-  // Se a última mensagem do usuário tem mídia (imagem/PDF), converte para bloco de visão
+  // Garante que a primeira mensagem sempre seja do usuário
+  while (conversaAcumulada.length > 0 && conversaAcumulada[0].role !== 'user') {
+    conversaAcumulada.shift();
+  }
+
+  // ...e que a última também seja, pelo motivo explicado em cortarFimAssistente.
+  cortarFimAssistente(conversaAcumulada);
+
+  // Sobrar vazio significa que não há mensagem do cliente nas últimas 10 —
+  // não há o que responder. Falhar aqui, com motivo, é melhor que mandar um
+  // corpo inválido e receber de volta um 400 que não explica nada.
+  if (conversaAcumulada.length === 0) {
+    throw new Error('Histórico sem mensagem do cliente — nada a responder.');
+  }
+
+  // Anexar a mídia é a ÚLTIMA coisa, depois do array já estar normalizado.
+  // Fazer antes tinha um efeito perverso: quando a conversa terminava numa
+  // fala do bot, o `role === 'user'` falhava, a imagem não era anexada, e o
+  // modelo acabava opinando sobre um comprovante que nunca viu.
   if (midiaData) {
     const ultima = conversaAcumulada[conversaAcumulada.length - 1];
     if (ultima?.role === 'user') {
       ultima.content = buildConteudoMidia(ultima.content, midiaData);
     }
-  }
-
-  // Garante que a primeira mensagem sempre seja do usuário
-  while (conversaAcumulada.length > 0 && conversaAcumulada[0].role !== 'user') {
-    conversaAcumulada.shift();
   }
 
   // 6. Loop: chama Claude → executa tools → chama novamente até parar. Começa
@@ -619,6 +648,7 @@ PROVEDOR: ${tenant.nome}`;
     return acc;
   }, []);
   while (conversaAcumulada.length && conversaAcumulada[0].role !== 'user') conversaAcumulada.shift();
+  cortarFimAssistente(conversaAcumulada);
 
   if (!conversaAcumulada.length) {
     throw new Error('Não há mensagem do cliente para basear a sugestão.');
