@@ -112,7 +112,7 @@ router.put('/me', autenticar, async (req, res) => {
     assinaturaTipo, assinaturaToken, assinaturaExtra,
     lembreteFaturaAtivo, lembreteFaturaTemplatePre, lembreteFaturaTemplatePos, lembreteFaturaIdioma,
     lembreteFaturaLinkAssinante, lembreteFaturaDiasPos, contratoModelo, desbloqueioPrazo,
-    encerrarHumanoPorInatividade, aceitaPix, npsAtivo,
+    encerrarHumanoPorInatividade, aceitaPix, npsAtivo, numerosIgnorados,
   } = req.body;
 
   // Dia 0 seria "no vencimento", que é o que o lembrete pré já cobre, e um
@@ -141,6 +141,7 @@ router.put('/me', autenticar, async (req, res) => {
       encerrarHumanoPorInatividade: encerrarHumanoPorInatividade !== false,
       aceitaPix: aceitaPix !== false,
       npsAtivo: npsAtivo !== false,
+      numerosIgnorados: numerosIgnorados?.trim() || null,
       atualizadoEm: new Date(),
     })
     .where(eq(tenants.id, req.user.tenantId))

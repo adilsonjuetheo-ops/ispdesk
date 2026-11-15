@@ -4,6 +4,24 @@ import api from '../../lib/api.js';
 import { planoTemContrato } from '../../lib/planos.js';
 import { Save, Loader2, Copy, Check, Upload, X, Building2, Stethoscope, CircleCheck, TriangleAlert, CircleX, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight, ArrowRightLeft, Smartphone } from 'lucide-react';
 
+// Mostra de volta o que o backend vai reconhecer na lista de números
+// particulares. A regra que vale está em backend/src/services/telefone.js —
+// isto aqui é espelho, não autoridade. Existe porque sem esse retorno uma linha
+// digitada errada falha calada e o provedor conclui que a lista não funciona.
+function numerosReconhecidos(texto) {
+  return String(texto || '')
+    .split(/[\n,;]+/)
+    .map(linha => {
+      let d = linha.replace(/\D/g, '');
+      if (d.startsWith('00')) d = d.slice(2);
+      if (d.startsWith('55') && d.length >= 12) d = d.slice(2);
+      if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+      if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+      return null;
+    })
+    .filter(Boolean);
+}
+
 function carregarFbSdk() {
   return new Promise((resolve) => {
     if (window.FB) { resolve(); return; }
@@ -2146,6 +2164,30 @@ export default function Settings() {
                 </p>
               </div>
             </button>
+
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-800">Números particulares</p>
+              <p className="text-xs text-gray-500 mt-0.5 mb-2.5">
+                Para quem usa o mesmo número no atendimento e no pessoal. Mensagem que vier destes
+                números não é respondida pelo assistente, não abre conversa e não aparece no painel —
+                você responde pelo próprio celular, como sempre. Um número por linha, com DDD.
+              </p>
+              <textarea rows={4} value={tenant.numerosIgnorados || ''}
+                onChange={e => set('numerosIgnorados', e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder={'(33) 99999-0000\n33988887777'} />
+              {(tenant.numerosIgnorados || '').trim() !== '' && (
+                numerosReconhecidos(tenant.numerosIgnorados).length > 0 ? (
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    Reconhecidos: {numerosReconhecidos(tenant.numerosIgnorados).join(' · ')}
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-600 mt-1.5">
+                    Nenhum número reconhecido — confira se cada linha tem DDD e 8 ou 9 dígitos.
+                  </p>
+                )
+              )}
+            </div>
           </section>
 
           {/* filiais */}

@@ -15,6 +15,7 @@ import { getLimite, getUso, incrementarUso } from '../services/limites.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { processarRespostaNps } from '../services/nps.js';
 import { dispensaIa } from '../services/mensagemCurta.js';
+import { numeroParticular } from '../services/telefone.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -235,6 +236,16 @@ router.post('/', async (req, res) => {
           const remetente = msg.from;
           const nomeWa = contatosWa[remetente] || null;
 
+          // Número que o dono marcou como particular: para o ISPDesk ele não
+          // existe. A saída é aqui, antes de transcrever áudio e de baixar
+          // mídia (as duas coisas custam dinheiro) e antes de gravar qualquer
+          // coisa — inclusive antes do aviso de ligação, senão a mãe dele liga
+          // e ouve que o número é automatizado.
+          if (numeroParticular(tenant.numerosIgnorados, remetente)) {
+            console.log(`[Particular] ${tenant.slug}: ignorada mensagem de ${remetente}`);
+            continue;
+          }
+
           // Ligações: avisa e ignora
           if (msg.type === 'call') {
             try { await enviarMensagem(wConfig, remetente, 'Este *whatsapp* é automatizado, não permite ligações por aqui.\n\nMande um *áudio* ou *mensagem* dizendo o que deseja.'); } catch {}
@@ -368,6 +379,12 @@ async function processarEcho(tenant, filialEntrada, eco) {
   const destinatario = eco.to;
   const texto = textoDoEco(eco);
   if (!destinatario || !texto) return;
+
+  // Resposta que o dono deu pelo aparelho a um número particular. Sem esta
+  // linha a conversa entraria no painel pelo eco da coexistência: a mensagem
+  // dele apareceria e só a do contato ficaria de fora — metade de um diálogo
+  // privado na fila da equipe, que é pior que o problema original.
+  if (numeroParticular(tenant.numerosIgnorados, destinatario)) return;
 
   // O mesmo webhook pode devolver o que o próprio painel acabou de enviar pela
   // Cloud API. Guardamos o wamid do que sai daqui, então wamid repetido quer

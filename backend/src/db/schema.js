@@ -95,6 +95,15 @@ export const tenants = pgTable('tenants', {
   // encerrado — conta na franquia da Meta e aparece na fatura de quem passar
   // dela. Default true preserva o comportamento de sempre.
   npsAtivo:           boolean('nps_ativo').default(true),
+  // Números particulares do dono: o número do provedor também é o pessoal
+  // dele, e mensagem de família não é atendimento. Mensagem que vem daqui não
+  // é respondida pela IA, não abre conversa e não é gravada — ele responde pelo
+  // aparelho, como já fazia. Não gravar é de propósito: a alternativa seria a
+  // conversa dele com a mulher aparecendo na fila para os atendentes lerem.
+  //
+  // Texto livre, um por linha, normalizado só na comparação (ver
+  // services/telefone.js).
+  numerosIgnorados:   text('numeros_ignorados'),
   criadoEm:           timestamp('criado_em').defaultNow(),
   atualizadoEm:       timestamp('atualizado_em').defaultNow(),
 });

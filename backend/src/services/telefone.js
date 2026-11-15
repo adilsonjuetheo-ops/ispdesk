@@ -16,3 +16,43 @@ export function formatarTelefoneBR(numero) {
   if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   return numero;
 }
+
+// Chave para comparar dois números que podem estar escritos de formas
+// diferentes. O que isto resolve de verdade é o nono dígito: o mesmo celular
+// chega da Meta como 553398777553 (12 dígitos) ou 5533998777553 (13),
+// dependendo de quando o contato foi salvo no aparelho. Comparar texto com
+// texto deixaria metade dos casos passar.
+//
+// A chave é DDD + os 8 últimos dígitos, que é a parte que nunca muda.
+export function chaveTelefone(entrada) {
+  let d = String(entrada || '').replace(/\D/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  // Só tira o 55 quando ainda sobra DDD + linha. Sem esse tamanho mínimo, um
+  // celular do DDD 55 (Santa Maria) perderia o próprio DDD.
+  if (d.startsWith('55') && d.length >= 12) d = d.slice(2);
+  // Fora do padrão brasileiro (DDD + 8 ou 9 dígitos) não há nono dígito para
+  // resolver: compara o que veio.
+  if (d.length !== 10 && d.length !== 11) return d || null;
+  return d.slice(0, 2) + d.slice(-8);
+}
+
+// Números particulares do provedor. O campo é texto livre, um por linha, do
+// jeito que o dono digitou — a normalização acontece só na comparação. Assim a
+// tela devolve o número legível, qualquer máscara funciona e ele pode anotar de
+// quem é ("Mãe — (33) 99877-7553"): o que não é dígito é descartado.
+//
+// Linha sem número nenhum vira null e é jogada fora aqui. Isso importa: uma
+// linha em branco que escapasse viraria chave vazia e bloquearia todo mundo.
+export function chavesParticulares(texto) {
+  return String(texto || '')
+    .split(/[\n,;]+/)
+    .map(chaveTelefone)
+    .filter(Boolean);
+}
+
+export function numeroParticular(texto, numero) {
+  if (!texto) return false;
+  const alvo = chaveTelefone(numero);
+  if (!alvo) return false;
+  return chavesParticulares(texto).includes(alvo);
+}
