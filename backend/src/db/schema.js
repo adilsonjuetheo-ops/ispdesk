@@ -90,6 +90,11 @@ export const tenants = pgTable('tenants', {
   // gera (híbrido do boleto) não é uma opção real de pagamento pra eles.
   // Default true preserva o comportamento de sempre pra quem não pediu isso.
   aceitaPix:          boolean('aceita_pix').default(true),
+  // false = não perguntar a nota de 0 a 10 ao fim do atendimento. Além do
+  // gosto do provedor, a pergunta é uma mensagem a mais por atendimento
+  // encerrado — conta na franquia da Meta e aparece na fatura de quem passar
+  // dela. Default true preserva o comportamento de sempre.
+  npsAtivo:           boolean('nps_ativo').default(true),
   criadoEm:           timestamp('criado_em').defaultNow(),
   atualizadoEm:       timestamp('atualizado_em').defaultNow(),
 });

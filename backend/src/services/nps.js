@@ -10,6 +10,15 @@ export function categorizar(nota) {
 }
 
 export async function enviarNps(tenant, conversa, clienteId, clienteWhatsapp) {
+  // Provedor que desligou a pesquisa não pergunta nada. A trava fica aqui, e
+  // não em quem chama, porque são dois caminhos independentes: o encerramento
+  // manual pelo atendente e o job de inatividade.
+  //
+  // `processarRespostaNps` continua valendo mesmo desligado: se a pergunta já
+  // saiu antes de desligarem, a nota que o cliente mandar ainda é registrada,
+  // em vez de virar uma mensagem solta que o bot tenta interpretar.
+  if (tenant.npsAtivo === false) return;
+
   // Não reenvia se já existe NPS nos últimos 30 dias para este cliente
   const limite = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const [existente] = await db.select({ id: npsRespostas.id })

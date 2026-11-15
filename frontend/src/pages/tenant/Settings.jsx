@@ -2133,6 +2133,19 @@ export default function Settings() {
                 </p>
               </div>
             </button>
+            <button type="button"
+              onClick={() => set('npsAtivo', !(tenant.npsAtivo !== false))}
+              className="w-full flex items-start gap-3 mt-4 text-left">
+              {tenant.npsAtivo !== false
+                ? <ToggleRight className="w-9 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                : <ToggleLeft className="w-9 h-5 text-gray-300 shrink-0 mt-0.5" />}
+              <div>
+                <p className="text-sm font-medium text-gray-800">Perguntar a nota de satisfação (NPS)</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Quando ativado (padrão), ao fim de cada atendimento o bot pergunta de 0 a 10 quanto o cliente recomendaria o suporte, no máximo uma vez a cada 30 dias por cliente. Desative para não perguntar nada — é uma mensagem a mais por atendimento, que conta na franquia do WhatsApp. As notas já respondidas continuam no relatório.
+                </p>
+              </div>
+            </button>
           </section>
 
           {/* filiais */}
