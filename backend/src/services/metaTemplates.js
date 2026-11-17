@@ -38,6 +38,26 @@ export async function listarTemplates(tenant) {
   return dados.data || [];
 }
 
+// Cria um template novo na WABA do provedor.
+//
+// Nome e idioma juntos são a chave: repetir os dois devolve erro 100 da Meta
+// ("template name already exists"), e é por isso que o nome pode ser o mesmo em
+// provedores diferentes — a WABA é outra.
+//
+// Nasce PENDING e a Meta aprova em minutos ou horas. Quem chama não deve gravar
+// o nome no provedor antes de ver APPROVED: template não aprovado conta como
+// formato antigo no detector, e o envio iria com 5 variáveis pra um corpo de 4.
+export async function criarTemplate(tenant, { nome, idioma = 'pt_BR', categoria = 'UTILITY', componentes }) {
+  if (!tenant?.wabaId)        throw new Error('Provedor sem WABA conectada.');
+  if (!tenant?.whatsappToken) throw new Error('Provedor sem token do WhatsApp.');
+  if (!nome || !componentes?.length) throw new Error('Template precisa de nome e componentes.');
+
+  return graph(`${GRAPH}/${tenant.wabaId}/message_templates`, tenant, {
+    method: 'POST',
+    body: JSON.stringify({ name: nome, language: idioma, category: categoria, components: componentes }),
+  });
+}
+
 // A Meta identifica a edição pelo id do template, e cada idioma é um id
 // diferente — o nome sozinho não basta.
 export async function editarTemplate(tenant, templateId, componentes) {
