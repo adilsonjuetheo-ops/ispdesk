@@ -74,6 +74,41 @@ export function classificarMensagemCurta(texto) {
 
 export const RESPOSTA_AGRADECIMENTO = 'Por nada! 😊 Qualquer coisa, é só chamar.';
 
+// Resposta curta a um lembrete de fatura: "blz, daqui a pouco", "vou pagar
+// hoje", "ok obrigado". O cliente não pediu nada — só avisou que vai pagar —,
+// e mandar isso para a IA fazia o bot se apresentar do zero e pedir CPF, como
+// se uma conversa tivesse começado (caso real na Express Fibra).
+//
+// Qualquer sinal de que há algo a resolver manda para a IA: pergunta, "já
+// paguei" (pode vir comprovante), problema com boleto, pedido de negociação,
+// reclamação de internet. Na dúvida, IA.
+const SINAIS_DE_DEMANDA = /\?|\bja paguei\b|\bpaguei\b|\bnao\b|\bnunca\b|internet|caiu|sem sinal|lent|boleto|pix|codigo|link|segunda via|valor|errad|desconto|negoci|parcel|cancel|juros|multa|atras|venc|problema|ajuda|atendente|falar com/;
+
+const PROMESSA = /daqui a pouco|daqui (a )?(um|uma|1|2|3|duas|tres) ?(hora|h|minuto|min)|mais tarde|ainda hoje|hoje (mesmo|eu|a noite|a tarde|cedo)|amanha|depois|ja (vou|vo|ja)|\bvou\b|\bvo\b|irei|farei|assim que|quando (eu )?(receber|chegar|sair)|no (dia|fim)|sexta|sabado|segunda|\bpago\b|pagarei|pagando|efetuar/;
+
+function normalizarTexto(texto) {
+  return String(texto || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}️‍]/gu, ' ')
+    .replace(/[.,!;:\-…]/g, ' ')
+    .replace(/(.)\1{2,}/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function respostaAoLembreteEncerra(texto) {
+  const t = normalizarTexto(texto);
+  // Só emoji ("👍"): a normalização apaga tudo, e quem decide é o
+  // classificador de confirmação, que conhece os emojis positivos.
+  if (!t) return classificarMensagemCurta(texto) !== null;
+  if (t.split(' ').length > 12) return false;
+  if (SINAIS_DE_DEMANDA.test(t) || String(texto).includes('?')) return false;
+  return PROMESSA.test(t) || classificarMensagemCurta(texto) !== null;
+}
+
+export const RESPOSTA_LEMBRETE = 'Combinado, obrigado pelo retorno! 😊 Se precisar de algo, é só chamar.';
+
 // Decide se a mensagem dispensa a IA, olhando também o que o atendimento disse
 // por último. Devolve { responder: texto | null } quando dispensa, ou null
 // quando a IA precisa ver a mensagem.

@@ -14,7 +14,7 @@ import { dentroDoHorario, proximoAtendimento } from '../services/horarios.js';
 import { getLimite, getUso, incrementarUso } from '../services/limites.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { processarRespostaNps } from '../services/nps.js';
-import { dispensaIa } from '../services/mensagemCurta.js';
+import { dispensaIa, respostaAoLembreteEncerra, RESPOSTA_LEMBRETE } from '../services/mensagemCurta.js';
 import { numeroParticular } from '../services/telefone.js';
 import crypto from 'crypto';
 
@@ -705,6 +705,47 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
   // custava uma chamada completa, com prompt, contexto do SGP e histórico.
   // Áudio e mídia sempre vão para a IA: a transcrição pode ter errado, e uma
   // foto com "ok" é um comprovante, não um agradecimento.
+  // Resposta curta ao lembrete de fatura ("blz, daqui a pouco pago"). O
+  // lembrete fica gravado como mensagem de sistema, que nem a IA nem o filtro
+  // abaixo enxergam — para eles a resposta parecia o começo de uma conversa, e
+  // o bot se apresentava e pedia CPF a quem só avisou que vai pagar. Só vale
+  // para a primeira resposta depois do lembrete, e recente.
+  if (!isAudio && !midiaData) {
+    const idxLembrete = historico.findLastIndex(m =>
+      m.origem !== 'cliente' && /^\[Sistema\] Lembrete de fatura/.test(m.conteudo || '')
+    );
+    const lembrete = idxLembrete >= 0 ? historico[idxLembrete] : null;
+    const depoisDoLembrete = lembrete ? historico.slice(idxLembrete + 1) : [];
+    const primeiraResposta = depoisDoLembrete.length > 0
+      && depoisDoLembrete.every(m => m.origem === 'cliente')
+      && depoisDoLembrete.length === 1;
+    const recente = lembrete && Date.now() - new Date(lembrete.enviadaEm).getTime() < 5 * 24 * 60 * 60 * 1000;
+
+    if (primeiraResposta && recente && respostaAoLembreteEncerra(texto)) {
+      console.log(`[ia:dispensada] ${tenant.nome} — resposta ao lembrete "${texto.slice(0, 40)}" (agradecida e encerrada)`);
+      let wamidResposta = null;
+      try {
+        const apiRes = await enviarMensagem(wConfig, remetente, RESPOSTA_LEMBRETE);
+        wamidResposta = apiRes?.messages?.[0]?.id || null;
+      } catch (err) {
+        console.error('[ia:dispensada] Falha ao responder lembrete:', err.message);
+      }
+      await db.insert(mensagens).values({
+        conversaId: conversa.id, origem: 'bot', conteudo: RESPOSTA_LEMBRETE,
+        wamid: wamidResposta, status: 'enviada',
+      });
+      await db.insert(mensagens).values({
+        conversaId: conversa.id, origem: 'bot',
+        conteudo: '[Sistema] Conversa encerrada: o cliente respondeu ao lembrete de fatura confirmando que vai pagar.',
+      });
+      await db.update(conversas)
+        .set({ status: 'encerrada', encerradaEm: new Date() })
+        .where(eq(conversas.id, conversa.id));
+      await atualizarUltMsg(conversa.id, RESPOSTA_LEMBRETE, 'bot');
+      return;
+    }
+  }
+
   if (!isAudio && !midiaData) {
     const ultimaDoAtendimento = [...historico].reverse().find(m =>
       m.origem !== 'cliente' && !/^\[(Sistema|Arquivo|Template)\]/.test(m.conteudo || '')
