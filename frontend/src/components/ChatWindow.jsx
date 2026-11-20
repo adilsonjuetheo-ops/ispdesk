@@ -1838,6 +1838,13 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                     value={texto}
                     onChange={e => setTexto(e.target.value)}
                     onPaste={handleColar}
+                    // Corretor do próprio navegador (sublinhado vermelho e
+                    // sugestão no botão direito). No celular, correção
+                    // automática e maiúscula no início da frase.
+                    spellCheck
+                    lang="pt-BR"
+                    autoCorrect="on"
+                    autoCapitalize="sentences"
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEnviar(e); }
                     }}
