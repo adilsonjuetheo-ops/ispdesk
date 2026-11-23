@@ -247,6 +247,22 @@ export async function runMigrations() {
     // A varredura de expirados roda por data; sem isso ela varre a tabela toda.
     await sql`CREATE INDEX IF NOT EXISTS idx_fatura_link_expira ON fatura_links(expira_em)`;
 
+    // O que a Meta cobrou por mensagem (webhook de status, objeto `pricing`).
+    await sql`
+      CREATE TABLE IF NOT EXISTS meta_cobranca (
+        wamid text PRIMARY KEY,
+        phone_number_id text NOT NULL,
+        categoria text,
+        tipo text,
+        subtipo text,
+        cobravel boolean,
+        entregue boolean DEFAULT false,
+        status_em timestamp,
+        atualizado_em timestamp DEFAULT now()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_meta_cobranca_numero ON meta_cobranca(phone_number_id, status_em)`;
+
     console.log('[migrations] OK');
   } catch (err) {
     console.error('[migrations] Erro:', err.message);

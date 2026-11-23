@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, boolean, timestamp, jsonb, integer, primaryKey, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, boolean, timestamp, jsonb, integer, primaryKey, uniqueIndex, index } from 'drizzle-orm/pg-core';
 
 export const tenants = pgTable('tenants', {
   id:                 uuid('id').primaryKey().defaultRandom(),
@@ -403,4 +403,40 @@ export const faturaLinks = pgTable('fatura_links', {
   // isso seriam dois tokens para a mesma fatura, e o primeiro link ficaria
   // com o PIX velho depois que o segundo atualizasse o valor corrigido.
   porTitulo: uniqueIndex('idx_fatura_link_titulo').on(t.tenantId, t.tituloId),
+}));
+
+// O que a Meta cobrou, na palavra dela.
+//
+// Desde 1/10/2026 ela cobra por mensagem: cada numero ganha 1.000 mensagens de
+// servico gratis por mes e paga da 1.001 em diante. Nossa contagem de baloes na
+// tabela `mensagens` nao serve para isso — ela nao sabe o que entrou na cota, o
+// que foi template de utilidade (tarifa propria, fora da cota) nem o que a Meta
+// simplesmente nao cobrou. Quem sabe e o objeto `pricing` que vem no webhook de
+// status, e e ele que bate com a fatura.
+//
+// A chave e o wamid, com upsert: nao esta documentado (ou nao consegui ler) em
+// qual status o `pricing` viaja, e ele pode chegar no 'sent' e de novo no
+// 'delivered'. Sobrescrever a mesma linha deixa o contador certo nos dois casos;
+// um contador incremental somaria duas vezes.
+//
+// O grao e o phone_number_id, nao o tenant: a cota e por numero, e um provedor
+// com filiais tem varios (a Microdata tem cinco). Agregar por provedor daria
+// uma cota onde existem cinco.
+export const metaCobranca = pgTable('meta_cobranca', {
+  wamid:         text('wamid').primaryKey(),
+  phoneNumberId: text('phone_number_id').notNull(),
+  categoria:     text('categoria'),  // service | utility | marketing | authentication
+  tipo:          text('tipo'),       // regular (cobrada) | free_customer_service | free_entry_point | ...
+  subtipo:       text('subtipo'),    // free_tier quando entrou nas 1.000 do mes
+  cobravel:      boolean('cobravel'),
+  entregue:      boolean('entregue').default(false),
+  // O timestamp do status da Meta, nao o nosso relogio: a cota vira o mes no
+  // fuso da conta de mensagens dela, e usar now() jogaria as mensagens da
+  // virada no mes errado.
+  statusEm:      timestamp('status_em'),
+  atualizadoEm:  timestamp('atualizado_em').defaultNow(),
+}, (t) => ({
+  // O painel soma por numero e por mes; sem indice isso varre a tabela, que
+  // cresce uma linha por mensagem enviada (~54 mil/mes hoje).
+  porNumero: index('idx_meta_cobranca_numero').on(t.phoneNumberId, t.statusEm),
 }));
