@@ -328,12 +328,14 @@ ${tenant.exigirDocumento
 IMAGENS E DOCUMENTOS:
 - Quando o cliente enviar uma imagem ou PDF, você consegue visualizar o conteúdo diretamente.
 - COMPROVANTE DE PAGAMENTO — o tratamento depende de COMO o cliente pagou:
-  - Pelo PIX copia e cola, QR Code ou boleto que o provedor enviou: o sistema concilia sozinho. Agradeça normalmente e diga que a baixa aparece em instantes. NÃO transfira.
+  - Pelo PIX copia e cola, QR Code, link "Pagar agora" ou boleto que o provedor enviou: o sistema concilia sozinho. Responda com UMA frase curta agradecendo e dizendo que a baixa aparece em instantes (ex.: "Obrigado pelo pagamento! 😊 A baixa aparece no sistema em instantes."), NÃO transfira e escreva na última linha ACTION:ENCERRAR — a conversa é encerrada, porque não há mais nada a resolver.
   - O app ou banco que aparece no comprovante — Mercado Pago, Nubank, PicPay, Caixa, qualquer outro — NÃO torna o pagamento avulso nem faz dele "plataforma externa": é apenas de onde o cliente pagou. Comprovante de boleto pago ou de PIX feito com o código do provedor é pagamento normal, venha do app que vier.
-  - Só trate como avulso quando o comprovante mostrar que o cliente claramente NÃO usou o código do provedor: PIX digitado direto numa chave (inclusive a chave pessoal do dono ou de alguém da equipe), TED/transferência para conta de pessoa ou depósito em dinheiro.
+  - Para saber se foi pelo código do provedor, olhe QUEM RECEBEU no comprovante. É pagamento normal quando o recebedor é o próprio provedor (${tenant.nome} ou a razão social de uma empresa), ou um banco/intermediário de cobrança (Efí, Gerencianet, Asaas, Iugu, Juno, Cora, Inter, Sicoob, Sicredi e similares), ou quando aparece "Pix Copia e Cola", "QR Code", "pagamento de boleto", linha digitável ou identificador da cobrança. Também é normal quando o provedor acabou de mandar nesta conversa um lembrete, 2ª via, link "Pagar agora" ou código PIX e o comprovante veio em seguida.
+  - Só trate como avulso quando o comprovante mostrar que o cliente claramente NÃO usou o código do provedor: PIX para uma PESSOA FÍSICA (recebedor com nome de pessoa e CPF, inclusive o dono ou alguém da equipe), TED/transferência para conta de pessoa ou depósito em dinheiro.
   - Comprovante avulso: responda com UMA frase curta — só agradeça e diga que vai passar para a equipe dar a baixa (ex.: "Obrigado pelo comprovante! 😊 Já vou passar para a equipe dar a baixa.") — e TRANSFIRA na mesma resposta escrevendo ACTION:HANDOFF:comprovante de pagamento avulso — dar baixa manual. Nada além disso: não peça CPF, CNPJ nem outro dado (o atendente identifica pelo próprio comprovante), não comente faturas, valores ou situação do contrato, não dê orientação sobre próximos pagamentos e não repreenda.
   - Se o cliente mandar comprovante feito pelo código do provedor e os dados do SGP mostrarem o acesso liberado e a fatura sumida logo depois, foi o pagamento dele que fez isso — comemore com ele, não trate como se a cobrança nunca tivesse existido.
-  - Na dúvida sobre a forma de pagamento, trate como pagamento normal: agradeça, diga que a baixa aparece em instantes e NÃO transfira.
+  - Na dúvida sobre a forma de pagamento, trate como pagamento normal: agradeça, diga que a baixa aparece em instantes e NÃO transfira — mas, na dúvida, NÃO escreva ACTION:ENCERRAR.
+- ACTION:ENCERRAR serve SÓ para o comprovante pago pelo código do provedor. Nunca o use junto com ACTION:HANDOFF, nem quando o cliente também perguntou ou pediu outra coisa na mesma mensagem.
 - Você NUNCA declara dívida quitada nem dá baixa. Não diga que o pagamento "já cobre", "regulariza" ou "resolve" a pendência — quem confirma é o sistema ou a equipe.
 - NUNCA some, subtraia ou compare valores para concluir algo sobre a situação financeira, e NUNCA diga que o cliente ficará com crédito, sobra ou troco com o provedor.
 - Sobre faturas, repita apenas o que está nos dados do SGP: vencimento, valor e código de pagamento. Não invente quantidade de títulos nem saldo consolidado.
@@ -359,7 +361,17 @@ ${atalhosProvedor}`;
   // rodadas do laço de ferramentas da mesma mensagem — e é ali que está o
   // desperdício. Uma mensagem que precisa identificar por CPF e depois puxar a
   // 2ª via reenvia o prompt inteiro três vezes, com este bloco igual nas três.
-  const parteConversa = `${contextoSgp}${blocoForaHorario}
+  // O lembrete de fatura fica gravado como [Sistema] e não entra no
+  // histórico; sem esta linha, um comprovante que chega logo depois parecia
+  // vir do nada e era tratado como pagamento avulso.
+  const lembreteRecente = [...historico].reverse().find(m =>
+    /^\[Sistema\] Lembrete de fatura/.test(m.conteudo || '')
+    && Date.now() - new Date(m.enviadaEm || m.criadaEm || 0).getTime() < 5 * 24 * 60 * 60 * 1000
+  );
+  const blocoLembrete = lembreteRecente
+    ? `\nLEMBRETE ENVIADO NESTA CONVERSA: o provedor mandou ao cliente um lembrete de fatura com o botão "Pagar agora", que leva ao PIX/boleto do próprio provedor (${lembreteRecente.conteudo.replace(/^\[Sistema\] /, '')}). Comprovante que chegar depois disso foi, quase sempre, pago por esse botão — é pagamento normal, a menos que o recebedor seja claramente uma pessoa física.`
+    : '';
+  const parteConversa = `${contextoSgp}${blocoForaHorario}${blocoLembrete}
 ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclua ao final da sua resposta (linha separada): TAG:categoria — onde categoria é exatamente uma de: ${TAGS_VALIDAS.join(', ')}.` : ''}`;
 
   // A hora fica sozinha no fim e fora do cache: ela muda a cada minuto, e
@@ -575,6 +587,15 @@ ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclu
     ];
   }
 
+  // Comprovante pago pelo código do provedor: agradece e encerra. Tirado do
+  // texto antes do handoff para nunca vazar ao cliente; se vier junto com
+  // handoff, o handoff vence.
+  let encerrar = false;
+  if (textoLimpo.includes('ACTION:ENCERRAR')) {
+    textoLimpo = textoLimpo.replace(/\s*ACTION:ENCERRAR\s*/g, ' ').trim();
+    encerrar = true;
+  }
+
   // 10. Detecta handoff
   if (textoLimpo.includes('ACTION:HANDOFF:')) {
     const motivo = textoLimpo.split('ACTION:HANDOFF:')[1].split('\n')[0].trim();
@@ -599,7 +620,7 @@ ${precisaClassificar ? `- Identifique o assunto principal desta conversa e inclu
     };
   }
 
-  return { resposta: textoLimpo, devePelearHumano: false, tag, midias: midiasParaEnviar, botoes, documentoValidado };
+  return { resposta: textoLimpo, devePelearHumano: false, tag, midias: midiasParaEnviar, botoes, documentoValidado, encerrar: encerrar && !botoes };
 }
 
 // Sugere uma resposta para o atendente revisar antes de enviar. Diferente de

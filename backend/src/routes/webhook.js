@@ -949,6 +949,17 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
 
   if (resultado.devePelearHumano) {
     await realizarHandoff(tenant, conversa, cliente, resultado.motivo, wConfig);
+  } else if (resultado.encerrar && resultado.resposta) {
+    // Comprovante pago pelo código do provedor: nada mais a resolver. Se o
+    // cliente escrever de novo, abre conversa nova, como no lembrete.
+    console.log(`[ia:encerrada] ${tenant.nome} — comprovante pelo código do provedor`);
+    await db.insert(mensagens).values({
+      conversaId: conversa.id, origem: 'bot',
+      conteudo: '[Sistema] Conversa encerrada: o cliente enviou comprovante pago pelo código do provedor.',
+    });
+    await db.update(conversas)
+      .set({ status: 'encerrada', encerradaEm: new Date() })
+      .where(eq(conversas.id, conversa.id));
   }
 }
 
