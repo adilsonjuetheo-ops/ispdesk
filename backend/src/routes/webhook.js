@@ -460,12 +460,61 @@ async function processarEcho(tenant, filialEntrada, eco) {
 // instância, isto precisa virar trava no banco.
 const filasPorRemetente = new Map();
 
+// Quantas mensagens deste remetente ainda não terminaram: a que está sendo
+// processada mais as que chegaram atrás dela. É o que deixa a mensagem do meio
+// de uma rajada saber que não é ela quem responde.
+const pendentesPorRemetente = new Map();
+
+// O que a mensagem silenciada deixa para a última do lote. O histórico sozinho
+// não basta: ele guarda "[Imagem]", não o arquivo, e não sabe se a conversa
+// nasceu agora.
+const rajadaPorRemetente = new Map();
+
+function chaveFila(tenantId, remetente) {
+  return `${tenantId}:${remetente}`;
+}
+
+// > 1 porque a própria mensagem em processamento está contada.
+function temMensagemAtras(tenantId, remetente) {
+  return (pendentesPorRemetente.get(chaveFila(tenantId, remetente)) || 0) > 1;
+}
+
+function acumularRajada(tenantId, remetente, dados) {
+  const chave = chaveFila(tenantId, remetente);
+  const atual = rajadaPorRemetente.get(chave) || {};
+  rajadaPorRemetente.set(chave, {
+    // Primeira imagem do lote ganha: duas fotos seguidas são quase sempre a
+    // mesma coisa fotografada duas vezes, e só uma cabe na chamada do modelo.
+    midiaData: atual.midiaData || dados.midiaData || null,
+    conversaRecemCriada: atual.conversaRecemCriada || dados.conversaRecemCriada || false,
+  });
+}
+
+function consumirRajada(tenantId, remetente) {
+  const chave = chaveFila(tenantId, remetente);
+  const dados = rajadaPorRemetente.get(chave);
+  rajadaPorRemetente.delete(chave);
+  return dados || {};
+}
+
 function processarWebhookMsg(tenant, remetente, ...resto) {
-  const chave = `${tenant.id}:${remetente}`;
+  const chave = chaveFila(tenant.id, remetente);
+  pendentesPorRemetente.set(chave, (pendentesPorRemetente.get(chave) || 0) + 1);
   const anterior = filasPorRemetente.get(chave) || Promise.resolve();
   const atual = anterior.catch(() => {}).then(() => processarMensagemRecebida(tenant, remetente, ...resto));
   filasPorRemetente.set(chave, atual);
-  const limpar = () => { if (filasPorRemetente.get(chave) === atual) filasPorRemetente.delete(chave); };
+  const limpar = () => {
+    const restantes = (pendentesPorRemetente.get(chave) || 1) - 1;
+    if (restantes > 0) pendentesPorRemetente.set(chave, restantes);
+    else pendentesPorRemetente.delete(chave);
+    if (filasPorRemetente.get(chave) === atual) {
+      filasPorRemetente.delete(chave);
+      // A rajada acabou sem ninguém consumir o que ficou para trás (erro no
+      // meio, cliente que foi para atendimento humano): não deixa o base64 da
+      // imagem preso na memória até o próximo deploy.
+      rajadaPorRemetente.delete(chave);
+    }
+  };
   atual.then(limpar, limpar);
   return atual;
 }
@@ -576,6 +625,28 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
   // A mensagem do cliente continua gravada e o push para a equipe já saiu acima,
   // então nada se perde: só o bot é que para de falar.
   if (conversa.status === 'humano' || conversa.status === 'aguardando') return;
+
+  // Cliente que manda duas mensagens seguidas — "👍" e logo "🤝", ou a frase
+  // quebrada em pedaços — recebia uma resposta para cada uma. A fila por
+  // remetente já garantia a ordem, mas cada mensagem continuava sendo um turno.
+  //
+  // Quem tem mensagem atrás de si só grava e sai; a última do lote responde, e
+  // aí o histórico já tem todas. Não há espera artificial: o tempo da consulta
+  // ao SGP, logo acima, é o que dá à mensagem seguinte a chance de chegar.
+  if (temMensagemAtras(tenant.id, remetente)) {
+    acumularRajada(tenant.id, remetente, { midiaData, conversaRecemCriada });
+    console.log(`[rajada] ${tenant.nome}: mensagem de ${remetente} agrupada com a seguinte`);
+    return;
+  }
+
+  // Recolhe o que as mensagens silenciadas deixaram. A imagem porque só existe
+  // neste parâmetro — sem isso a resposta falaria de um comprovante que o
+  // modelo não viu. E a conversa recém-criada porque a saudação do provedor
+  // depende dela: quem criou a conversa foi a primeira mensagem do lote, não
+  // esta, e sem repassar o cliente nunca seria cumprimentado.
+  const herdado = consumirRajada(tenant.id, remetente);
+  midiaData = midiaData || herdado.midiaData || null;
+  conversaRecemCriada = conversaRecemCriada || herdado.conversaRecemCriada || false;
 
   // Verifica incidente ativo — responde automaticamente ao cliente
   const [incidenteAtivo] = await db.select().from(incidentes)
