@@ -11,6 +11,19 @@ import { buscarContextoSgp, buscarContextoPorDocumentoSgp } from '../services/sg
 import { processarProvedor as processarLembretesProvedor, testarClienteEspecifico } from '../jobs/lembreteFaturas.js';
 import { diagnosticar } from '../services/diagnostico.js';
 
+// Tarifa de mensagem vinda do formulario. O provedor digita "0,035" porque e
+// assim que o numero aparece na fatura dele; guardar com virgula faria Number()
+// devolver NaN e o painel mostrar "R$ NaN". Qualquer coisa que nao seja numero
+// positivo volta como null, que e o estado "nao sei a tarifa" — e nesse estado
+// o painel mostra contagem em vez de inventar reais.
+function tarifa(valor) {
+  if (valor === undefined) return undefined;
+  const limpo = String(valor ?? '').trim().replace(',', '.');
+  if (!limpo) return null;
+  const n = Number(limpo);
+  return Number.isFinite(n) && n > 0 ? String(n) : null;
+}
+
 const router = Router();
 
 // O D4Sign mostra o cofre como uma URL de painel, e é ela que a pessoa copia:
@@ -113,6 +126,7 @@ router.put('/me', autenticar, async (req, res) => {
     lembreteFaturaAtivo, lembreteFaturaTemplatePre, lembreteFaturaTemplatePos, lembreteFaturaIdioma,
     lembreteFaturaLinkAssinante, lembreteFaturaDiasPos, contratoModelo, desbloqueioPrazo,
     encerrarHumanoPorInatividade, aceitaPix, npsAtivo, numerosIgnorados,
+    custoMsgServico, custoMsgUtilidade,
   } = req.body;
 
   // Dia 0 seria "no vencimento", que é o que o lembrete pré já cobre, e um
@@ -142,6 +156,8 @@ router.put('/me', autenticar, async (req, res) => {
       aceitaPix: aceitaPix !== false,
       npsAtivo: npsAtivo !== false,
       numerosIgnorados: numerosIgnorados?.trim() || null,
+      custoMsgServico:   tarifa(custoMsgServico),
+      custoMsgUtilidade: tarifa(custoMsgUtilidade),
       atualizadoEm: new Date(),
     })
     .where(eq(tenants.id, req.user.tenantId))

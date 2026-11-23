@@ -243,6 +243,8 @@ export async function runMigrations() {
     `;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS nps_ativo boolean DEFAULT true`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS numeros_ignorados text`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS custo_msg_servico text`;
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS custo_msg_utilidade text`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_fatura_link_titulo ON fatura_links(tenant_id, titulo_id)`;
     // A varredura de expirados roda por data; sem isso ela varre a tabela toda.
     await sql`CREATE INDEX IF NOT EXISTS idx_fatura_link_expira ON fatura_links(expira_em)`;

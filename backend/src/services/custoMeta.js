@@ -106,7 +106,14 @@ export async function cobrancaDoTenant(tenantId, inicio, fim) {
            n.id AS phone_number_id,
            count(c.wamid)::int AS total,
            count(c.wamid) FILTER (WHERE c.cobravel IS TRUE)::int  AS cobradas,
-           count(c.wamid) FILTER (WHERE c.cobravel IS FALSE)::int AS na_cota
+           count(c.wamid) FILTER (WHERE c.cobravel IS FALSE)::int AS na_cota,
+           -- Separado por categoria porque o preco e diferente: resposta de
+           -- atendimento e 'service', lembrete de fatura e 'utility'.
+           count(c.wamid) FILTER (WHERE c.cobravel IS TRUE AND c.categoria = 'service')::int AS cobradas_servico,
+           count(c.wamid) FILTER (WHERE c.cobravel IS TRUE AND c.categoria = 'utility')::int AS cobradas_utilidade,
+           count(c.wamid) FILTER (WHERE c.cobravel IS TRUE
+                                    AND c.categoria IS DISTINCT FROM 'service'
+                                    AND c.categoria IS DISTINCT FROM 'utility')::int AS cobradas_outras
       FROM numeros n
       LEFT JOIN meta_cobranca c
         ON c.phone_number_id = n.id
@@ -120,6 +127,9 @@ export async function cobrancaDoTenant(tenantId, inicio, fim) {
     total: Number(r.total),
     cobradas: Number(r.cobradas),
     naCota: Number(r.na_cota),
+    cobradasServico: Number(r.cobradas_servico),
+    cobradasUtilidade: Number(r.cobradas_utilidade),
+    cobradasOutras: Number(r.cobradas_outras),
   }));
 
   return {
@@ -127,6 +137,9 @@ export async function cobrancaDoTenant(tenantId, inicio, fim) {
     total:    numeros.reduce((s, n) => s + n.total, 0),
     cobradas: numeros.reduce((s, n) => s + n.cobradas, 0),
     naCota:   numeros.reduce((s, n) => s + n.naCota, 0),
+    cobradasServico:   numeros.reduce((s, n) => s + n.cobradasServico, 0),
+    cobradasUtilidade: numeros.reduce((s, n) => s + n.cobradasUtilidade, 0),
+    cobradasOutras:    numeros.reduce((s, n) => s + n.cobradasOutras, 0),
     // Quantas mensagens ainda não têm resposta de cobrança da Meta. Serve para
     // o painel não afirmar "zero cobradas" quando o que houve foi falta de dado
     // — a captura começou em 23/11/2026 e nada antes disso existe aqui.

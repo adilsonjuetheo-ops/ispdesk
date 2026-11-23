@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
 import { planoTemContrato } from '../../lib/planos.js';
-import { Save, Loader2, Copy, Check, Upload, X, Building2, Stethoscope, CircleCheck, TriangleAlert, CircleX, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight, ArrowRightLeft, Smartphone } from 'lucide-react';
+import { Save, Loader2, Copy, Check, Upload, X, Building2, Stethoscope, CircleCheck, TriangleAlert, CircleX, Plus, Trash2, MapPin, Lock, Clock, Wifi, WifiOff, ChevronDown, ChevronUp, FileSignature, Tag, AlertCircle, GitBranch, ToggleLeft, ToggleRight, ArrowRightLeft, Smartphone, Receipt } from 'lucide-react';
 
 // Mostra de volta o que o backend vai reconhecer na lista de números
 // particulares. A regra que vale está em backend/src/services/telefone.js —
@@ -2187,6 +2187,43 @@ export default function Settings() {
                   </p>
                 )
               )}
+            </div>
+          </section>
+
+          {/* custo das mensagens */}
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-amber-500" /> Custo das mensagens no WhatsApp
+            </h2>
+            <p className="text-xs text-gray-500 mb-4">
+              A Meta dá 1.000 mensagens de atendimento grátis por mês para cada número e cobra da
+              1.001 em diante. Quem recebe essa cobrança é você, pelo seu parceiro de WhatsApp —
+              então só a sua fatura tem o preço exato. Preencha aqui e o Relatório passa a mostrar
+              o gasto do mês em reais; deixando vazio, ele mostra só a quantidade.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Mensagem de atendimento (R$)
+                </label>
+                <input type="text" inputMode="decimal"
+                  value={tenant.custoMsgServico || ''}
+                  onChange={e => set('custoMsgServico', e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="0,035" />
+                <p className="text-xs text-gray-400 mt-1">As respostas do assistente e dos atendentes.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Lembrete de fatura (R$)
+                </label>
+                <input type="text" inputMode="decimal"
+                  value={tenant.custoMsgUtilidade || ''}
+                  onChange={e => set('custoMsgUtilidade', e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="0,08" />
+                <p className="text-xs text-gray-400 mt-1">Os modelos aprovados, cobrados à parte da cota.</p>
+              </div>
             </div>
           </section>
 

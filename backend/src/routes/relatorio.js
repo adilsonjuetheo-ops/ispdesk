@@ -82,6 +82,26 @@ router.get('/', async (req, res) => {
   // pouco. Dentro do mês o número é o dela.
   const cobranca = await cobrancaDoTenant(tenantId, inicio, fim);
 
+  // Converte contagem em reais com a tarifa que o provedor cadastrou. Sem
+  // tarifa nao estima: quem paga a Meta e o provedor, por meio de um parceiro
+  // que poe a margem dele, entao so ele sabe o preco — esta na fatura dele.
+  // Chutar um valor aqui daria um numero que parece oficial e nao e.
+  const [tarifas] = await db
+    .select({ servico: tenants.custoMsgServico, utilidade: tenants.custoMsgUtilidade })
+    .from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+
+  const pServico   = Number(tarifas?.servico) || 0;
+  const pUtilidade = Number(tarifas?.utilidade) || 0;
+  cobranca.temTarifa = pServico > 0 || pUtilidade > 0;
+  cobranca.valor = cobranca.temTarifa
+    ? cobranca.cobradasServico * pServico + cobranca.cobradasUtilidade * pUtilidade
+    : null;
+  // As categorias sem tarifa cadastrada ficam de fora da soma; dizer quantas
+  // sao evita o provedor conferir com a fatura e achar que o painel errou.
+  cobranca.foraDaConta = (pServico > 0 ? 0 : cobranca.cobradasServico)
+    + (pUtilidade > 0 ? 0 : cobranca.cobradasUtilidade)
+    + cobranca.cobradasOutras;
+
   res.json({
     mes,
     total:           Number(total),

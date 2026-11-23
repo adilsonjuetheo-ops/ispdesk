@@ -104,6 +104,19 @@ export const tenants = pgTable('tenants', {
   // Texto livre, um por linha, normalizado só na comparação (ver
   // services/telefone.js).
   numerosIgnorados:   text('numeros_ignorados'),
+
+  // Quanto o provedor paga por mensagem, em reais.
+  //
+  // Nao e constante no codigo de proposito: quem paga a Meta e o provedor, e a
+  // cobranca dele passa por um parceiro (a API responde "o CUSTO nao e mostrado
+  // para empresas que fazem cobrancas por meio de um parceiro"). Cada parceiro
+  // poe a margem dele, entao a tarifa e diferente em cada provedor e so ele tem
+  // o numero, na fatura. Vazio: o painel mostra contagem e nao inventa reais.
+  //
+  // Duas tarifas porque sao duas categorias com preco diferente: as respostas
+  // do atendimento sao `service` e os lembretes de fatura sao `utility`.
+  custoMsgServico:    text('custo_msg_servico'),
+  custoMsgUtilidade:  text('custo_msg_utilidade'),
   criadoEm:           timestamp('criado_em').defaultNow(),
   atualizadoEm:       timestamp('atualizado_em').defaultNow(),
 });

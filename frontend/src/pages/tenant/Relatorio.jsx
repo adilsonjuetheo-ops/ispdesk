@@ -220,7 +220,7 @@ export default function Relatorio() {
 const COTA_POR_NUMERO = 1000;
 
 function BlocoCobranca({ cobranca }) {
-  const { total, cobradas, naCota, semDado, numeros } = cobranca;
+  const { total, cobradas, naCota, semDado, numeros, temTarifa, valor, foraDaConta } = cobranca;
   // Mes sem captura (ela comecou em 23/11/2026) mostraria "0 cobradas", o que e
   // falso. Dizer que nao temos o dado e melhor que afirmar zero.
   const semCaptura = total === 0;
@@ -239,12 +239,26 @@ function BlocoCobranca({ cobranca }) {
       ) : (
         <>
           <p className="text-3xl font-black text-gray-900 leading-none mt-2">
-            {cobradas.toLocaleString('pt-BR')}
+            {temTarifa
+              ? valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+              : cobradas.toLocaleString('pt-BR')}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            mensagens cobradas de {total.toLocaleString('pt-BR')} enviadas
+            {temTarifa && `${cobradas.toLocaleString('pt-BR')} mensagens cobradas — `}
+            {!temTarifa && 'mensagens cobradas '}
+            de {total.toLocaleString('pt-BR')} enviadas
             {naCota > 0 && ` — ${naCota.toLocaleString('pt-BR')} entraram na cota grátis`}
           </p>
+          {!temTarifa && (
+            <p className="text-xs text-gray-400 mt-1">
+              Para ver em reais, cadastre o preço por mensagem em Configurações.
+            </p>
+          )}
+          {temTarifa && foraDaConta > 0 && (
+            <p className="text-xs text-amber-600 mt-1">
+              {foraDaConta.toLocaleString('pt-BR')} mensagens ficaram fora da conta por não ter preço cadastrado.
+            </p>
+          )}
 
           <div className="mt-4 space-y-2.5">
             {numeros.filter(n => n.total > 0).map(n => {
