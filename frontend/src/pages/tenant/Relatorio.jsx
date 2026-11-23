@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import api from '../../lib/api.js';
-import { Download, Loader2, TrendingUp, Users, MessageSquare, UserCheck, Bot, CalendarDays, Tag } from 'lucide-react';
+import { Download, Loader2, TrendingUp, Users, MessageSquare, UserCheck, Bot, CalendarDays, Tag, Receipt } from 'lucide-react';
 
 const MESES_PT = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -187,6 +187,10 @@ export default function Relatorio() {
               </div>
             </div>
 
+            {/* O que a Meta cobrou. Separado dos outros numeros de proposito: os
+                de cima sao a nossa contagem, este e o da Meta. */}
+            {dados.cobranca && <BlocoCobranca cobranca={dados.cobranca} />}
+
             {/* Dia destaque */}
             {dados.diaMaisMovimentado && (
               <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-7 text-white text-center">
@@ -206,6 +210,74 @@ export default function Relatorio() {
           <div className="text-center text-gray-500 py-20">Erro ao carregar relatório</div>
         )}
       </div>
+    </div>
+  );
+}
+
+// A cota de 1.000 mensagens de servico e por numero e nao acumula de um mes
+// para o outro. Mostrar por numero, e nao somado, porque somar cinco numeros e
+// comparar com 1.000 nao quer dizer nada.
+const COTA_POR_NUMERO = 1000;
+
+function BlocoCobranca({ cobranca }) {
+  const { total, cobradas, naCota, semDado, numeros } = cobranca;
+  // Mes sem captura (ela comecou em 23/11/2026) mostraria "0 cobradas", o que e
+  // falso. Dizer que nao temos o dado e melhor que afirmar zero.
+  const semCaptura = total === 0;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl p-5">
+      <div className="flex items-center gap-1.5 mb-1">
+        <Receipt className="w-3.5 h-3.5 text-gray-400" />
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Cobrado pela Meta</p>
+      </div>
+
+      {semCaptura ? (
+        <p className="text-sm text-gray-500 mt-2">
+          Sem dado da Meta neste mês. A contagem começou em 23/11/2026 e não alcança o que veio antes.
+        </p>
+      ) : (
+        <>
+          <p className="text-3xl font-black text-gray-900 leading-none mt-2">
+            {cobradas.toLocaleString('pt-BR')}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            mensagens cobradas de {total.toLocaleString('pt-BR')} enviadas
+            {naCota > 0 && ` — ${naCota.toLocaleString('pt-BR')} entraram na cota grátis`}
+          </p>
+
+          <div className="mt-4 space-y-2.5">
+            {numeros.filter(n => n.total > 0).map(n => {
+              const usoCota = Math.min(n.naCota, COTA_POR_NUMERO);
+              const pct = Math.round((usoCota / COTA_POR_NUMERO) * 100);
+              return (
+                <div key={n.rotulo}>
+                  <div className="flex items-baseline justify-between gap-2 text-xs">
+                    <span className="font-semibold text-gray-700 truncate">{n.rotulo}</span>
+                    <span className="text-gray-500 shrink-0">
+                      {n.cobradas > 0
+                        ? `${n.cobradas.toLocaleString('pt-BR')} cobradas`
+                        : `cota: ${usoCota.toLocaleString('pt-BR')}/${COTA_POR_NUMERO.toLocaleString('pt-BR')}`}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${n.cobradas > 0 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${n.cobradas > 0 ? 100 : pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {semDado > 0 && (
+            <p className="text-xs text-gray-400 mt-3">
+              {semDado.toLocaleString('pt-BR')} ainda sem resposta de cobrança da Meta.
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

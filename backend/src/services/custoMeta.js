@@ -77,3 +77,59 @@ export async function resumoCustoMeta(mes) {
   `);
   return rows;
 }
+
+// Quantas mensagens a Meta cobrou de um provedor no período.
+//
+// Por número, não só somado: a cota de 1.000 mensagens de serviço é por número,
+// então um provedor com cinco números tem cinco cotas. Somar primeiro e comparar
+// com 1.000 depois daria um número sem significado.
+//
+// O rótulo de cada número vem de onde ele está cadastrado — matriz, filial ou
+// número extra de filial — para o painel não mostrar só o id da Meta.
+export async function cobrancaDoTenant(tenantId, inicio, fim) {
+  const { rows } = await db.execute(sql`
+    WITH numeros AS (
+      SELECT t.whatsapp_number_id AS id, 'Principal' AS rotulo
+        FROM tenants t
+        WHERE t.id = ${tenantId} AND t.whatsapp_number_id IS NOT NULL
+      UNION ALL
+      SELECT f.whatsapp_number_id, f.nome
+        FROM filiais f
+        WHERE f.tenant_id = ${tenantId} AND f.whatsapp_number_id IS NOT NULL
+      UNION ALL
+      SELECT e.whatsapp_number_id, f.nome || ' (' || coalesce(e.rotulo, 'extra') || ')'
+        FROM filial_whatsapp_extra e
+        JOIN filiais f ON f.id = e.filial_id
+        WHERE f.tenant_id = ${tenantId}
+    )
+    SELECT n.rotulo,
+           n.id AS phone_number_id,
+           count(c.wamid)::int AS total,
+           count(c.wamid) FILTER (WHERE c.cobravel IS TRUE)::int  AS cobradas,
+           count(c.wamid) FILTER (WHERE c.cobravel IS FALSE)::int AS na_cota
+      FROM numeros n
+      LEFT JOIN meta_cobranca c
+        ON c.phone_number_id = n.id
+       AND c.status_em >= ${inicio} AND c.status_em < ${fim}
+     GROUP BY n.rotulo, n.id
+     ORDER BY cobradas DESC, n.rotulo
+  `);
+
+  const numeros = rows.map(r => ({
+    rotulo: r.rotulo,
+    total: Number(r.total),
+    cobradas: Number(r.cobradas),
+    naCota: Number(r.na_cota),
+  }));
+
+  return {
+    numeros,
+    total:    numeros.reduce((s, n) => s + n.total, 0),
+    cobradas: numeros.reduce((s, n) => s + n.cobradas, 0),
+    naCota:   numeros.reduce((s, n) => s + n.naCota, 0),
+    // Quantas mensagens ainda não têm resposta de cobrança da Meta. Serve para
+    // o painel não afirmar "zero cobradas" quando o que houve foi falta de dado
+    // — a captura começou em 23/11/2026 e nada antes disso existe aqui.
+    semDado: numeros.reduce((s, n) => s + (n.total - n.cobradas - n.naCota), 0),
+  };
+}

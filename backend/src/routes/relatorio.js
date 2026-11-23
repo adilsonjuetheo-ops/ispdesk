@@ -4,6 +4,7 @@ import { conversas, mensagens, clientes, tenants, npsRespostas, acoesBot } from 
 import { eq, and, gte, lt, isNotNull, count, desc, sql } from 'drizzle-orm';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
 import { dentroDoHorario } from '../services/horarios.js';
+import { cobrancaDoTenant } from '../services/custoMeta.js';
 
 const router = Router();
 router.use(autenticar, apenasAdmin);
@@ -75,6 +76,12 @@ router.get('/', async (req, res) => {
     .orderBy(desc(count()))
     .limit(1);
 
+  // O que a Meta cobrou, pela contagem dela. O recorte de mês é o do servidor:
+  // a Meta vira a cota no fuso da conta de mensagens, que a API não entrega com
+  // o nosso token, então no primeiro e no último dia do mês pode divergir um
+  // pouco. Dentro do mês o número é o dela.
+  const cobranca = await cobrancaDoTenant(tenantId, inicio, fim);
+
   res.json({
     mes,
     total:           Number(total),
@@ -83,6 +90,7 @@ router.get('/', async (req, res) => {
     novosContatos:   Number(novosContatos),
     totalMensagens:  Number(totalMensagens),
     motivoPrincipal: motivosRows[0]?.motivo ?? null,
+    cobranca,
     diaMaisMovimentado: diasRows[0]
       ? { dia: diasRows[0].dia, total: Number(diasRows[0].qt) }
       : null,
