@@ -2125,6 +2125,17 @@ export default function Settings() {
             <h2 className="font-semibold text-gray-700 mb-1 flex items-center gap-2">
               <Clock className="w-4 h-4 text-emerald-500" /> Comportamento do Atendimento
             </h2>
+            <label className="flex items-center gap-3 mt-3">
+              <span className="text-sm font-medium text-gray-800">Encerrar conversa após</span>
+              <input type="number" min={1} max={24}
+                value={tenant.horasInatividade ?? 4}
+                onChange={e => set('horasInatividade', e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-16 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center" />
+              <span className="text-sm text-gray-600">horas sem interação</span>
+            </label>
+            <p className="text-xs text-gray-500 mt-1">
+              Padrão: 4 horas. Aumente para que o que chega de madrugada ainda esteja na fila quando a equipe chegar (de 1 a 24).
+            </p>
             <button type="button"
               onClick={() => set('encerrarHumanoPorInatividade', !(tenant.encerrarHumanoPorInatividade !== false))}
               className="w-full flex items-start gap-3 mt-3 text-left">
@@ -2134,7 +2145,7 @@ export default function Settings() {
               <div>
                 <p className="text-sm font-medium text-gray-800">Encerrar atendimento humano por inatividade</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Quando ativado (padrão), uma conversa em atendimento humano é encerrada automaticamente após 4 horas sem mensagens, igual às conversas com o bot. Desative para que ela só feche quando o atendente resolver e encerrar manualmente.
+                  Quando ativado (padrão), uma conversa em atendimento humano também é encerrada pelo tempo sem interação acima, igual às conversas com o bot. Desative para que ela só feche quando o atendente resolver e encerrar manualmente.
                 </p>
               </div>
             </button>
@@ -2145,9 +2156,9 @@ export default function Settings() {
                 ? <ToggleRight className="w-9 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 : <ToggleLeft className="w-9 h-5 text-gray-300 shrink-0 mt-0.5" />}
               <div>
-                <p className="text-sm font-medium text-gray-800">Encerrar conversas que nenhum atendente assumiu</p>
+                <p className="text-sm font-medium text-gray-800">Bot encerra a conversa na hora</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Quando ativado (padrão), conversas só com o bot ou aguardando atendente são encerradas após 4 horas sem mensagens, e o bot encerra sozinho quando o cliente responde ao lembrete ou manda comprovante pago pelo código. Desative para que elas fiquem na fila até um atendente assumir — útil para quem quer ver de manhã tudo o que chegou de madrugada.
+                  Quando ativado (padrão), o bot encerra sozinho quando o cliente responde ao lembrete ("ok, vou pagar") ou manda comprovante pago pelo código. Desative para que a conversa continue na fila e só feche pelo tempo sem interação.
                 </p>
               </div>
             </button>

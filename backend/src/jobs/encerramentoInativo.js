@@ -3,7 +3,9 @@ import { conversas, mensagens, tenants, clientes } from '../db/schema.js';
 import { and, ne, or, eq, inArray, sql } from 'drizzle-orm';
 import { enviarNps } from '../services/nps.js';
 
-const INATIVIDADE_MS = 4 * 60 * 60 * 1000; // 4 horas
+// Cada provedor escolhe as horas (tenants.horas_inatividade, 1 a 24). Para
+// decidir se vale acordar o banco, vale o maior prazo possível.
+const MAX_INATIVIDADE_MS = 24 * 60 * 60 * 1000;
 
 // Controle de atividade em memória: evita varrer o banco quando não há nada
 // que possa expirar, permitindo o autosuspend do Neon em períodos ociosos.
@@ -17,10 +19,14 @@ export function registrarAtividade() {
 }
 
 export async function encerramentoInativo() {
-  const corte = new Date(Date.now() - INATIVIDADE_MS);
-
+  // A hora vai do Node, como antes, e não do now() do banco: enviada_em é
+  // timestamp sem fuso, e misturar com timestamptz dependeria do fuso da sessão.
+  const agora = new Date().toISOString();
   const parEncerrar = await db
-    .select({ id: conversas.id, tenantId: conversas.tenantId, clienteId: conversas.clienteId })
+    .select({
+      id: conversas.id, tenantId: conversas.tenantId, clienteId: conversas.clienteId,
+      horas: sql`COALESCE(${tenants.horasInatividade}, 4)`.mapWith(Number),
+    })
     .from(conversas)
     .innerJoin(tenants, eq(conversas.tenantId, tenants.id))
     .where(
@@ -29,13 +35,10 @@ export async function encerramentoInativo() {
         // Atendimento humano só entra na varredura se o provedor não tiver
         // pedido pra ficar aberto até um atendente resolver e fechar na mão.
         or(ne(conversas.status, 'humano'), eq(tenants.encerrarHumanoPorInatividade, true)),
-        // Sem atendente ainda (bot ou aguardando): só entra se o provedor não
-        // pediu para segurar a conversa aberta até alguém assumir.
-        or(eq(conversas.status, 'humano'), eq(tenants.encerrarSemAtendente, true)),
         sql`COALESCE(
           (SELECT MAX(m.enviada_em) FROM mensagens m WHERE m.conversa_id = conversas.id),
           conversas.iniciada_em
-        ) < ${corte}`
+        ) < ${agora}::timestamp - make_interval(hours => COALESCE(${tenants.horasInatividade}, 4))`
       )
     );
 
@@ -51,7 +54,7 @@ export async function encerramentoInativo() {
     await db.insert(mensagens).values({
       conversaId: c.id,
       origem: 'bot',
-      conteudo: '[Sistema] Conversa encerrada automaticamente por inatividade (4 horas).',
+      conteudo: `[Sistema] Conversa encerrada automaticamente por inatividade (${c.horas} horas).`,
     });
   }
 
@@ -80,7 +83,7 @@ export function agendarEncerramentoInativo() {
   const tick = () => {
     // Se a última varredura aconteceu depois de tudo que poderia expirar,
     // não há conversa para encerrar — pula sem acordar o banco.
-    if (ultimaVarredura > ultimaAtividade + INATIVIDADE_MS) return;
+    if (ultimaVarredura > ultimaAtividade + MAX_INATIVIDADE_MS) return;
 
     const inicio = Date.now();
     encerramentoInativo()
