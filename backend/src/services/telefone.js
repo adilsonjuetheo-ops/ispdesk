@@ -36,6 +36,18 @@ export function chaveTelefone(entrada) {
   return d.slice(0, 2) + d.slice(-8);
 }
 
+// As duas grafias do mesmo celular brasileiro: com e sem o nono dígito. O SGP
+// costuma ter 5533998777553, e a Meta pode entregar a resposta do cliente como
+// 553398777553. Gravar o lembrete numa grafia e receber na outra criava dois
+// contatos — e a resposta "ok" caía numa conversa sem o lembrete.
+export function variantesTelefoneBR(numero) {
+  const d = String(numero || '').replace(/\D/g, '');
+  if (!d.startsWith('55')) return d ? [d] : [];
+  if (d.length === 13 && d[4] === '9') return [d, d.slice(0, 4) + d.slice(5)];
+  if (d.length === 12 && /[6-9]/.test(d[4])) return [d, `${d.slice(0, 4)}9${d.slice(4)}`];
+  return [d];
+}
+
 // Números particulares do provedor. O campo é texto livre, um por linha, do
 // jeito que o dono digitou — a normalização acontece só na comparação. Assim a
 // tela devolve o número legível, qualquer máscara funciona e ele pode anotar de

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { tenants, clientes, conversas, mensagens, webhookLog, filiais, filialWhatsappExtra, incidentes, cobrancaEnvios } from '../db/schema.js';
-import { eq, and, ne, lt, sql as sqlRaw } from 'drizzle-orm';
+import { eq, and, ne, lt, inArray, sql as sqlRaw } from 'drizzle-orm';
 import { processarMensagem } from '../services/ai.js';
 import { buscarDadosCliente } from '../services/sgp.js';
 import { dividirEmBlocos } from '../services/blocosResposta.js';
@@ -16,7 +16,7 @@ import { getLimite, getUso, incrementarUso } from '../services/limites.js';
 import { registrarAtividade } from '../jobs/encerramentoInativo.js';
 import { processarRespostaNps } from '../services/nps.js';
 import { dispensaIa, respostaAoLembreteEncerra, RESPOSTA_LEMBRETE } from '../services/mensagemCurta.js';
-import { numeroParticular } from '../services/telefone.js';
+import { numeroParticular, variantesTelefoneBR } from '../services/telefone.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -536,6 +536,22 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
   let [cliente] = await db.select().from(clientes)
     .where(and(eq(clientes.tenantId, tenant.id), eq(clientes.whatsapp, remetente)))
     .limit(1);
+
+  // Contato criado pelo lembrete de fatura com o número do SGP, na outra
+  // grafia do nono dígito: é o mesmo cliente, e a conversa do lembrete está
+  // nele. Passa a usar o número que a Meta entrega.
+  if (!cliente) {
+    const outras = variantesTelefoneBR(remetente).filter(v => v !== remetente);
+    if (outras.length) {
+      [cliente] = await db.select().from(clientes)
+        .where(and(eq(clientes.tenantId, tenant.id), inArray(clientes.whatsapp, outras)))
+        .limit(1);
+      if (cliente) {
+        await db.update(clientes).set({ whatsapp: remetente }).where(eq(clientes.id, cliente.id));
+        cliente = { ...cliente, whatsapp: remetente };
+      }
+    }
+  }
 
   if (!cliente) {
     [cliente] = await db.insert(clientes).values({

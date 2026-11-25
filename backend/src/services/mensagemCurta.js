@@ -107,7 +107,7 @@ export function respostaAoLembreteEncerra(texto) {
   return PROMESSA.test(t) || classificarMensagemCurta(texto) !== null;
 }
 
-export const RESPOSTA_LEMBRETE = 'Combinado, obrigado pelo retorno! 😊 Se precisar de algo, é só chamar.';
+export const RESPOSTA_LEMBRETE = 'Combinado, obrigado pelo retorno! 😊 Se precisar de algo, estamos à disposição.';
 
 // Decide se a mensagem dispensa a IA, olhando também o que o atendimento disse
 // por último. Devolve { responder: texto | null } quando dispensa, ou null

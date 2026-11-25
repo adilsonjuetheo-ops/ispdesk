@@ -1,6 +1,7 @@
 import { db } from '../db/index.js';
 import { tenants, clientes, conversas, mensagens, lembreteFaturaEnviados } from '../db/schema.js';
-import { eq, and, ne, inArray } from 'drizzle-orm';
+import { eq, and, ne, inArray, sql } from 'drizzle-orm';
+import { variantesTelefoneBR } from '../services/telefone.js';
 import { criarSgp } from '../services/sgp.js';
 import { enviarTemplate } from '../services/whatsapp.js';
 import { criarLinkFatura } from '../services/faturaLink.js';
@@ -26,8 +27,11 @@ function paraDataISO(diasOffset) {
 }
 
 async function registrarMensagemBot(tenant, telefone, texto) {
+  // Procura nas duas grafias (com e sem o nono dígito) e prefere o contato que
+  // já escreveu: é nele que a resposta do cliente vai cair.
   let [cliente] = await db.select().from(clientes)
-    .where(and(eq(clientes.tenantId, tenant.id), eq(clientes.whatsapp, telefone)))
+    .where(and(eq(clientes.tenantId, tenant.id), inArray(clientes.whatsapp, variantesTelefoneBR(telefone))))
+    .orderBy(sql`${clientes.ultimoContato} desc nulls last`)
     .limit(1);
 
   if (!cliente) {
