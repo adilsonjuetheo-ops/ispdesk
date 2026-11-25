@@ -125,7 +125,7 @@ router.put('/me', autenticar, async (req, res) => {
     assinaturaTipo, assinaturaToken, assinaturaExtra,
     lembreteFaturaAtivo, lembreteFaturaTemplatePre, lembreteFaturaTemplatePos, lembreteFaturaIdioma,
     lembreteFaturaLinkAssinante, lembreteFaturaDiasPos, contratoModelo, desbloqueioPrazo,
-    encerrarHumanoPorInatividade, aceitaPix, npsAtivo, numerosIgnorados,
+    encerrarHumanoPorInatividade, encerrarSemAtendente, aceitaPix, npsAtivo, numerosIgnorados,
     custoMsgServico, custoMsgUtilidade,
   } = req.body;
 
@@ -153,6 +153,7 @@ router.put('/me', autenticar, async (req, res) => {
       lembreteFaturaLinkAssinante: lembreteFaturaLinkAssinante?.trim() || null,
       lembreteFaturaDiasPos: diasPos,
       encerrarHumanoPorInatividade: encerrarHumanoPorInatividade !== false,
+      encerrarSemAtendente: encerrarSemAtendente !== false,
       aceitaPix: aceitaPix !== false,
       npsAtivo: npsAtivo !== false,
       numerosIgnorados: numerosIgnorados?.trim() || null,

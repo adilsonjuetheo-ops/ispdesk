@@ -29,6 +29,9 @@ export async function encerramentoInativo() {
         // Atendimento humano só entra na varredura se o provedor não tiver
         // pedido pra ficar aberto até um atendente resolver e fechar na mão.
         or(ne(conversas.status, 'humano'), eq(tenants.encerrarHumanoPorInatividade, true)),
+        // Sem atendente ainda (bot ou aguardando): só entra se o provedor não
+        // pediu para segurar a conversa aberta até alguém assumir.
+        or(eq(conversas.status, 'humano'), eq(tenants.encerrarSemAtendente, true)),
         sql`COALESCE(
           (SELECT MAX(m.enviada_em) FROM mensagens m WHERE m.conversa_id = conversas.id),
           conversas.iniciada_em

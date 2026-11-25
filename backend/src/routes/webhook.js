@@ -828,13 +828,15 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
         conversaId: conversa.id, origem: 'bot', conteudo: RESPOSTA_LEMBRETE,
         wamid: wamidResposta, status: 'enviada',
       });
-      await db.insert(mensagens).values({
-        conversaId: conversa.id, origem: 'bot',
-        conteudo: '[Sistema] Conversa encerrada: o cliente respondeu ao lembrete de fatura confirmando que vai pagar.',
-      });
-      await db.update(conversas)
-        .set({ status: 'encerrada', encerradaEm: new Date() })
-        .where(eq(conversas.id, conversa.id));
+      if (tenant.encerrarSemAtendente !== false) {
+        await db.insert(mensagens).values({
+          conversaId: conversa.id, origem: 'bot',
+          conteudo: '[Sistema] Conversa encerrada: o cliente respondeu ao lembrete de fatura confirmando que vai pagar.',
+        });
+        await db.update(conversas)
+          .set({ status: 'encerrada', encerradaEm: new Date() })
+          .where(eq(conversas.id, conversa.id));
+      }
       await atualizarUltMsg(conversa.id, RESPOSTA_LEMBRETE, 'bot');
       return;
     }
@@ -972,7 +974,7 @@ async function processarMensagemRecebida(tenant, remetente, texto, wamid, isAudi
 
   if (resultado.devePelearHumano) {
     await realizarHandoff(tenant, conversa, cliente, resultado.motivo, wConfig);
-  } else if (resultado.encerrar && resultado.resposta) {
+  } else if (resultado.encerrar && resultado.resposta && tenant.encerrarSemAtendente !== false) {
     // Comprovante pago pelo código do provedor: nada mais a resolver. Se o
     // cliente escrever de novo, abre conversa nova, como no lembrete.
     console.log(`[ia:encerrada] ${tenant.nome} — comprovante pelo código do provedor`);

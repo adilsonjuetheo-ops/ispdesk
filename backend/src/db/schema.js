@@ -85,6 +85,11 @@ export const tenants = pgTable('tenants', {
   // inatividade (fica aberta até o atendente resolver e fechar manualmente).
   // Default true preserva o comportamento de sempre pra quem não pediu isso.
   encerrarHumanoPorInatividade: boolean('encerrar_humano_por_inatividade').default(true),
+  // false = conversa que nenhum atendente assumiu (bot ou aguardando) nunca é
+  // encerrada sozinha — nem por inatividade, nem pelo bot ao fim de um
+  // lembrete ou comprovante. Pedido da UaiFibra: o que chega de madrugada tem
+  // que estar na fila de manhã, não só no histórico.
+  encerrarSemAtendente: boolean('encerrar_sem_atendente').default(true),
   // false = nunca mostrar PIX na 2ª via/boleto, mesmo que o SGP devolva um
   // código — alguns provedores não trabalham com PIX e o código que o SGP
   // gera (híbrido do boleto) não é uma opção real de pagamento pra eles.

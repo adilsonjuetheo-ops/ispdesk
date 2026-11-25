@@ -2139,6 +2139,19 @@ export default function Settings() {
               </div>
             </button>
             <button type="button"
+              onClick={() => set('encerrarSemAtendente', !(tenant.encerrarSemAtendente !== false))}
+              className="w-full flex items-start gap-3 mt-4 text-left">
+              {tenant.encerrarSemAtendente !== false
+                ? <ToggleRight className="w-9 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                : <ToggleLeft className="w-9 h-5 text-gray-300 shrink-0 mt-0.5" />}
+              <div>
+                <p className="text-sm font-medium text-gray-800">Encerrar conversas que nenhum atendente assumiu</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Quando ativado (padrão), conversas só com o bot ou aguardando atendente são encerradas após 4 horas sem mensagens, e o bot encerra sozinho quando o cliente responde ao lembrete ou manda comprovante pago pelo código. Desative para que elas fiquem na fila até um atendente assumir — útil para quem quer ver de manhã tudo o que chegou de madrugada.
+                </p>
+              </div>
+            </button>
+            <button type="button"
               onClick={() => set('aceitaPix', !(tenant.aceitaPix !== false))}
               className="w-full flex items-start gap-3 mt-4 text-left">
               {tenant.aceitaPix !== false
