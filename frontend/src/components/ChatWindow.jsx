@@ -564,6 +564,28 @@ function TypingIndicator() {
   );
 }
 
+// Estado da conversa como etiqueta ao lado do número, no cabeçalho. Antes era
+// uma faixa colorida de largura inteira, que gastava uma linha do chat.
+const CHIP_STATUS = {
+  aguardando:        ['Aguardando atendimento', 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'],
+  aguardando_filial: ['Aguardando atendimento', 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'],
+  humano:            ['Em atendimento', 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'],
+  bot:               ['Com o bot', 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'],
+  encerrada:         ['Encerrada', 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300'],
+};
+function ChipStatus({ conversa }) {
+  const info = CHIP_STATUS[conversa.status];
+  if (!info) return null;
+  const [rotulo, cor] = info;
+  const quem = conversa.status === 'humano' && conversa.agenteNome ? ` · ${conversa.agenteNome.split(' ')[0]}` : '';
+  return (
+    <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${cor}`}>
+      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+      {rotulo}{quem}
+    </span>
+  );
+}
+
 function StatusIcon({ status }) {
   // "enviando" é estado só da tela: o balão aparece antes de a API do WhatsApp
   // confirmar, para o atendente não ficar olhando o campo parado.
@@ -639,17 +661,27 @@ function BolaoMsg({ msg, agenteNome, nomeAssistente, equipePorNome }) {
             'bg-blue-50 text-blue-900 rounded-tr-sm border border-blue-100 dark:bg-blue-950 dark:text-blue-100 dark:border-blue-900': !isCliente && !isBot,
           })}>
             {msg.conteudo}
+            {/* Hora e visto dentro do balão, como no WhatsApp: a linha de
+                baixo, separada, gastava uma linha por mensagem. */}
+            <span className="float-right ml-3 mt-1.5 -mb-1 inline-flex items-center gap-1 text-[11px] leading-none opacity-60 select-none">
+              {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
+              {!isCliente && <StatusIcon status={msg.status} />}
+            </span>
           </div>
         )}
-        <div className={clsx('flex items-center gap-1 mt-1', isCliente ? 'justify-start' : 'justify-end')}>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
-          </span>
-          {!isCliente && !isNota && !isSistema && <StatusIcon status={msg.status} />}
-          {msg.status === 'falhou' && (
-            <span className="text-[10px] text-red-500">não entregue</span>
-          )}
-        </div>
+        {(isMidia || msg.status === 'falhou') && (
+          <div className={clsx('flex items-center gap-1 mt-1', isCliente ? 'justify-start' : 'justify-end')}>
+            {isMidia && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {format(new Date(msg.enviadaEm), 'HH:mm', { locale: ptBR })}
+              </span>
+            )}
+            {isMidia && !isCliente && <StatusIcon status={msg.status} />}
+            {msg.status === 'falhou' && (
+              <span className="text-[10px] text-red-500">não entregue</span>
+            )}
+          </div>
+        )}
         {/* O motivo vai na tela, não num title: quem precisa dele está
             investigando por que o cliente ficou sem resposta, e passar o mouse
             em cada balão para descobrir é o oposto de ajudar. */}
@@ -1522,7 +1554,10 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
             )}
             <div className="min-w-0">
               <p className="font-semibold text-gray-800 dark:text-gray-100 truncate">{conversa.clienteNome || conversa.clienteWhatsapp}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{conversa.clienteWhatsapp}{conversa.clienteFilial ? ` · ${conversa.clienteFilial}` : ''}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1.5">
+                <ChipStatus conversa={conversa} />
+                <span className="truncate">{conversa.clienteWhatsapp}{conversa.clienteFilial ? ` · ${conversa.clienteFilial}` : ''}</span>
+              </p>
             </div>
           </div>
           {/* Uma ação primária por estado; as raras vão para o menu. Antes eram
@@ -1609,24 +1644,6 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
         )}
       </div>
 
-      {/* Status banner */}
-      {conversa.status === 'aguardando' || conversa.status === 'aguardando_filial' ? (
-        <div className="bg-amber-500 text-white text-xs font-semibold text-center py-1.5 px-4 shrink-0">
-          Aguardando atendimento
-        </div>
-      ) : conversa.status === 'humano' ? (
-        <div className="bg-emerald-500 text-white text-xs font-semibold text-center py-1.5 px-4 shrink-0">
-          Em atendimento{conversa.agenteNome ? ` · ${conversa.agenteNome}` : ''}
-        </div>
-      ) : conversa.status === 'bot' ? (
-        <div className="bg-blue-500 text-white text-xs font-semibold text-center py-1.5 px-4 shrink-0">
-          Bot está respondendo
-        </div>
-      ) : conversa.status === 'encerrada' ? (
-        <div className="bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-200 text-xs font-semibold text-center py-1.5 px-4 shrink-0">
-          Atendimento encerrado
-        </div>
-      ) : null}
 
       {/* mensagens */}
       <div className="relative flex-1 min-h-0 flex">
@@ -1947,9 +1964,6 @@ export default function ChatWindow({ conversa, onAtualizar, onVoltar, painelAber
                     </div>
                   </div>
                 </div>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 px-4 pb-2">
-                  {isNota ? 'Shift+Enter para nova linha' : 'Enter para enviar · Shift+Enter para nova linha'}
-                </p>
               </>
             )}
           </form>

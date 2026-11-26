@@ -6,7 +6,7 @@ import { useNotificationSound } from '../../hooks/useNotificationSound.js';
 import ConversationList from '../../components/ConversationList.jsx';
 import ChatWindow from '../../components/ChatWindow.jsx';
 import ClientInfoPanel from '../../components/ClientInfoPanel.jsx';
-import { Bot, Zap, Users, BarChart2, Star, MessageCircle, ArrowRight, BookUser, ExternalLink, Clock, UserCheck } from 'lucide-react';
+import { Bot, Zap, Users, BarChart2, Star, ArrowRight, BookUser, ExternalLink, Clock, UserCheck, Settings, MessageCircleWarning, CheckCircle2 } from 'lucide-react';
 import { differenceInMinutes, format } from 'date-fns';
 
 // Preferência de layout do operador. Fica no navegador de propósito: é ajuste
@@ -29,76 +29,13 @@ function saudacao(nome) {
   return nome ? `${periodo}, ${nome.split(' ')[0]}!` : `${periodo}!`;
 }
 
-const CARDS = [
-  {
-    icon: BookUser,
-    bg: 'bg-sky-100',
-    color: 'text-sky-600',
-    title: 'Contatos',
-    desc: 'Salve o número dos clientes e inicie uma conversa a partir da agenda.',
-    href: '/contatos',
-    label: 'Abrir agenda',
-  },
-  {
-    icon: MessageCircle,
-    bg: 'bg-green-100',
-    color: 'text-green-600',
-    title: 'WhatsApp Business',
-    desc: 'Configure seu número e token para começar a receber mensagens.',
-    href: '/settings',
-    label: 'Configurar',
-    admin: true,
-  },
-  {
-    icon: Bot,
-    bg: 'bg-blue-100',
-    color: 'text-blue-600',
-    title: 'Assistente com IA',
-    desc: 'Treine o bot para responder automaticamente 24 horas por dia.',
-    href: '/settings',
-    label: 'Configurar',
-    admin: true,
-  },
-  {
-    icon: Zap,
-    bg: 'bg-amber-100',
-    color: 'text-amber-600',
-    title: 'Atalhos de Resposta',
-    desc: 'Crie mensagens prontas para agilizar o atendimento da equipe.',
-    href: '/atalhos',
-    label: 'Gerenciar',
-    admin: true,
-  },
-  {
-    icon: Users,
-    bg: 'bg-purple-100',
-    color: 'text-purple-600',
-    title: 'Equipe & Filiais',
-    desc: 'Adicione agentes, defina senhas e organize por filial.',
-    href: '/agents',
-    label: 'Gerenciar',
-    admin: true,
-  },
-  {
-    icon: BarChart2,
-    bg: 'bg-indigo-100',
-    color: 'text-indigo-600',
-    title: 'Relatórios',
-    desc: 'Acompanhe volume de atendimentos, tempo de resposta e NPS.',
-    href: '/relatorio',
-    label: 'Ver relatórios',
-    admin: true,
-  },
-  {
-    icon: Star,
-    bg: 'bg-teal-100',
-    color: 'text-teal-600',
-    title: 'Pesquisa de Satisfação',
-    desc: 'Colete avaliações automáticas ao encerrar cada atendimento.',
-    href: '/nps',
-    label: 'Ver avaliações',
-    admin: true,
-  },
+const ATALHOS = [
+  { icon: BookUser, title: 'Contatos', href: '/contatos' },
+  { icon: Zap, title: 'Atalhos de resposta', href: '/atalhos', admin: true },
+  { icon: Users, title: 'Equipe e filiais', href: '/agents', admin: true },
+  { icon: BarChart2, title: 'Relatórios', href: '/relatorio', admin: true },
+  { icon: Star, title: 'Pesquisa de satisfação', href: '/nps', admin: true },
+  { icon: Settings, title: 'Configurações', href: '/settings', admin: true },
 ];
 
 // Identifica a build no rodapé. Serve para o suporte: em vez de perguntar "você
@@ -172,6 +109,9 @@ function resumoDaOperacao(conversas) {
     maiorEspera: esperas.length ? Math.max(...esperas) : null,
     emAtendimento: conversas.filter(c => c.status === 'humano').length,
     comAssistente: conversas.filter(c => c.status === 'bot').length,
+    // Encerradas hoje sem nenhum atendente: o bot resolveu do começo ao fim.
+    botResolveuHoje: conversas.filter(c => c.status === 'encerrada' && !c.agenteId
+      && c.encerradaEm && new Date(c.encerradaEm) >= inicioDoDia).length,
     abertasHoje: desdeHoje('iniciadaEm'),
     encerradasHoje: desdeHoje('encerradaEm'),
   };
@@ -208,7 +148,7 @@ function PainelAgora({ conversas, online, slaMinutos, navigate }) {
     : 'text-emerald-600';
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
       <Indicador
         icon={Clock}
         rotulo="Na fila"
@@ -225,9 +165,9 @@ function PainelAgora({ conversas, online, slaMinutos, navigate }) {
       />
       <Indicador
         icon={Bot}
-        rotulo="Com o assistente"
+        rotulo="Com o bot"
         valor={r.comAssistente}
-        detalhe="respondendo sozinho"
+        detalhe={`${r.botResolveuHoje} resolvida${r.botResolveuHoje === 1 ? '' : 's'} sozinho hoje`}
       />
       <Indicador
         icon={BarChart2}
@@ -239,6 +179,117 @@ function PainelAgora({ conversas, online, slaMinutos, navigate }) {
   );
 }
 
+// Quem está esperando a equipe agora: na fila ou com atendente, com a última
+// mensagem do cliente ainda sem resposta. Mais antigo primeiro.
+function esperandoResposta(conversas) {
+  const agora = Date.now();
+  return conversas
+    .filter(c => (EM_ESPERA.includes(c.status) || (c.status === 'humano' && c.ultimaMsgOrigem === 'cliente')))
+    .map(c => {
+      const desde = EM_ESPERA.includes(c.status) ? (c.iniciadaEm || c.ultimaMsgEm) : c.ultimaMsgEm;
+      return { c, mins: desde ? Math.max(0, Math.floor((agora - new Date(desde).getTime()) / 60000)) : 0 };
+    })
+    .sort((a, b) => b.mins - a.mins);
+}
+
+function tomEspera(mins, limite) {
+  return mins >= limite ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+    : mins >= 5 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+    : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300';
+}
+
+function Bloco({ icon: Icon, titulo, children, acao }) {
+  return (
+    <section className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <header className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+        <Icon className="w-4 h-4 text-gray-400" />
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex-1">{titulo}</h3>
+        {acao}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function EsperandoAgora({ conversas, slaMinutos, onAbrir, navigate }) {
+  const lista = esperandoResposta(conversas);
+  const limite = slaMinutos || 15;
+  return (
+    <Bloco
+      icon={MessageCircleWarning}
+      titulo="Esperando resposta"
+      acao={lista.length > 5 && (
+        <button onClick={() => navigate('/inbox?view=fila')} className="text-xs font-medium text-blue-600 hover:underline">
+          ver todas ({lista.length})
+        </button>
+      )}
+    >
+      {lista.length === 0 ? (
+        <div className="flex items-center gap-2 px-4 py-6 text-sm text-gray-500 dark:text-gray-400">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Nenhum cliente esperando resposta.
+        </div>
+      ) : (
+        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+          {lista.slice(0, 5).map(({ c, mins }) => (
+            <li key={c.id}>
+              <button onClick={() => onAbrir?.(c)}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                    {c.clienteNome && c.clienteNome !== c.clienteWhatsapp ? c.clienteNome : c.clienteWhatsapp}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {EM_ESPERA.includes(c.status) ? 'Na fila' : c.agenteNome || 'Em atendimento'}
+                    {c.ultimaMensagem ? ` · ${c.ultimaMensagem}` : ''}
+                  </p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${tomEspera(mins, limite)}`}>
+                  {formatarEspera(mins)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Bloco>
+  );
+}
+
+function EquipeAgora({ conversas, online }) {
+  const carga = new Map();
+  for (const c of conversas) {
+    if (c.status === 'humano' && c.agenteId) carga.set(c.agenteId, (carga.get(c.agenteId) || 0) + 1);
+  }
+  const pessoas = [...online].sort((a, b) => (carga.get(b.id) || 0) - (carga.get(a.id) || 0));
+  const maior = Math.max(1, ...pessoas.map(p => carga.get(p.id) || 0));
+  return (
+    <Bloco icon={Users} titulo="Equipe agora">
+      {pessoas.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-gray-500 dark:text-gray-400">Ninguém da equipe online.</p>
+      ) : (
+        <ul className="px-4 py-2">
+          {pessoas.map(p => {
+            const n = carga.get(p.id) || 0;
+            return (
+              <li key={p.id} className="py-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-700 dark:text-gray-200 truncate">{p.nome}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums shrink-0 ml-2">
+                    {n} conversa{n === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                  <div className="h-full rounded-full bg-blue-500" style={{ width: `${(n / maior) * 100}%` }} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Bloco>
+  );
+}
+
 function chamada(conversas, isAdmin) {
   const fila = conversas.filter(c => EM_ESPERA.includes(c.status)).length;
   if (fila > 0) {
@@ -246,27 +297,26 @@ function chamada(conversas, isAdmin) {
       ? 'Tem 1 conversa esperando atendimento agora.'
       : `Tem ${fila} conversas esperando atendimento agora.`;
   }
-  return isAdmin
-    ? 'Ninguém na fila. Selecione uma conversa ou ajuste sua plataforma abaixo.'
-    : 'Ninguém na fila. Selecione uma conversa na lista ao lado.';
+  return 'Ninguém na fila. Selecione uma conversa na lista ao lado.';
 }
 
-function WelcomePanel({ currentUser, conversas = [], online = [], slaMinutos = 0 }) {
+function WelcomePanel({ currentUser, conversas = [], online = [], slaMinutos = 0, onAbrir }) {
   const navigate = useNavigate();
   const nome = currentUser?.nome || '';
   const isAdmin = currentUser?.role === 'admin';
   // As rotas de admin redirecionam quem não tem permissão. Mostrar o atalho
   // para o atendente devolvia ele ao inbox sem explicar nada.
-  const cards = CARDS.filter(c => !c.admin || isAdmin);
+  const atalhos = ATALHOS.filter(c => !c.admin || isAdmin);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900 md:rounded-2xl md:border md:border-gray-200 dark:md:border-gray-800 md:shadow-sm flex flex-col items-center justify-start py-12 px-8">
-      <div className="w-full max-w-2xl">
-        {/* Logo + greeting */}
-        <div className="flex flex-col items-center text-center mb-8">
-          <img src="/logoisp.png" alt="Logo" className="h-16 rounded-xl mb-6 shadow-sm" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50 mb-1">{saudacao(nome)}</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">{chamada(conversas, isAdmin)}</p>
+    <div className="flex-1 overflow-y-auto bg-gray-50/60 dark:bg-gray-900 md:rounded-2xl md:border md:border-gray-200 dark:md:border-gray-800 md:shadow-sm py-8 px-6 lg:px-8">
+      <div className="w-full max-w-4xl mx-auto">
+        <div className="flex items-center gap-4 mb-6">
+          <img src="/logoisp.png" alt="Logo" className="h-11 rounded-xl shadow-sm" />
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-50">{saudacao(nome)}</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">{chamada(conversas, isAdmin)}</p>
+          </div>
         </div>
 
         <PainelAgora
@@ -276,36 +326,21 @@ function WelcomePanel({ currentUser, conversas = [], online = [], slaMinutos = 0
           navigate={navigate}
         />
 
-        <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
-          {isAdmin ? 'Configurar a plataforma' : 'Atalhos'}
-        </p>
+        <div className="grid grid-cols-1 xl:grid-cols-[3fr_2fr] gap-4 mb-8">
+          <EsperandoAgora conversas={conversas} slaMinutos={slaMinutos} onAbrir={onAbrir} navigate={navigate} />
+          <EquipeAgora conversas={conversas} online={online} />
+        </div>
 
-        {/* Feature cards */}
-        <div className="grid grid-cols-2 gap-4">
-          {cards.map((card, i) => {
-            const Icon = card.icon;
-            // Grade de duas colunas: com contagem ímpar o último card ficaria
-            // sozinho, quebrando o alinhamento. Ocupando a linha inteira, a
-            // sobra vira intenção.
-            const ultimoImpar = cards.length % 2 === 1 && i === cards.length - 1;
-            return (
-              <button
-                key={card.title}
-                onClick={() => navigate(card.href)}
-                className={`group text-left bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all duration-150 ${ultimoImpar ? 'col-span-2' : ''}`}
-              >
-                <div className={`w-10 h-10 rounded-xl ${card.bg} flex items-center justify-center mb-3`}>
-                  <Icon className={`w-5 h-5 ${card.color}`} />
-                </div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">{card.title}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-3">{card.desc}</p>
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 group-hover:gap-2 transition-all">
-                  {card.label}
-                  <ArrowRight className="w-3 h-3" />
-                </span>
-              </button>
-            );
-          })}
+        <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Atalhos</p>
+        <div className="flex flex-wrap gap-2">
+          {atalhos.map(a => (
+            <button key={a.title} onClick={() => navigate(a.href)}
+              className="group inline-flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+              <a.icon className="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
+              {a.title}
+              <ArrowRight className="w-3 h-3 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+            </button>
+          ))}
         </div>
 
         <Rodape />
@@ -463,6 +498,7 @@ export default function Inbox() {
             conversas={conversas}
             online={online}
             slaMinutos={slaMinutos}
+            onAbrir={setSelecionada}
           />
         )}
       </div>

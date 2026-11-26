@@ -214,12 +214,22 @@ export default function TenantLayout() {
 
   // No celular a barra é uma gaveta que abre por cima; recolher ali não faz
   // sentido, então o modo ícone só vale quando ela está fixa no desktop.
-  const colapsado = recolhido && !sidebarOpen;
+  //
+  // Com uma conversa aberta o chat precisa de largura: o menu vira só ícones
+  // sozinho. Quem expandir na mão enquanto conversa fica expandido até sair.
+  const [expandidoNoChat, setExpandidoNoChat] = useState(false);
+  useEffect(() => { if (!chatMobileAberto) setExpandidoNoChat(false); }, [chatMobileAberto]);
+  const recolhidoPeloChat = chatMobileAberto && !expandidoNoChat;
+  const colapsado = (recolhido || recolhidoPeloChat) && !sidebarOpen;
 
-  const alternarRecolhido = () => setRecolhido(v => {
-    try { localStorage.setItem(PREF_MENU, v ? '0' : '1'); } catch { /* modo privado */ }
-    return !v;
-  });
+  const alternarRecolhido = () => {
+    if (!recolhido && recolhidoPeloChat) { setExpandidoNoChat(true); return; }
+    if (!recolhido && chatMobileAberto) { setExpandidoNoChat(false); return; }
+    setRecolhido(v => {
+      try { localStorage.setItem(PREF_MENU, v ? '0' : '1'); } catch { /* modo privado */ }
+      return !v;
+    });
+  };
 
   const subItem = (active, onClick, Icon, label, badge) => (
     <button
@@ -314,7 +324,7 @@ export default function TenantLayout() {
               </p>
             )}
             <div className="space-y-0.5">
-              {subItem(isTodos, () => navigate('/inbox'), Activity, 'Acontecendo agora', counts.todos)}
+              {subItem(isTodos, () => navigate('/inbox'), Activity, 'Em andamento', counts.todos)}
               {subItem(isView('fila'), () => navigate('/inbox?view=fila'), Clock, 'Fila', counts.fila)}
               {subItem(isView('mine'), () => navigate('/inbox?view=mine'), UserCheck, 'Meus atendimentos', counts.mine)}
               {subItem(isView('historico'), () => navigate('/inbox?view=historico'), Archive, 'Histórico')}

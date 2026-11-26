@@ -421,10 +421,10 @@ export default function ClientInfoPanel({ conversa, onAtualizar, conversas = [] 
             {temAssinatura && conversa.status === 'humano' && !conversa.contratoStatus && (
               <button
                 onClick={() => setModalContrato(true)}
-                className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium py-2.5 rounded-lg transition-colors border border-blue-200 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 dark:border-blue-900"
+                className="w-full flex items-center justify-center gap-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 text-xs font-medium py-1.5 rounded-lg transition-colors border border-gray-200 hover:border-blue-200 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-blue-950 dark:hover:text-blue-300 dark:hover:border-blue-900"
               >
-                <FileSignature className="w-4 h-4" />
-                Enviar Contrato
+                <FileSignature className="w-3.5 h-3.5" />
+                Enviar contrato
               </button>
             )}
 
