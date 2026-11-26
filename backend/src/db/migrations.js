@@ -247,6 +247,21 @@ export async function runMigrations() {
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS numeros_ignorados text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS custo_msg_servico text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS custo_msg_utilidade text`;
+    await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS atendida_no_celular boolean DEFAULT false`;
+    // Reconstroi o passado: todo eco da coexistencia grava agente_nome='Celular'
+    // na mensagem, entao da para saber quais conversas ja foram atendidas pelo
+    // aparelho. Sem isso o conserto so valeria dali para a frente e os meses
+    // anteriores continuariam dizendo que o bot resolveu tudo sozinho.
+    // Indice parcial: so as mensagens de eco entram nele. E o que faz o UPDATE
+    // abaixo custar quase nada em todo deploy seguinte, em vez de varrer as
+    // ~150 mil mensagens de novo a cada reinicio.
+    await sql`CREATE INDEX IF NOT EXISTS idx_mensagens_celular
+                ON mensagens(conversa_id) WHERE agente_nome = 'Celular'`;
+    await sql`
+      UPDATE conversas c SET atendida_no_celular = true
+      FROM (SELECT DISTINCT conversa_id FROM mensagens WHERE agente_nome = 'Celular') m
+      WHERE c.id = m.conversa_id AND c.atendida_no_celular IS NOT TRUE
+    `;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_fatura_link_titulo ON fatura_links(tenant_id, titulo_id)`;
     // A varredura de expirados roda por data; sem isso ela varre a tabela toda.
     await sql`CREATE INDEX IF NOT EXISTS idx_fatura_link_expira ON fatura_links(expira_em)`;

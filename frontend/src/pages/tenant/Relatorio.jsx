@@ -144,7 +144,9 @@ export default function Relatorio() {
                 icon={UserCheck}
                 label="Com humano"
                 value={dados.comHumano.toLocaleString('pt-BR')}
-                sub="atendimentos"
+                sub={dados.soNoCelular > 0
+                  ? `${dados.soNoCelular.toLocaleString('pt-BR')} pelo celular`
+                  : 'atendimentos'}
                 color="blue"
               />
               <StatCard

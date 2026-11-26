@@ -212,6 +212,16 @@ export const conversas = pgTable('conversas', {
   status:          text('status').default('bot'),
   agenteId:        uuid('agente_id').references(() => tenantUsers.id),
   motivoHandoff:   text('motivo_handoff'),
+  // Alguem respondeu esta conversa pelo aparelho, na coexistencia.
+  //
+  // Nao da para usar agenteId para isso: quem responde pelo celular nao e
+  // usuario do painel, e preencher agenteId tiraria a conversa da fila de quem
+  // deveria acompanha-la (ver processarEcho). Sem este sinal, todo relatorio
+  // que pergunta "foi para humano?" por agenteId responde "nao" para os
+  // provedores que atendem pelo celular — e eram justamente os dois que mais
+  // atendem assim, Mataverde e Express, que apareciam como se o bot tivesse
+  // resolvido tudo sozinho.
+  atendidaNoCelular: boolean('atendida_no_celular').default(false),
   resumoIa:        text('resumo_ia'),
   tags:            jsonb('tags').default('[]'),
   ultimaMensagem:  text('ultima_mensagem'),

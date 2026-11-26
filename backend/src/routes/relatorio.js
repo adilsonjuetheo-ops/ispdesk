@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { conversas, mensagens, clientes, tenants, npsRespostas, acoesBot } from '../db/schema.js';
-import { eq, and, gte, lt, isNotNull, count, desc, sql } from 'drizzle-orm';
+import { eq, and, or, gte, lt, isNotNull, isNull, count, desc, sql } from 'drizzle-orm';
 import { autenticar, apenasAdmin } from '../middleware/auth.js';
 import { dentroDoHorario } from '../services/horarios.js';
 import { cobrancaDoTenant } from '../services/custoMeta.js';
@@ -32,10 +32,22 @@ router.get('/', async (req, res) => {
     .from(conversas)
     .where(baseConv);
 
+  // Atendimento humano é atendente do painel OU alguém respondendo pelo
+  // aparelho, na coexistência. Só o agenteId contava antes, e por isso o
+  // Mataverde aparecia com 7% quando uma pessoa tinha atendido muito mais.
+  const atendidaPorPessoa = or(isNotNull(conversas.agenteId), eq(conversas.atendidaNoCelular, true));
+
   const [{ comHumano }] = await db
     .select({ comHumano: count() })
     .from(conversas)
-    .where(and(baseConv, isNotNull(conversas.agenteId)));
+    .where(and(baseConv, atendidaPorPessoa));
+
+  // Quantas foram atendidas SÓ pelo celular: é o trabalho que o painel não
+  // enxergava, e o dono merece ver separado.
+  const [{ soNoCelular }] = await db
+    .select({ soNoCelular: count() })
+    .from(conversas)
+    .where(and(baseConv, eq(conversas.atendidaNoCelular, true), isNull(conversas.agenteId)));
 
   const [{ novosContatos }] = await db
     .select({ novosContatos: count() })
@@ -109,6 +121,7 @@ router.get('/', async (req, res) => {
     botResolvido:    Number(total) - Number(comHumano),
     novosContatos:   Number(novosContatos),
     totalMensagens:  Number(totalMensagens),
+    soNoCelular:     Number(soNoCelular),
     motivoPrincipal: motivosRows[0]?.motivo ?? null,
     cobranca,
     diaMaisMovimentado: diasRows[0]
@@ -143,12 +156,13 @@ router.get('/resultados', async (req, res) => {
     iniciadaEm: conversas.iniciadaEm,
     status: conversas.status,
     agenteId: conversas.agenteId,
+    atendidaNoCelular: conversas.atendidaNoCelular,
     motivoHandoff: conversas.motivoHandoff,
   }).from(conversas)
     .where(and(eq(conversas.tenantId, tenantId), gte(conversas.iniciadaEm, desde)));
 
   const encerradas = convs.filter(c => c.status === 'encerrada');
-  const resolvidasBot = encerradas.filter(c => !c.agenteId && !c.motivoHandoff).length;
+  const resolvidasBot = encerradas.filter(c => !c.agenteId && !c.atendidaNoCelular && !c.motivoHandoff).length;
   // Só faz sentido com expediente configurado; sem ele tudo é "dentro".
   const foraDoHorario = horarios?.dias
     ? convs.filter(c => c.iniciadaEm && !dentroDoHorario(horarios, new Date(c.iniciadaEm))).length

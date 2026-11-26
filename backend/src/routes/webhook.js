@@ -448,8 +448,14 @@ async function processarEcho(tenant, filialEntrada, eco) {
   // painel — e o bot só se cala em 'humano'/'aguardando'. Sem agenteId de
   // propósito: nenhum usuário do painel é dono dela, e fingir que é faria a
   // conversa sumir da fila de quem deveria acompanhá-la.
-  if (conversa.status !== 'humano') {
-    await db.update(conversas).set({ status: 'humano' }).where(eq(conversas.id, conversa.id));
+  //
+  // O que marca o atendimento humano aqui é `atendidaNoCelular`, não o
+  // agenteId. Sem ele, o relatório do provedor que atende pelo aparelho dizia
+  // que o bot resolveu tudo: o dono trabalhava e não aparecia na própria tela.
+  if (conversa.status !== 'humano' || !conversa.atendidaNoCelular) {
+    await db.update(conversas)
+      .set({ status: 'humano', atendidaNoCelular: true })
+      .where(eq(conversas.id, conversa.id));
   }
 
   registrarAtividade();
