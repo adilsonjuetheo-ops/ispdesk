@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../../lib/api.js';
 import {
   RefreshCw, MapPin, Phone, Navigation, Clock, AlertTriangle, CheckCircle2, Wrench,
-  NotebookPen, X, Loader2, Info,
+  NotebookPen, X, Loader2, Info, Coffee, LogIn, LogOut,
 } from 'lucide-react';
 
 const LIMITE_RELATO = 2000;
@@ -251,6 +251,129 @@ function Cartao({ c, onRegistrar }) {
   );
 }
 
+const ROTULO_PONTO = {
+  entrada:          'Registrar entrada',
+  intervalo_inicio: 'Sair para intervalo',
+  intervalo_fim:    'Voltar do intervalo',
+  saida:            'Registrar saída',
+};
+const ICONE_PONTO = {
+  entrada: LogIn, intervalo_inicio: Coffee, intervalo_fim: LogIn, saida: LogOut,
+};
+
+function hora(valor) {
+  const d = new Date(valor);
+  return Number.isNaN(d.getTime())
+    ? '--:--'
+    : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Cartão de ponto do técnico.
+//
+// Fica no topo porque bater o ponto é a primeira coisa do dia — e porque quem
+// está na rua com o celular na mão não deve precisar procurar.
+function CartaoPonto() {
+  const [dados, setDados] = useState(null);
+  const [enviando, setEnviando] = useState('');
+  const [erro, setErro] = useState('');
+  // Mesma regra do registro de atendimento: visível e desmarcável. Mandar a
+  // posição de um funcionário calado seria outra coisa.
+  const [enviarLocal, setEnviarLocal] = useState(true);
+
+  const carregar = () => api.get('/campo/ponto/hoje').then(r => setDados(r.data)).catch(() => {});
+  useEffect(() => { carregar(); }, []);
+
+  const bater = async tipo => {
+    setErro('');
+    setEnviando(tipo);
+    try {
+      const pos = enviarLocal ? await posicaoAtual() : null;
+      const r = await api.post('/campo/ponto', { tipo, ...(pos || {}) });
+      setDados(d => ({ ...d, proximos: r.data.proximos, resumo: r.data.resumo }));
+      await carregar();
+    } catch (err) {
+      setErro(err.response?.data?.erro || 'Não foi possível registrar agora. Tente de novo.');
+      carregar();
+    } finally {
+      setEnviando('');
+    }
+  };
+
+  if (!dados) return null;
+
+  const { registros = [], proximos = [], resumo = {} } = dados;
+  const ultimo = registros[registros.length - 1];
+  const situacao = !ultimo || ultimo.tipo === 'saida'
+    ? 'Fora do expediente'
+    : ultimo.tipo === 'intervalo_inicio'
+      ? `Em intervalo desde ${hora(ultimo.registradoEm)}`
+      : `Trabalhando desde ${hora(ultimo.registradoEm)}`;
+
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 mb-4">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Meu ponto</p>
+          <p className="text-sm font-medium text-gray-800 dark:text-gray-100 mt-0.5">{situacao}</p>
+        </div>
+        {resumo.minutos > 0 && (
+          <div className="text-right shrink-0">
+            <p className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-none">
+              {Math.floor(resumo.minutos / 60)}h{String(resumo.minutos % 60).padStart(2, '0')}
+            </p>
+            <p className="text-[11px] text-gray-500">hoje</p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {proximos.map(tipo => {
+          const Icone = ICONE_PONTO[tipo] || Clock;
+          const principal = tipo === 'entrada' || tipo === 'intervalo_fim';
+          return (
+            <button key={tipo} onClick={() => bater(tipo)} disabled={!!enviando}
+              className={`min-h-[52px] w-full rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60 ${
+                principal
+                  ? 'bg-emerald-600 text-white'
+                  : 'border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-200'
+              }`}>
+              {enviando === tipo
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Icone className="w-4 h-4" />}
+              {ROTULO_PONTO[tipo]}
+            </button>
+          );
+        })}
+      </div>
+
+      {erro && <p className="text-xs text-red-600 dark:text-red-400 mt-2">{erro}</p>}
+
+      {registros.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+          {registros.map(r => (
+            <span key={r.id} className="text-xs text-gray-500 dark:text-gray-400">
+              {hora(r.registradoEm)} {ROTULO_PONTO[r.tipo]?.replace('Registrar ', '').replace('Sair para ', '').replace('Voltar do ', 'volta do ') || r.tipo}
+              {r.temLocal && <MapPin className="w-3 h-3 inline ml-0.5 -mt-0.5" />}
+              {r.lancadoPeloEscritorio && ' (escritório)'}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <label className="flex items-center gap-2 mt-3 text-xs text-gray-500 dark:text-gray-400">
+        <input type="checkbox" checked={enviarLocal} onChange={e => setEnviarLocal(e.target.checked)}
+          className="rounded border-gray-300" />
+        Enviar minha localização ao registrar
+      </label>
+
+      {/* Promessa honesta: isto não é REP-P e ninguém pode achar que é. */}
+      <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2 leading-snug">
+        Registro interno de jornada, para o controle do provedor. Não substitui ponto eletrônico legal.
+      </p>
+    </div>
+  );
+}
+
 export default function Fila() {
   const [chamados, setChamados] = useState([]);
   const [estado, setEstado] = useState({ suportado: null, vinculado: null });
@@ -299,6 +422,8 @@ export default function Fila() {
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
+      <CartaoPonto />
+
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex gap-2">
           <button onClick={() => setVerFinalizados(false)}

@@ -10,6 +10,7 @@ import Inbox from './pages/tenant/Inbox.jsx';
 import Agents from './pages/tenant/Agents.jsx';
 import Settings from './pages/tenant/Settings.jsx';
 import Relatorio from './pages/tenant/Relatorio.jsx';
+import Ponto from './pages/tenant/Ponto.jsx';
 import Atalhos from './pages/tenant/Atalhos.jsx';
 import Lembretes from './pages/tenant/Lembretes.jsx';
 import Contatos from './pages/tenant/Contatos.jsx';
@@ -94,6 +95,11 @@ export default function App() {
           <Route path="/relatorio" element={
             <ProtectedRoute roles={['admin']}>
               <Relatorio />
+            </ProtectedRoute>
+          } />
+          <Route path="/ponto" element={
+            <ProtectedRoute roles={['admin']}>
+              <Ponto />
             </ProtectedRoute>
           } />
           <Route path="/atalhos" element={

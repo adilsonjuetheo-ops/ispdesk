@@ -248,6 +248,23 @@ export async function runMigrations() {
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS custo_msg_servico text`;
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS custo_msg_utilidade text`;
     await sql`ALTER TABLE conversas ADD COLUMN IF NOT EXISTS atendida_no_celular boolean DEFAULT false`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS pontos (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        usuario_id uuid NOT NULL REFERENCES tenant_users(id),
+        tipo text NOT NULL,
+        registrado_em timestamp NOT NULL DEFAULT now(),
+        latitude text,
+        longitude text,
+        ajuste_de_id uuid,
+        anulado boolean DEFAULT false,
+        motivo text,
+        autor_id uuid REFERENCES tenant_users(id),
+        criado_em timestamp DEFAULT now()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_ponto_usuario ON pontos(usuario_id, registrado_em)`;
     // Reconstroi o passado: todo eco da coexistencia grava agente_nome='Celular'
     // na mensagem, entao da para saber quais conversas ja foram atendidas pelo
     // aparelho. Sem isso o conserto so valeria dali para a frente e os meses

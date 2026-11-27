@@ -469,3 +469,45 @@ export const metaCobranca = pgTable('meta_cobranca', {
   // cresce uma linha por mensagem enviada (~54 mil/mes hoje).
   porNumero: index('idx_meta_cobranca_numero').on(t.phoneNumberId, t.statusEm),
 }));
+
+// Registro de jornada do tecnico de campo.
+//
+// E controle interno do provedor, NAO ponto eletronico legal (REP-P da
+// Portaria 671/2021). O REP-P exigiria registro do programa no INPI, AFD
+// assinado com certificado ICP-Brasil do desenvolvedor e atestado tecnico
+// assinado por pessoa fisica — obrigacoes que recairiam sobre quem escreve o
+// software, nao sobre o provedor. A tela diz isso com todas as letras para
+// ninguem achar que tem o que nao tem.
+//
+// Nada aqui e editado nem apagado. Correcao do escritorio entra como linha
+// nova apontando para a original (ajusteDeId), com motivo e autor. Um registro
+// de jornada que pode ser alterado em silencio nao serve nem para controle
+// interno: a primeira duvida derruba a tabela inteira.
+export const pontos = pgTable('pontos', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  tenantId:  uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  usuarioId: uuid('usuario_id').notNull().references(() => tenantUsers.id),
+  // entrada | intervalo_inicio | intervalo_fim | saida
+  tipo:      text('tipo').notNull(),
+  // Relogio do servidor, nunca o do celular: a hora do aparelho e do
+  // funcionario, e ele pode mudar.
+  registradoEm: timestamp('registrado_em').defaultNow().notNull(),
+  // Posicao no momento do clique, quando o tecnico deixa marcado. Nulo e
+  // normal: recusa de permissao, GPS desligado ou sem sinal. Nunca e
+  // rastreamento continuo — so o instante da batida.
+  latitude:  text('latitude'),
+  longitude: text('longitude'),
+  // Correcao: aponta para o registro que esta sendo corrigido. Nulo nos
+  // registros batidos pelo proprio tecnico.
+  ajusteDeId: uuid('ajuste_de_id'),
+  // Na linha de correcao, true quer dizer "desconsidere o original" sem por
+  // nada no lugar (batida duplicada, por exemplo).
+  anulado:   boolean('anulado').default(false),
+  motivo:    text('motivo'),
+  // Quem lancou. Nulo = o proprio tecnico apertou o botao; preenchido = o
+  // escritorio lancou por ele. A diferenca precisa aparecer no espelho.
+  autorId:   uuid('autor_id').references(() => tenantUsers.id),
+  criadoEm:  timestamp('criado_em').defaultNow(),
+}, (t) => ({
+  porUsuario: index('idx_ponto_usuario').on(t.usuarioId, t.registradoEm),
+}));

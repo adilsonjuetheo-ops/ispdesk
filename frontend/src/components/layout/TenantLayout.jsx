@@ -8,7 +8,7 @@ import { usePresencaStatus, STATUS } from '../../hooks/usePresencaStatus.js';
 import {
   LogOut, Wifi, BarChart2, Users, Settings,
   Activity, Clock, UserCheck, Archive, MapPin, Zap, AlertTriangle, Star, X, BookUser,
-  PanelLeftClose, PanelLeftOpen, BellRing, Sun, Moon, FileSignature, TrendingUp, Camera, Wrench } from 'lucide-react';
+  PanelLeftClose, PanelLeftOpen, BellRing, Sun, Moon, FileSignature, TrendingUp, Camera, Wrench, Timer } from 'lucide-react';
 import api from '../../lib/api.js';
 import AvatarAtendente, { reduzirParaAvatar } from '../AvatarAtendente.jsx';
 import { recarregarEquipe } from '../../hooks/useEquipe.js';
@@ -391,6 +391,9 @@ export default function TenantLayout() {
               </NavLink>
               <NavLink to="/chamados" className={navClass} title={colapsado ? 'Chamados' : undefined}>
                 <Wrench /> {!colapsado && 'Chamados'}
+              </NavLink>
+              <NavLink to="/ponto" className={navClass} title={colapsado ? 'Ponto' : undefined}>
+                <Timer /> {!colapsado && 'Ponto'}
               </NavLink>
               <NavLink to="/contratos" className={navClass} title={colapsado ? 'Contratos' : undefined}>
                 <FileSignature /> {!colapsado && 'Contratos'}
